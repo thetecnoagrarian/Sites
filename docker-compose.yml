@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  fruitionforestgarden:
+    build:
+      context: .
+      dockerfile: fruitionforestgarden/Dockerfile.dev
+    container_name: ffg-blog
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3000
+      - APP_ROLE=production
+      - SESSION_SECRET=${SESSION_SECRET:-production-session-secret-change-me}
+      - DATABASE_PATH=/app/data/blog.db
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - MAX_FILE_SIZE=10485760
+      - UPLOAD_PATH=/app/data/uploads
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=1000
+    volumes:
+      - ./blog-core:/app/blog-core
+      - ./fruitionforestgarden:/app/fruitionforestgarden
+      - ./fruitionforestgarden/src/database:/app/data/database
+      - ./fruitionforestgarden/src/public/uploads:/app/data/uploads
+      - ffg_logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - blog_network
+
+  thetecnoagrarian:
+    build:
+      context: .
+      dockerfile: thetecnoagrarian/Dockerfile.dev
+    container_name: tta-blog
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=3002
+      - APP_ROLE=production
+      - SESSION_SECRET=${SESSION_SECRET:-production-session-secret-change-me}
+      - DATABASE_PATH=/app/data/blog.db
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - MAX_FILE_SIZE=10485760
+      - UPLOAD_PATH=/app/data/uploads
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=1000
+    volumes:
+      - ./blog-core:/app/blog-core
+      - ./thetecnoagrarian:/app/thetecnoagrarian
+      - ./thetecnoagrarian/src/database:/app/data/database
+      - ./thetecnoagrarian/src/public/uploads:/app/data/uploads
+      - tta_logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - blog_network
+
+volumes:
+  ffg_logs:
+  tta_logs:
+
+networks:
+  blog_network:
+    driver: bridge

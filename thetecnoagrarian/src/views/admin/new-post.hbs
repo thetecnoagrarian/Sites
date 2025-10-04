@@ -1,0 +1,190 @@
+{{#> layouts/admin}}
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>{{#if post}}Edit Post{{else}}New Post{{/if}}</h1>
+    </div>
+
+    <form action="{{#if post}}/admin/dashboard/posts/{{post.id}}/update{{else}}/admin/dashboard/posts/create{{/if}}" method="POST" enctype="multipart/form-data" class="post-form">
+        <input type="hidden" name="_csrf" value="{{csrfToken}}">
+        {{#if error}}
+        <div class="alert alert-danger">{{error}}</div>
+        {{/if}}
+
+        <div class="form-group">
+            <label for="title" class="form-label">Title</label>
+            <input type="text" class="form-control" id="title" name="title" value="{{post.title}}" required>
+        </div>
+
+        <div class="form-group">
+            <label for="description" class="form-label">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="2">{{post.description}}</textarea>
+            <div class="form-text">A brief description of the post that will appear in search results and social media shares</div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Categories</label>
+            <div class="categories-checkbox-group">
+                {{#each categories}}
+                <div class="form-check">
+                    <input type="checkbox" 
+                           class="form-check-input" 
+                           id="category-{{id}}" 
+                           name="categories[]" 
+                           value="{{id}}"
+                           {{#if selected}}checked{{/if}}>
+                    <label class="form-check-label" for="category-{{id}}">
+                        {{name}}
+                    </label>
+                </div>
+                {{/each}}
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="content" class="form-label">Content</label>
+            <textarea class="form-control" id="content" name="body" rows="10" required>{{post.body}}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Featured Image</label>
+            <sl-button variant="primary" size="small" onclick="document.getElementById('image-input').click()">
+                <sl-icon slot="prefix" name="upload"></sl-icon>
+                Upload Images
+            </sl-button>
+            <input type="file" id="image-input" name="image" accept="image/*" class="file-input" multiple style="display: none;">
+            {{#if post.images}}
+            <div id="existing-images" class="image-preview-container">
+                <h4>Current Images</h4>
+                <div class="image-sizes">
+                    {{#each post.images}}
+                    <div class="image-preview-item">
+                        <img src="{{this.thumbnail}}" 
+                             alt="Image preview" 
+                             class="lightbox-trigger"
+                             data-full-img="{{this.large}}"
+                             style="max-width: 100%; height: auto;">
+                        <input type="text" name="captions[]" class="form-control" placeholder="Enter image caption" style="margin-top:0.5rem;" value="{{lookup ../post.captions @index}}" />
+                        <span class="size-label">Thumbnail (Preview)</span>
+                    </div>
+                    {{/each}}
+                </div>
+            </div>
+            {{/if}}
+        </div>
+
+        <div class="form-group">
+            <label for="excerpt" class="form-label">Excerpt</label>
+            <textarea class="form-control" id="excerpt" name="excerpt" rows="3">{{post.excerpt}}</textarea>
+            <div class="form-text">A brief summary of the post for previews</div>
+        </div>
+
+        <div class="form-group">
+            <label for="created_at" class="form-label">Event Date</label>
+            <input type="date" class="form-control" id="created_at" name="created_at"
+                   value="{{formatDateInput post.created_at}}" required>
+            <div class="form-text">Date the event happened (not when posted)</div>
+        </div>
+
+        <div class="form-actions">
+            <sl-button type="submit" variant="primary">
+                <sl-icon slot="prefix" name="check2-circle"></sl-icon>
+                {{#if post}}Update{{else}}Create{{/if}} Post
+            </sl-button>
+            <sl-button href="/admin" variant="neutral">
+                <sl-icon slot="prefix" name="x-circle"></sl-icon>
+                Cancel
+            </sl-button>
+        </div>
+    </form>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" class="lightbox">
+    <div class="lightbox-content">
+        <button class="lightbox-close">&times;</button>
+        <img id="lightbox-img" src="" alt="">
+    </div>
+</div>
+
+<style>
+.image-sizes {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.image-preview-item {
+    flex: 1;
+    min-width: 200px;
+    max-width: 400px;
+}
+
+.image-preview-item img {
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.image-preview-item img:hover {
+    opacity: 0.9;
+}
+
+.size-label {
+    display: block;
+    text-align: center;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: #666;
+}
+
+.preview-info {
+    font-size: 0.875rem;
+    color: #666;
+    margin-top: 0.5rem;
+    text-align: center;
+}
+
+/* Lightbox styles */
+.lightbox {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.lightbox-content {
+    position: relative;
+    max-width: 90%;
+    max-height: 90vh;
+}
+
+.lightbox-content img {
+    max-width: 100%;
+    max-height: 90vh;
+    object-fit: contain;
+}
+
+.lightbox-close {
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 2rem;
+    cursor: pointer;
+    padding: 10px;
+}
+
+.lightbox-close:hover {
+    color: #ccc;
+}
+</style>
+
+{{/layouts/admin}} 

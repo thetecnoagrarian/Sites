@@ -1,0 +1,33 @@
+{
+  "name": "fruitionforestgarden",
+  "version": "1.0.0",
+  "description": "A blog website for Fruition Forest Garden",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "start": "NODE_ENV=production node src/app.js",
+    "dev": "node src/scripts/backup-reminder.js && nodemon src/app.js",
+    "backup": "node src/scripts/backup.js",
+    "backup:check": "node src/scripts/backup-reminder.js",
+    "backup:stats": "node -e \"require('./src/scripts/backup-reminder.js').showBackupStats()\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "blog",
+    "express",
+    "handlebars",
+    "sqlite"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@ffg/blog-core": "0.1.0",
+    "sanitize-html": "^2.17.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

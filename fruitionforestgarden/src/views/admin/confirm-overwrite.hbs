@@ -1,0 +1,69 @@
+{{#> layouts/admin}}
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>Confirm Overwrite</h1>
+    </div>
+
+    <div class="alert alert-warning">
+        <h3>⚠️ Duplicate Title Detected</h3>
+        <p>A post with the title <strong>"{{pendingPostData.title}}"</strong> already exists.</p>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Existing Post</h4>
+                </div>
+                <div class="card-body">
+                    <h5>{{existingPost.title}}</h5>
+                    <p><strong>Created:</strong> {{formatDate existingPost.created_at}}</p>
+                    <p><strong>Slug:</strong> {{existingPost.slug}}</p>
+                    <div class="post-preview">
+                        <p>{{truncate existingPost.body 200}}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>New Post</h4>
+                </div>
+                <div class="card-body">
+                    <h5>{{pendingPostData.title}}</h5>
+                    <p><strong>Description:</strong> {{pendingPostData.description}}</p>
+                    <div class="post-preview">
+                        <p>{{truncate pendingPostData.body 200}}</p>
+                    </div>
+                    {{#if pendingPostData.images.length}}
+                    <p><strong>Images:</strong> {{pendingPostData.images.length}} uploaded</p>
+                    {{/if}}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <form method="POST" action="/admin/posts/confirm-overwrite">
+            <input type="hidden" name="_csrf" value="{{csrfToken}}">
+            
+            <div class="alert alert-info">
+                <h4>What would you like to do?</h4>
+                <p><strong>Overwrite:</strong> Replace the existing post with your new content</p>
+                <p><strong>Cancel:</strong> Go back and change the title</p>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" name="action" value="overwrite" class="btn btn-warning">
+                    <i class="fas fa-exclamation-triangle"></i> Overwrite Existing Post
+                </button>
+                <button type="submit" name="action" value="cancel" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{{/layouts/admin}}

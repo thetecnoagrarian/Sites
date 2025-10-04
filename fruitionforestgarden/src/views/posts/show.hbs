@@ -1,0 +1,268 @@
+{{#> layouts/main}}
+<article class="post">
+    <header class="post-header">
+        <h1>{{post.title}}</h1>
+        <div class="post-meta">
+            <span>Event: {{formatDate post.created_at}}</span>
+            <span>Posted: {{formatDate post.updated_at}}</span>
+            {{#if post.author}}
+            <span>By: {{post.author}}</span>
+            {{/if}}
+            {{#if post.categories}}
+            <div class="post-categories">
+                {{#each post.categories}}
+                <a href="/category/{{slug}}" class="category-tag">{{name}}</a>
+                {{/each}}
+            </div>
+            {{/if}}
+        </div>
+    </header>
+
+    {{#if post.multipleImages}}
+        <!-- Carousel for multiple images -->
+        <sl-carousel class="post-carousel" navigation loop id="post-carousel">
+            {{#each post.imageList}}
+            <sl-carousel-item>
+                <img src="{{medium}}" 
+                     alt="{{../post.title}}" 
+                     class="lightbox-trigger post-image"
+                     data-full-img="{{large}}"
+                     data-caption="{{caption}}"
+                     data-index="{{@index}}"
+                     loading="lazy">
+            </sl-carousel-item>
+            {{/each}}
+        </sl-carousel>
+        <div id="carousel-caption" class="carousel-caption" style="margin-top: 1em;"></div>
+        
+        <!-- Pass server-side captions directly to JavaScript -->
+        <script>
+        // Server-side captions data - properly escaped
+        const serverCaptions = {{{json post.imageList}}};
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const carousel = document.getElementById('post-carousel');
+            const captionDiv = document.getElementById('carousel-caption');
+            
+            // Check if elements exist before proceeding
+            if (!carousel || !captionDiv) {
+                return;
+            }
+            
+            // Use server-side captions directly
+            const captions = serverCaptions.map(item => item.caption || '');
+
+            function updateCaption(index = 0) {
+                const caption = captions[index] || '';
+                captionDiv.textContent = caption;
+            }
+
+            // Listen for slide change events
+            carousel.addEventListener('sl-slide-change', function(event) {
+                updateCaption(event.detail.index);
+            });
+
+            // Set initial caption
+            updateCaption(0);
+        });
+        </script>
+    {{else if post.images.medium}}
+        <!-- Single image -->
+        <div class="post-image-container">
+            <img src="{{post.images.medium}}" 
+                 alt="{{post.title}}" 
+                 class="lightbox-trigger post-image"
+                 data-full-img="{{post.images.large}}"
+                 data-caption="{{post.images.caption}}"
+                 loading="lazy">
+        </div>
+        {{#if post.images.caption}}
+        <div class="carousel-caption" style="margin-top: 1em;">{{post.images.caption}}</div>
+        {{/if}}
+    {{/if}}
+
+    <div class="post-content">
+        {{{post.content}}}
+    </div>
+</article>
+
+<style>
+.post {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.post-header {
+    margin-bottom: 2rem;
+    background: none !important;
+}
+
+.post-meta {
+    color: #666;
+    margin: 1rem 0;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.category-tag {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: #f0f0f0;
+    border-radius: 1rem;
+    color: #333;
+    text-decoration: none;
+    font-size: 0.875rem;
+}
+
+.category-tag:hover {
+    background: #e0e0e0;
+}
+
+.post-image-container {
+    margin: 2rem 0;
+    text-align: center;
+}
+
+.post-image {
+    max-width: 100%;
+    height: auto;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.post-image:hover {
+    opacity: 0.95;
+}
+
+.post-carousel {
+    margin: 2rem 0;
+    --sl-spacing-medium: 1rem;
+    border-radius: 0.6em;
+    overflow: hidden;
+}
+
+.post-carousel::part(base) {
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.post-carousel::part(navigation-button) {
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    border-radius: 50%;
+    padding: 1rem;
+}
+
+.post-carousel::part(navigation-button):hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.post-carousel sl-carousel-item {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.post-content {
+    line-height: 1.6;
+    font-size: 1.1rem;
+}
+
+/* Lightbox styles */
+.lightbox {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.lightbox-content {
+    position: relative;
+    max-width: 90%;
+    max-height: 90vh;
+}
+
+.lightbox-content img {
+    max-width: 100%;
+    max-height: 90vh;
+    object-fit: contain;
+}
+
+.lightbox-close {
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 2rem;
+    cursor: pointer;
+    padding: 10px;
+}
+
+.lightbox-close:hover {
+    color: #ccc;
+}
+
+.carousel-caption {
+  white-space: pre-line;
+  background: var(--blue-slate);
+  color: #fff;
+  padding: 0.5em 1em;
+  border-radius: 0.2em;
+  margin-top: 0.5em;
+  text-align: center;
+  font-size: 1rem;
+  max-width: 100%;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lightbox = document.getElementById('lightbox-overlay');
+    const lightboxImg = document.getElementById('lightbox-img');
+    const lightboxClose = document.getElementById('lightbox-close');
+
+    // Check if elements exist before proceeding
+    if (!lightbox || !lightboxImg || !lightboxClose) {
+        console.error('Lightbox elements not found');
+        return;
+    }
+
+    // Add lightbox functionality to all images with lightbox-trigger class
+    document.querySelectorAll('.lightbox-trigger').forEach(img => {
+        img.addEventListener('click', function() {
+            const fullImg = this.dataset.fullImg || this.src;
+            lightboxImg.src = fullImg;
+            lightbox.style.display = 'flex';
+        });
+    });
+
+    lightboxClose.addEventListener('click', () => {
+        lightbox.style.display = 'none';
+    });
+
+    lightbox.addEventListener('click', (e) => {
+        if (e.target === lightbox) {
+            lightbox.style.display = 'none';
+        }
+    });
+
+    // Handle keyboard events for lightbox
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && lightbox.style.display === 'flex') {
+            lightbox.style.display = 'none';
+        }
+    });
+});
+</script>
+{{/layouts/main}} 

@@ -1,0 +1,46 @@
+# Shared Dockerfile template for blog sites
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    sqlite \
+    sqlite-dev \
+    python3 \
+    make \
+    g++ \
+    bash \
+    && rm -rf /var/cache/apk/*
+
+# Copy blog-core package first (for better caching)
+COPY blog-core/package*.json ./blog-core/
+WORKDIR /app/blog-core
+RUN npm ci --only=production
+
+# Copy blog-core source
+COPY blog-core ./blog-core/
+
+# Copy site-specific package.json
+COPY site/package*.json ./site/
+
+# Install site dependencies (which will include blog-core as dependency)
+WORKDIR /app/site
+RUN npm ci
+
+# Copy site-specific code
+COPY site ./site/
+
+# Create data directories
+RUN mkdir -p /app/data/database /app/data/uploads /app/logs
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Expose port (will be overridden in docker-compose)
+EXPOSE 3000
+
+# Start the application
+CMD ["node", "site/src/app.js"]

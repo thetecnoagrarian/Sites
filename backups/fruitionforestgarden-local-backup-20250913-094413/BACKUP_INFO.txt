@@ -1,0 +1,13 @@
+=== BACKUP SUMMARY ===
+Backup created: Sat Sep 13 09:45:25 EDT 2025
+Source: /Users/air/Sites/fruitionforestgarden
+
+Files backed up:
+- Database files (src/database/)
+- Upload files (src/public/uploads/)
+- Modified ADMIN_GUIDE.md
+- backup-reminder.log
+- .DS_Store files
+
+These are files NOT tracked by GitHub
+=========================================

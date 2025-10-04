@@ -1,0 +1,188 @@
+{{#> layouts/admin}}
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>Analytics Dashboard</h1>
+    </div>
+
+    {{#if error}}
+        <div class="alert alert-danger">{{error}}</div>
+    {{/if}}
+
+    <!-- Database Health -->
+    <section class="admin-section">
+        <h2>Database Health</h2>
+        <div class="health-indicator {{#if dbHealth.healthy}}healthy{{else}}unhealthy{{/if}}">
+            <div class="health-status">
+                <span class="status-dot"></span>
+                {{#if dbHealth.healthy}}Database Healthy{{else}}Database Issues Detected{{/if}}
+            </div>
+            <div class="health-details">
+                <div><strong>Page Views Table:</strong> {{dbHealth.tables.page_views.rowCount}} rows</div>
+                <div><strong>Unique Visitors Table:</strong> {{dbHealth.tables.unique_visitors.rowCount}} rows</div>
+                <div><strong>Last Check:</strong> {{formatDate dbHealth.timestamp}}</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Summary Stats -->
+    <section class="admin-section">
+        <h2>Summary Statistics</h2>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">{{totalStats.totalPageViews}}</div>
+                <div class="stat-label">Total Page Views</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{totalStats.totalUniqueVisitors}}</div>
+                <div class="stat-label">Unique Visitors</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{totalStats.todayPageViews}}</div>
+                <div class="stat-label">Today's Views</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Page View Statistics -->
+    <section class="admin-section">
+        <h2>Top Pages (Last 30 Days)</h2>
+        <table class="analytics-table">
+            <thead>
+                <tr>
+                    <th>Page</th>
+                    <th>Total Views</th>
+                    <th>Unique IPs</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each pageViewStats}}
+                <tr>
+                    <td>{{this.page_path}}</td>
+                    <td>{{this.views}}</td>
+                    <td>{{this.unique_ips}}</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Recent Activity -->
+    <section class="admin-section">
+        <h2>Recent Activity</h2>
+        <table class="analytics-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Page</th>
+                    <th>IP Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each recentActivity}}
+                <tr>
+                    <td>{{formatDate this.timestamp}}</td>
+                    <td>{{this.page_path}}</td>
+                    <td>{{this.ip_address}}</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </section>
+</div>
+
+<style>
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: var(--primary-light);
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid var(--primary);
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: var(--text);
+    font-size: 0.9rem;
+}
+
+.analytics-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.analytics-table th,
+.analytics-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+.analytics-table th {
+    background: var(--primary-light);
+    font-weight: 600;
+}
+
+.analytics-table tr:hover {
+    background: var(--background-light);
+}
+
+.health-indicator {
+    background: var(--primary-light);
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--primary);
+    margin-bottom: 2rem;
+}
+
+.health-indicator.healthy {
+    border-color: #28a745;
+    background: #d4edda;
+}
+
+.health-indicator.unhealthy {
+    border-color: #dc3545;
+    background: #f8d7da;
+}
+
+.health-status {
+    display: flex;
+    align-items: center;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+}
+
+.health-indicator.healthy .status-dot {
+    background: #28a745;
+}
+
+.health-indicator.unhealthy .status-dot {
+    background: #dc3545;
+}
+
+.health-details {
+    font-size: 0.9rem;
+    line-height: 1.6;
+}
+</style>
+{{/layouts/admin}}

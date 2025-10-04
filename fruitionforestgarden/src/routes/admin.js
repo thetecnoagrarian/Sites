@@ -1,0 +1,654 @@
+import express from 'express';
+import path from 'path';
+import { promises as fs } from 'fs';
+import { fileURLToPath } from 'url';
+import { isAuthenticated, isAdmin, processImage } from '@ffg/blog-core';
+import postController from '../controllers/postController.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const router = express.Router();
+
+// Top-level logger for all admin requests
+router.use((req, res, next) => {
+  console.log('ADMIN ROUTER REQUEST:', req.method, req.originalUrl);
+  next();
+});
+
+// Note: isAdmin middleware is imported from ../middleware/auth
+
+// Protect all admin routes
+router.use(isAuthenticated);
+
+// Root admin route - redirect to dashboard
+router.get('/', isAdmin, (req, res) => {
+    res.redirect('/admin/dashboard');
+});
+
+// Admin dashboard
+router.get('/dashboard', isAdmin, async (req, res) => {
+    try {
+        const { Post } = await import('@ffg/blog-core');
+        console.log('Loading admin dashboard...');
+        // Get all posts with their categories
+        const posts = Post.findAll(100, 0); // Fetch up to 100 posts
+        console.log('Found posts:', posts.length);
+        
+        for (const post of posts) {
+            try {
+                post.categories = Post.getCategories(post.id);
+                console.log('Dashboard: Post', post.id, 'categories:', post.categories);
+            } catch (categoryError) {
+                console.error('Error loading categories for post', post.id, ':', categoryError);
+                post.categories = [];
+            }
+        }
+
+        // Get all categories
+        const { Category } = await import('@ffg/blog-core');
+        const categories = Category.findAll();
+        console.log('Found categories:', categories.length);
+        
+        console.log('Rendering dashboard template...');
+        res.render('admin/dashboard', {
+            title: 'Admin Dashboard',
+            posts,
+            categories,
+            success: req.flash('success'),
+            error: req.flash('error'),
+            user: req.user
+        });
+        console.log('Dashboard rendered successfully');
+    } catch (error) {
+        console.error('Dashboard error:', error);
+        req.flash('error', 'Failed to load dashboard: ' + error.message);
+        res.redirect('/');
+    }
+});
+
+// Update the delete post route to delete all image sizes for each image
+router.post('/dashboard/posts/:id/delete', isAdmin, async (req, res) => {
+    try {
+        const { Post } = await import('@ffg/blog-core');
+        const post = Post.findById(req.params.id);
+        if (!post) {
+            req.flash('error', 'Post not found');
+            return res.redirect('/admin/dashboard');
+        }
+        // Delete associated images (all sizes)
+        if (post.images && Array.isArray(post.images)) {
+            for (const imageObj of post.images) {
+                for (const size of ['thumbnail', 'medium', 'large']) {
+                    if (imageObj && imageObj[size]) {
+                        try {
+                            await fs.unlink(path.join(process.cwd(), 'src/public', imageObj[size]));
+                        } catch (err) {
+                            if (err.code !== 'ENOENT') {
+                                console.error('Error deleting image file:', err);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Post.delete(post.id);
+        req.flash('success', 'Post deleted successfully');
+        res.redirect('/admin/dashboard');
+    } catch (error) {
+        console.error('Error deleting post:', error);
+        req.flash('error', 'Failed to delete post');
+        res.redirect('/admin/dashboard');
+    }
+});
+
+// Categories list
+router.get('/categories', isAdmin, async (req, res) => {
+    try {
+        const { Category } = await import('@ffg/blog-core');
+        const categories = Category.findAll();
+        res.render('admin/categories', {
+            title: 'Manage Categories',
+            categories,
+            success: req.flash('success'),
+            error: req.flash('error'),
+            user: req.user
+        });
+    } catch (error) {
+        console.error('Error fetching categories:', error);
+        req.flash('error', 'Failed to fetch categories');
+        res.redirect('/admin');
+    }
+});
+
+// Create category
+router.post('/categories', isAdmin, async (req, res) => {
+    try {
+        const { Category } = await import('@ffg/blog-core');
+        const { name } = req.body;
+        if (!name) {
+            req.flash('error', 'Category name is required');
+            return res.redirect('/admin/dashboard');
+        }
+
+        Category.create(name);
+        req.flash('success', 'Category created successfully');
+        res.redirect('/admin/dashboard');
+    } catch (error) {
+        console.error('Error creating category:', error);
+        req.flash('error', 'Failed to create category');
+        res.redirect('/admin/dashboard');
+    }
+});
+
+// Update category
+router.post('/categories/update', isAdmin, async (req, res) => {
+    try {
+        const { Category } = await import('@ffg/blog-core');
+        const { categoryId, name } = req.body;
+        if (!categoryId || !name) {
+            req.flash('error', 'Category ID and name are required');
+            return res.redirect('/admin/categories');
+        }
+
+        Category.update(categoryId, name);
+        req.flash('success', 'Category updated successfully');
+        res.redirect('/admin/categories');
+    } catch (error) {
+        console.error('Error updating category:', error);
+        req.flash('error', 'Failed to update category');
+        res.redirect('/admin/categories');
+    }
+});
+
+// Delete category
+router.post('/categories/:id/delete', isAdmin, async (req, res) => {
+    try {
+        const { Category } = await import('@ffg/blog-core');
+        const categoryId = req.params.id;
+        Category.delete(categoryId);
+        req.flash('success', 'Category deleted successfully');
+        res.redirect('/admin/dashboard');
+    } catch (error) {
+        console.error('Error deleting category:', error);
+        req.flash('error', 'Failed to delete category');
+        res.redirect('/admin/dashboard');
+    }
+});
+
+// Minimal test for /admin/posts/test-create
+router.post('/posts/test-create', (req, res) => {
+  console.log('TEST: /posts/test-create hit');
+  res.send('OK');
+});
+
+// Add a GET route for /admin/posts/new
+router.get('/posts/new', isAdmin, async (req, res) => {
+    try {
+        const { Category } = await import('@ffg/blog-core');
+        const categories = Category.findAll();
+        const csrfToken = req.csrfToken();
+        console.log('New post route - CSRF token:', csrfToken);
+        res.render('admin/new-post', {
+            title: 'New Post',
+            categories,
+            user: req.user
+        });
+    } catch (error) {
+        console.error('Error loading new post form:', error);
+        req.flash('error', 'Failed to load new post form');
+        res.redirect('/admin/dashboard');
+    }
+});
+
+// Confirmation route for overwriting existing posts
+router.get('/posts/confirm-overwrite', isAdmin, async (req, res) => {
+    try {
+        const existingPostId = req.session.existingPostId;
+        const pendingPostData = req.session.pendingPostData;
+        
+        if (!existingPostId || !pendingPostData) {
+            req.flash('error', 'No pending post data found');
+            return res.redirect('/admin/posts/new');
+        }
+        
+        const { Post } = await import('@ffg/blog-core');
+        const existingPost = Post.findById(existingPostId);
+        if (!existingPost) {
+            req.flash('error', 'Existing post not found');
+            return res.redirect('/admin/posts/new');
+        }
+        
+        res.render('admin/confirm-overwrite', {
+            title: 'Confirm Overwrite',
+            existingPost,
+            pendingPostData,
+            user: req.user
+        });
+    } catch (error) {
+        console.error('Error in confirm overwrite route:', error);
+        req.flash('error', 'Error loading confirmation page');
+        res.redirect('/admin/posts/new');
+    }
+});
+
+// Handle overwrite confirmation
+router.post('/posts/confirm-overwrite', isAdmin, async (req, res) => {
+    try {
+        const pendingPostData = req.session.pendingPostData;
+        
+        if (!pendingPostData) {
+            req.flash('error', 'No pending post data found');
+            return res.redirect('/admin/posts/new');
+        }
+        
+        if (req.body.action === 'overwrite') {
+            // Set overwrite flag and create the post
+            pendingPostData.overwriteExisting = true;
+            const { Post } = await import('@ffg/blog-core');
+            console.log('Overwrite confirmed, calling Post.create with:', pendingPostData);
+            const result = Post.create(pendingPostData);
+            console.log('Post.create result:', result);
+            
+            // Clear session data
+            delete req.session.pendingPostData;
+            delete req.session.existingPostId;
+            
+            if (result && (result.lastInsertRowid || result.changes > 0)) {
+                req.flash('success', 'Post updated successfully!');
+                return res.redirect('/admin/dashboard');
+            } else {
+                req.flash('error', 'Failed to update post');
+                return res.redirect('/admin/posts/new');
+            }
+        } else {
+            // Cancel - clear session data and redirect back
+            delete req.session.pendingPostData;
+            delete req.session.existingPostId;
+            
+            req.flash('info', 'Post creation cancelled');
+            return res.redirect('/admin/posts/new');
+        }
+    } catch (error) {
+        console.error('Error in confirm overwrite post route:', error);
+        req.flash('error', `Error updating post: ${error.message}`);
+        return res.redirect('/admin/posts/new');
+    }
+});
+
+// Add a POST route for creating a new post
+router.post('/dashboard/posts/create', isAdmin, async (req, res) => {
+    console.log('POST /dashboard/posts/create - Starting post creation...');
+    console.log('req.body:', req.body);
+    console.log('req.files:', req.files);
+    console.log('req.body._csrf:', req.body._csrf);
+    
+    try {
+        // Validate required fields
+        if (!req.body.title || !req.body.body) {
+            console.log('Missing required fields - title or body');
+            req.flash('error', 'Title and body are required');
+            return res.redirect('/admin/posts/new');
+        }
+
+        // Process images and captions
+        let images = [];
+        let captions = [];
+        
+        // Process images first, and only continue if all images process successfully
+        let imageProcessingFailed = false;
+        if (req.files && req.files.length > 0) {
+            console.log('Processing uploaded files...');
+            for (const file of req.files) {
+                try {
+                    const processedImage = await processImage(file.path, file.filename);
+                    images.push(processedImage);
+                    captions.push(req.body.captions?.[images.length - 1] || '');
+                    console.log('Processed image:', processedImage);
+                } catch (imageError) {
+                    console.error('Error processing image:', imageError);
+                    
+                    // Special handling for HEIF files
+                    if (imageError.code === 'HEIF_NOT_SUPPORTED') {
+                        req.flash('error', imageError.message);
+                    } else {
+                        req.flash('error', `Error processing image "${file.filename}": ${imageError.message}`);
+                    }
+                    
+                    // Clean up the failed file
+                    try {
+                        await fs.unlink(file.path);
+                    } catch (cleanupError) {
+                        console.error('Error cleaning up failed file:', cleanupError);
+                    }
+                    
+                    // Mark that image processing failed
+                    imageProcessingFailed = true;
+                    break; // Exit the loop
+                }
+            }
+        }
+
+        // If image processing failed, don't create the post
+        if (imageProcessingFailed) {
+            return res.redirect('/admin/posts/new');
+        }
+
+        console.log('Final images array:', images);
+        console.log('Final captions array:', captions);
+
+        // Create post data object
+        console.log('Raw created_at from form:', req.body.created_at);
+        console.log('Server timezone offset:', new Date().getTimezoneOffset());
+        console.log('Current server time:', new Date().toISOString());
+        console.log('Current server local time:', new Date().toString());
+        
+        // Fix timezone issue: ensure date is treated as local time
+        let created_at = req.body.created_at;
+        if (created_at) {
+            // Append local timezone to ensure the date is treated as local time
+            const localDate = new Date(created_at + 'T00:00:00');
+            created_at = localDate.toISOString().split('T')[0];
+            console.log('Processed created_at:', created_at);
+        }
+        
+        const postData = {
+            title: req.body.title,
+            body: req.body.body,
+            description: req.body.description || '',
+            excerpt: req.body.excerpt || '',
+            images: images,
+            captions: captions,
+            created_at: created_at,
+            author_id: req.user.id,
+            overwriteExisting: req.body.overwriteExisting === 'true'
+        };
+
+        console.log('Post data to create:', postData);
+
+        // Create the post
+        const { Post } = await import('@ffg/blog-core');
+        let result;
+        try {
+            result = Post.create(postData);
+        } catch (error) {
+            if (error.message.startsWith('DUPLICATE_TITLE:')) {
+                // Extract the existing post ID from the error message
+                const match = error.message.match(/ID: (\d+)\)/);
+                const existingPostId = match ? match[1] : null;
+                
+                // Store the form data in session for potential overwrite
+                req.session.pendingPostData = postData;
+                req.session.existingPostId = existingPostId;
+                
+                req.flash('warning', `A post with the title "${req.body.title}" already exists. Do you want to overwrite it?`);
+                return res.redirect('/admin/posts/confirm-overwrite');
+            }
+            throw error; // Re-throw other errors
+        }
+        console.log('Post creation result:', result);
+
+        if (result && (result.lastInsertRowid || result.changes > 0)) {
+            console.log('Post created successfully with ID:', result.lastInsertRowid);
+            
+            // Handle categories if any
+            if (req.body.categories && Array.isArray(req.body.categories)) {
+                console.log('Adding categories to post:', req.body.categories);
+                for (const categoryId of req.body.categories) {
+                    try {
+                        Post.addCategory(result.lastInsertRowid, categoryId);
+                        console.log('Added category', categoryId, 'to post', result.lastInsertRowid);
+                    } catch (categoryError) {
+                        console.error('Error adding category:', categoryError);
+                    }
+                }
+            }
+
+            req.flash('success', 'Post created successfully!');
+            console.log('Redirecting to dashboard...');
+            return res.redirect('/admin/dashboard');
+        } else {
+            console.log('Post creation failed - no result or lastInsertRowid');
+            req.flash('error', 'Failed to create post');
+            return res.redirect('/admin/posts/new');
+        }
+
+    } catch (error) {
+        console.error('Error in post creation route:', error);
+        req.flash('error', `Error creating post: ${error.message}`);
+        return res.redirect('/admin/posts/new');
+    }
+});
+
+// Add a GET route for editing a post
+router.get('/posts/:id/edit', isAdmin, async (req, res) => {
+    try {
+        const { Post, Category } = await import('@ffg/blog-core');
+        const post = Post.findById(req.params.id);
+        if (!post) {
+            req.flash('error', 'Post not found');
+            return res.redirect('/admin/dashboard');
+        }
+        const categories = Category.findAll();
+        // Mark categories as selected if they belong to the post
+        const postCategories = Post.getCategories(post.id);
+        for (const category of categories) {
+            category.selected = postCategories.some(pc => String(pc.id) === String(category.id));
+        }
+        console.log('Edit post route - Global CSRF token:', res.locals.csrfToken);
+        console.log('Edit post route - Session ID:', req.sessionID);
+        res.render('admin/new-post', {
+            title: 'Edit Post',
+            post,
+            categories,
+            user: req.user
+        });
+    } catch (error) {
+        console.error('Error loading post for edit:', error);
+        req.flash('error', 'Failed to load post for editing');
+        res.redirect('/admin/dashboard');
+    }
+});
+
+// Add a POST route for updating a post
+router.post('/dashboard/posts/:id/update', isAdmin, async (req, res) => {
+    try {
+        console.log('Update route - CSRF token from form:', req.body._csrf);
+        console.log('Update route - Session ID:', req.sessionID);
+        console.log('Update route - Global CSRF token:', res.locals.csrfToken);
+        const { Post } = await import('@ffg/blog-core');
+        const post = Post.findById(req.params.id);
+        if (!post) {
+            req.flash('error', 'Post not found');
+            return res.redirect('/admin/dashboard');
+        }
+        let imageUrls = post.images || [];
+        if (!Array.isArray(imageUrls)) imageUrls = [];
+        // Process new images if uploaded
+        if (req.files && req.files.length > 0) {
+            // Delete old images if they exist
+            if (post.images && Array.isArray(post.images)) {
+                for (const imageObj of post.images) {
+                    for (const size of ['thumbnail', 'medium', 'large']) {
+                        if (imageObj && imageObj[size]) {
+                            try {
+                                await fs.unlink(path.join(process.cwd(), 'src/public', imageObj[size]));
+                            } catch (error) {
+                                if (error.code !== 'ENOENT') {
+                                    console.error('Error deleting old image:', error);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Add new images
+            imageUrls = [];
+            for (const file of req.files) {
+                const newImageUrls = await processImage(file.path, file.filename);
+                imageUrls.push(newImageUrls);
+            }
+        }
+        // Get captions from form
+        let captions = Array.isArray(req.body['captions[]']) ? req.body['captions[]'] : (req.body['captions[]'] ? [req.body['captions[]']] : []);
+        if (!captions.length && req.body.captions) {
+            captions = Array.isArray(req.body.captions) ? req.body.captions : [req.body.captions];
+        }
+        if (captions.length < imageUrls.length) {
+            while (captions.length < imageUrls.length) captions.push('');
+        } else if (captions.length > imageUrls.length) {
+            captions = captions.slice(0, imageUrls.length);
+        }
+        console.log('Update route - Raw created_at from form:', req.body.created_at);
+        
+        // Fix timezone issue: ensure date is treated as local time
+        let created_at = req.body.created_at;
+        if (created_at) {
+            // Append local timezone to ensure the date is treated as local time
+            const localDate = new Date(created_at + 'T00:00:00');
+            created_at = localDate.toISOString().split('T')[0];
+            console.log('Update route - Processed created_at:', created_at);
+        }
+        
+        await Post.update(req.params.id, {
+            title: req.body.title,
+            body: req.body.body,
+            description: req.body.description || '',
+            excerpt: req.body.excerpt || '',
+            images: imageUrls,
+            captions: captions,
+            created_at: created_at
+        });
+        // Update categories for the post
+        const categoryIds = Array.isArray(req.body.categories) ? req.body.categories : (req.body.categories ? [req.body.categories] : []);
+        // Remove all existing categories
+        const existingCategories = Post.getCategories(post.id);
+        if (existingCategories && existingCategories.length) {
+            for (const cat of existingCategories) {
+                Post.removeCategory(post.id, cat.id);
+            }
+        }
+        // Add new categories
+        if (categoryIds.length) {
+            for (const categoryId of categoryIds) {
+                Post.addCategory(post.id, categoryId);
+            }
+        }
+        req.flash('success', 'Post updated successfully');
+        res.redirect('/admin/dashboard');
+    } catch (error) {
+        if (req.file) {
+            try {
+                await fs.unlink(req.file.path);
+            } catch (unlinkError) {
+                console.error('Error deleting uploaded file:', unlinkError);
+            }
+        }
+        console.error('Error updating post:', error);
+        req.flash('error', 'Error updating post');
+        res.redirect('/admin/dashboard');
+    }
+});
+
+// Analytics dashboard
+router.get('/analytics', isAdmin, async (req, res) => {
+    try {
+        const Analytics = require('../models/analytics');
+        
+        // Get row limits from query parameters with defaults
+        const pageViewLimit = parseInt(req.query.pageViewLimit) || 25;
+        const activityLimit = parseInt(req.query.activityLimit) || 25;
+        
+        const totalStats = Analytics.getTotalStats();
+        const pageViewStats = Analytics.getPageViewStats(30, pageViewLimit);
+        const recentActivity = Analytics.getRecentActivity(activityLimit);
+        const dbHealth = Analytics.checkDatabaseHealth();
+        
+        res.render('admin/analytics', {
+            title: 'Analytics Dashboard',
+            user: req.user,
+            totalStats,
+            pageViewStats,
+            recentActivity,
+            dbHealth,
+            pageViewLimit,
+            activityLimit
+        });
+    } catch (error) {
+        console.error('Error loading analytics:', error);
+        req.flash('error', 'Failed to load analytics');
+        res.redirect('/admin/dashboard');
+    }
+});
+
+// Analytics health check API
+router.get('/analytics/health', isAdmin, async (req, res) => {
+    try {
+        const Analytics = require('../models/analytics');
+        const health = Analytics.checkDatabaseHealth();
+        res.json(health);
+    } catch (error) {
+        res.status(500).json({ error: 'Health check failed', details: error.message });
+    }
+});
+
+// User management
+
+// List users
+router.get('/users', isAdmin, async (req, res) => {
+    const { User } = await import('@ffg/blog-core');
+    const users = User.findAll();
+    res.render('admin/users', {
+        title: 'Manage Users',
+        users,
+        user: req.user,
+        success: req.flash('success'),
+        error: req.flash('error')
+    });
+});
+
+// Show new user form
+router.get('/users/new', isAdmin, (req, res) => {
+    res.render('admin/new-user', {
+        title: 'New User',
+        user: req.user,
+        csrfToken: req.csrfToken(),
+        success: req.flash('success'),
+        error: req.flash('error')
+    });
+});
+
+// Create user
+router.post('/users', isAdmin, async (req, res) => {
+    const { User } = await import('@ffg/blog-core');
+    const { username, password, role } = req.body;
+    if (!username || !password || !role) {
+        req.flash('error', 'Username, password, and role are required');
+        return res.redirect('/admin/users/new');
+    }
+    try {
+        User.create(username, password, role);
+        req.flash('success', 'User created successfully');
+        res.redirect('/admin/users');
+    } catch (error) {
+        req.flash('error', 'Failed to create user: ' + error.message);
+        res.redirect('/admin/users/new');
+    }
+});
+
+// Delete user (cannot delete self)
+router.post('/users/:id/delete', isAdmin, async (req, res) => {
+    if (req.session.userId == req.params.id) {
+        req.flash('error', 'You cannot delete your own account.');
+        return res.redirect('/admin/users');
+    }
+    try {
+        const { User } = await import('@ffg/blog-core');
+        User.delete(req.params.id);
+        req.flash('success', 'User deleted successfully');
+        res.redirect('/admin/users');
+    } catch (error) {
+        req.flash('error', 'Failed to delete user: ' + error.message);
+        res.redirect('/admin/users');
+    }
+});
+
+export default router; 

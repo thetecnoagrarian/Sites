@@ -1,0 +1,33 @@
+<div class="manage-posts-container">
+    <h1>Manage Posts</h1>
+    
+    {{#if error}}
+        <div class="error">{{error}}</div>
+    {{/if}}
+
+    <table class="posts-table">
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#each posts}}
+                <tr>
+                    <td>{{this.title}}</td>
+                    <td>{{this.author}}</td>
+                    <td>{{formatDate this.createdAt}}</td>
+                    <td>{{this.status}}</td>
+                    <td class="actions-cell">
+                        <a href="/posts/{{this._id}}/edit" class="edit-link">Edit</a>
+                        <button class="delete-btn" data-id="{{this._id}}">Delete</button>
+                    </td>
+                </tr>
+            {{/each}}
+        </tbody>
+    </table>
+</div> 

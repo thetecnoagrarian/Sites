@@ -1,0 +1,104 @@
+{{#> layouts/admin }}
+<div class="admin-container">
+    <h1>Admin Dashboard</h1>
+
+    {{#if messages.success}}
+        <div class="message success">{{messages.success}}</div>
+    {{/if}}
+    {{#if messages.error}}
+        <div class="message error">{{messages.error}}</div>
+    {{/if}}
+
+    <section class="admin-section">
+        <h2>Posts</h2>
+        <sl-button href="/admin/posts/new" variant="primary" style="margin-bottom: 1rem;">
+            <sl-icon slot="prefix" name="plus-circle"></sl-icon>
+            Add Post
+        </sl-button>
+        <table>
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Categories</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each posts}}
+                <tr>
+                    <td>{{title}}</td>
+                    <td>
+                        {{#each categories}}
+                            <span class="category-tag">{{name}}</span>
+                        {{/each}}
+                    </td>
+                    <td>{{formatDate created_at}}</td>
+                    <td>
+                        <sl-button href="/admin/posts/{{id}}/edit" variant="primary" size="small">
+                            <sl-icon slot="prefix" name="pencil"></sl-icon>
+                            Edit
+                        </sl-button>
+                        <form action="/admin/dashboard/posts/{{id}}/delete" method="POST" style="display: inline;">
+                            <input type="hidden" name="_csrf" value="{{../csrfToken}}">
+                            <sl-button type="submit" variant="danger" size="small" onclick="return confirm('Are you sure?')">
+                                <sl-icon slot="prefix" name="trash"></sl-icon>
+                                Delete
+                            </sl-button>
+                        </form>
+                    </td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="admin-section">
+        <h2>Categories</h2>
+        <form action="/admin/categories" method="POST" class="category-form">
+            <input type="hidden" name="_csrf" value="{{csrfToken}}">
+            <div class="form-group">
+                <input type="text" name="name" placeholder="Category name" required>
+                <sl-button type="submit" variant="primary">
+                    <sl-icon slot="prefix" name="plus-circle"></sl-icon>
+                    Add Category
+                </sl-button>
+            </div>
+        </form>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Slug</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each categories}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td>{{slug}}</td>
+                    <td>
+                        <form action="/admin/categories/{{id}}/delete" method="POST" class="inline-form">
+                            <input type="hidden" name="_csrf" value="{{../csrfToken}}">
+                            <sl-button type="submit" variant="danger" size="small" onclick="return confirm('Are you sure?')">
+                                <sl-icon slot="prefix" name="trash"></sl-icon>
+                                Delete
+                            </sl-button>
+                        </form>
+                    </td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="admin-section">
+        <h2>Users</h2>
+        <sl-button href="/admin/users" variant="primary">
+            <sl-icon slot="prefix" name="people"></sl-icon>
+            Manage Users
+        </sl-button>
+    </section>
+</div>
+{{/layouts/admin}} 

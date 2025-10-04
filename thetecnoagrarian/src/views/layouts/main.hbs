@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Noto+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+
+
+    <title>{{title}} - The Tecnoagrarian</title>
+    {{{ogTags}}}
+    <!-- Open Graph Meta Tags for Social Sharing -->
+    <!-- Removed static OG tags: these are now injected dynamically per page -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css?v=20250802-1530" media="all">
+    {{#if isAdmin}}
+    <link rel="stylesheet" href="/css/admin.css?v=20250802-1530" media="all">
+    {{/if}}
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/shoelace.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/themes/light.css" />
+    <!-- Shoelace Icon Library - Required for sl-icon elements -->
+    <!-- Removed problematic CDN link that was causing 404 errors -->
+    <script type="module">
+        import { setBasePath } from 'https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/shoelace.js';
+        setBasePath('https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/');
+    </script>
+</head>
+<body>
+    <header>
+        <div class="site-header">
+            <div class="site-logo">
+                <a href="/"><img src="/images/TTA.PNG" alt="The Tecnoagrarian Logo" class="logo-image"></a>
+            </div>
+            <button class="hamburger">
+                <i class="fas fa-bars"></i>
+            </button>
+            <nav>
+                <ul>
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/about">About</a></li>
+                    {{#if user}}
+                        <li><a href="/admin">Admin</a></li>
+                        <li><a href="/logout" class="logout">Logout</a></li>
+                    {{else}}
+                        <li><a href="/login">Login</a></li>
+                    {{/if}}
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="menu-overlay hidden"></div>
+
+    <div class="search-area">
+        <div class="search-container">
+            <div class="search-categories-row">
+                <form action="/search" method="GET" class="search-form-main">
+                    <sl-input type="text" name="q" placeholder="Search posts..." size="large"></sl-input>
+                    <sl-button type="submit" variant="primary" size="large">
+                        <sl-icon slot="prefix" name="search"></sl-icon>
+                        Search
+                    </sl-button>
+                </form>
+                <div class="categories-dropdown">
+                    <button class="categories-toggle">
+                        Categories <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="categories-menu">
+                        <div class="categories-grid">
+                            {{#each sidebarCategories}}
+                            <a href="/category/{{this.slug}}" class="category-link">{{this.name}}</a>
+                            {{/each}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid-container">
+        <main class="content">
+            {{{body}}}
+        </main>
+
+        <footer class="footer">
+            <div class="footer-icons">
+                <a href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer" title="Facebook">
+                    <i class="fab fa-facebook"></i>
+                </a>
+                <a href="https://github.com/" target="_blank" rel="noopener noreferrer" title="GitHub">
+                    <i class="fa-brands fa-github"></i>
+                </a>
+                <a href="https://x.com/" target="_blank" rel="noopener noreferrer" title="X">
+                    <i class="fa-brands fa-square-x-twitter"></i>
+                </a>
+            </div>
+            <p>&copy; {{currentYear}} The Tecnoagrarian. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <!-- Lightbox for images -->
+    <div id="lightbox-overlay">
+        <div class="lightbox-content">
+            <button id="lightbox-close">&times;</button>
+            <img id="lightbox-img" src="" alt="Lightbox Image">
+            <p id="lightbox-caption"></p>
+        </div>
+    </div>
+
+    <script src="/js/main.js?v=20250802-1530"></script>
+</body>
+</html> 

@@ -1,0 +1,45 @@
+# Development Dockerfile for The Tecnoagrarian
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    sqlite \
+    sqlite-dev \
+    python3 \
+    make \
+    g++ \
+    bash \
+    && rm -rf /var/cache/apk/*
+
+# Copy blog-core package first (for better caching)
+COPY blog-core/package*.json ./blog-core/
+WORKDIR /app/blog-core
+RUN npm install
+
+# Copy blog-core source
+COPY blog-core ./blog-core/
+
+# Copy site package.json
+COPY thetecnoagrarian/package*.json ./thetecnoagrarian/
+
+# Install site dependencies (which will include blog-core as dependency)
+WORKDIR /app/thetecnoagrarian
+RUN npm install
+
+# Copy site code
+COPY thetecnoagrarian ./thetecnoagrarian/
+
+# Create necessary directories
+RUN mkdir -p /app/data/database /app/data/uploads /app/logs
+
+# Expose port
+EXPOSE 3002
+
+# Set environment
+ENV PORT=3002
+
+# Start development server
+CMD ["npm", "run", "dev"]

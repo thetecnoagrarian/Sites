@@ -1,0 +1,87 @@
+{{!< main}}
+
+<div class="error-container">
+    <h1>500 - Internal Server Error</h1>
+    <p>Sorry, something went wrong on our end.</p>
+    <a href="/" class="btn btn-primary">Return Home</a>
+
+    {{#unless production}}
+        {{#if error}}
+            <div class="error-details">
+                <h2>Error Details</h2>
+                <p class="error-message">{{error}}</p>
+                {{#if stack}}
+                    <pre class="error-stack">{{stack}}</pre>
+                {{/if}}
+            </div>
+        {{/if}}
+    {{/unless}}
+</div>
+
+<style>
+.error-container {
+    text-align: center;
+    padding: 4rem 1rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.error-container h1 {
+    font-size: 2.5rem;
+    color: #333;
+    margin-bottom: 1rem;
+}
+
+.error-container p {
+    font-size: 1.2rem;
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+.btn-primary {
+    display: inline-block;
+    padding: 0.8rem 1.5rem;
+    background-color: #007bff;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+    margin-bottom: 2rem;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+.error-details {
+    text-align: left;
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 4px;
+    margin-top: 2rem;
+}
+
+.error-details h2 {
+    font-size: 1.5rem;
+    color: #dc3545;
+    margin-bottom: 1rem;
+}
+
+.error-message {
+    color: #721c24;
+    background-color: #f8d7da;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.error-stack {
+    background: #343a40;
+    color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+</style> 

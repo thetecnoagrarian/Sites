@@ -1,0 +1,18 @@
+# Initialization container for blog core setup
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    sqlite \
+    sqlite-dev \
+    python3 \
+    make \
+    g++ \
+    bash \
+    && rm -rf /var/cache/apk/*
+
+# Keep container running for initialization tasks
+CMD ["tail", "-f", "/dev/null"]

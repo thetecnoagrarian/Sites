@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{title}} - Fruition Forest Garden</title>
+    {{{ogTags}}}
+    <!-- Open Graph Meta Tags for Social Sharing -->
+    <!-- Removed static OG tags: these are now injected dynamically per page -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    {{#if isAdmin}}
+    <link rel="stylesheet" href="/css/admin.css">
+    {{/if}}
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/shoelace.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/themes/light.css" />
+    <!-- Shoelace Icon Library - Required for sl-icon elements -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/icons.css" />
+    <script type="module">
+        import { setBasePath } from 'https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/shoelace.js';
+        setBasePath('https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/');
+    </script>
+</head>
+<body>
+    <header>
+        <div class="site-header">
+            <div class="site-logo">
+                <a href="/"><img src="/images/FFGnewLogo.PNG" alt="Site Logo"></a>
+            </div>
+            <button class="hamburger">
+                <i class="fas fa-bars"></i>
+            </button>
+            <nav>
+                <ul>
+                    <li><a href="/">Home</a></li>
+                    <li><a href="/about">About</a></li>
+                    {{#if user}}
+                        <li><a href="/admin">Admin</a></li>
+                        <li><a href="/admin/analytics">Analytics</a></li>
+                        <li><a href="/logout" class="logout">Logout</a></li>
+                    {{else}}
+                        <li><a href="/login">Login</a></li>
+                    {{/if}}
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="menu-overlay hidden"></div>
+
+    <div class="grid-container">
+        <main class="content">
+            {{{body}}}
+        </main>
+
+        <aside class="sidebar">
+            <div class="search-box">
+                <h2>Search</h2>
+                <form action="/search" method="GET" class="search-form">
+                    <sl-input type="text" name="q" placeholder="Search posts..." size="large" style="width: 100%; margin-bottom: 0.5rem;"></sl-input>
+                    <sl-button type="submit" variant="primary" size="medium" style="width: 100%;">
+                        <sl-icon slot="prefix" name="search"></sl-icon>
+                        Search
+                    </sl-button>
+                </form>
+            </div>
+            <div class="categories">
+                <h2>Categories</h2>
+                <ul>
+                    {{#each sidebarCategories}}
+                    <li><a href="/category/{{this.slug}}">{{this.name}}</a></li>
+                    {{/each}}
+                </ul>
+            </div>
+        </aside>
+
+        <footer class="footer">
+            <div class="footer-icons">
+                <a href="https://www.facebook.com/michael.diehl.citoli.2025/" target="_blank" rel="noopener noreferrer" title="Facebook">
+                    <i class="fab fa-facebook"></i>
+                </a>
+                <a href="https://github.com/fruitionforestgarden" target="_blank" rel="noopener noreferrer" title="GitHub">
+                    <i class="fa-brands fa-github"></i>
+                </a>
+                <a href="nostr:npub14fwc6d99w60gqs6wzqc46h2gaen900hhekfl23fuc8tm0nk0nm9slx4zqp" target="_blank" rel="noopener noreferrer" title="Nostr">
+                    <img src="/images/nostr.png" alt="Nostr" class="nostr-icon">
+                </a>
+            </div>
+            <p>&copy; {{currentYear}} Fruition Forest Garden. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <!-- Lightbox for images -->
+    <div id="lightbox-overlay">
+        <div class="lightbox-content">
+            <button id="lightbox-close">&times;</button>
+            <img id="lightbox-img" src="" alt="Lightbox Image">
+            <p id="lightbox-caption"></p>
+        </div>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html> 

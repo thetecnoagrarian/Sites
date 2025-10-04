@@ -1,0 +1,25 @@
+# Simple test Dockerfile for local testing
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install basic dependencies
+RUN apk add --no-cache sqlite curl
+
+# Copy entire project
+COPY . .
+
+# Install dependencies in root (since we're using npm workspaces)
+RUN npm install
+
+# Create data directories
+RUN mkdir -p /app/ffg-data /app/tta-data
+
+# Set environment
+ENV NODE_ENV=production
+
+# Expose ports
+EXPOSE 3000 3002
+
+# Simple start script that runs both sites
+CMD sh -c "cd fruitionforestgarden && PORT=3000 node src/app.js & cd ../thetecnoagrarian && PORT=3002 node src/app.js & wait"

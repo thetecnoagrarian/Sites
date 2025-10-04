@@ -1,0 +1,46 @@
+<div class="hero-content">
+    <h1>The Tecnoagrarian</h1>
+</div>
+<div class="hero">
+    <img src="/images/Hero.png" alt="Black and White Mountain Scene" class="hero-image lightbox-trigger" data-caption="https://pixabay.com/vectors/landscape-mountains-forest-9545981/">
+</div>
+
+<section class="recent-posts">
+    <h2>Recent Posts</h2>
+    {{#if posts.length}}
+        <div class="post-previews">
+            {{#each posts}}
+                <a href="/post/{{this.slug}}" class="card-link">
+                    <sl-card>
+                        {{#if this.images.[0]}}
+                            <img slot="image" src="{{this.images.[0].medium}}" alt="{{this.title}}" loading="lazy">
+                        {{/if}}
+                        <h3>{{this.title}}</h3>
+                        {{#if this.excerpt}}
+                            <p>{{this.excerpt}}</p>
+                        {{else}}
+                            <p>{{truncate this.body 150}}</p>
+                        {{/if}}
+                        <div class="post-meta">
+                            <span>Event: {{formatDate this.created_at}}</span>
+                            <span>Posted: {{formatDate this.updated_at}}</span>
+                            {{#if this.author}}
+                            <span>By: {{this.author}}</span>
+                            {{/if}}
+                        </div>
+                    </sl-card>
+                </a>
+            {{/each}}
+        </div>
+
+        {{#if pages.length}}
+            <div class="pagination">
+                {{#each pages}}
+                    <a href="/?page={{this}}" class="page-link {{#if (eq this ../currentPage)}}active{{/if}}">{{this}}</a>
+                {{/each}}
+            </div>
+        {{/if}}
+    {{else}}
+        <p class="no-posts">No posts yet. Check back soon!</p>
+    {{/if}}
+</section> 

@@ -1,0 +1,62 @@
+# Production Dockerfile for blog sites
+FROM node:20-alpine
+
+# Build arguments
+ARG SITE_DIR_NAME
+ARG SITE_PORT
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apk add --no-cache \
+    sqlite \
+    python3 \
+    make \
+    g++ \
+    bash \
+    curl \
+    && rm -rf /var/cache/apk/*
+
+# Copy blog-core package.json and install production dependencies
+COPY blog-core/package*.json ./blog-core/
+WORKDIR /app/blog-core
+RUN npm install --omit=dev && npm cache clean --force
+
+# Copy blog-core source code
+COPY blog-core/src ./src/
+COPY blog-core/README.md ./README.md
+
+# Copy site package.json and install production dependencies
+COPY ${SITE_DIR_NAME}/package*.json ./${SITE_DIR_NAME}/
+WORKDIR /app/${SITE_DIR_NAME}
+RUN npm install --omit=dev && npm cache clean --force
+
+# Copy site source code
+COPY ${SITE_DIR_NAME}/src ./src/
+COPY ${SITE_DIR_NAME}/README.md ./README.md
+
+# Create necessary directories
+RUN mkdir -p /app/data/database /app/data/uploads /app/logs
+
+# Set proper permissions
+RUN addgroup -g 1001 -S blog && \
+    adduser -S blog -u 1001 -G blog && \
+    chown -R blog:blog /app/data /app/logs
+
+# Switch to non-root user
+USER blog
+
+# Expose port
+EXPOSE ${SITE_PORT}
+
+# Set environment
+ENV NODE_ENV=production
+ENV PORT=${SITE_PORT}
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${SITE_PORT}/health || exit 1
+
+# Start the application
+CMD ["node", "src/app.js"]

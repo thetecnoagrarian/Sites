@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{title}} - Admin Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/admin.css">
+    <!-- Shoelace components -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/themes/light.css" />
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/shoelace.js"></script>
+    <!-- Shoelace Icon Library - Required for sl-icon elements -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/icons.css" />
+    <script type="module">
+        import { setBasePath } from 'https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/shoelace.js';
+        setBasePath('https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.15.0/cdn/');
+    </script>
+</head>
+<body>
+    <header class="admin-header">
+        <nav class="admin-nav">
+            <div class="admin-nav-brand">
+                <a href="/admin">Admin Dashboard</a>
+            </div>
+            <div class="admin-nav-links">
+                <sl-button href="/admin/categories" variant="text" class="{{#if activeCategories}}active{{/if}}">Categories</sl-button>
+                <sl-button href="/" variant="text" target="_blank">View Site</sl-button>
+                {{#if user.isAdmin}}
+                <sl-button href="/admin/posts/new" variant="text">New Post</sl-button>
+                {{/if}}
+                <form action="/logout" method="POST" style="display: inline;">
+                    <input type="hidden" name="_csrf" value="{{csrfToken}}">
+                    <sl-button type="submit" variant="danger" size="small">
+                        <sl-icon slot="prefix" name="box-arrow-right"></sl-icon>
+                        Logout
+                    </sl-button>
+                </form>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        {{{body}}}
+    </main>
+
+    <script src="/js/admin.js"></script>
+</body>
+</html> 

@@ -1,0 +1,29 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - SESSION_SECRET=${SESSION_SECRET}
+      - DATABASE_PATH=/app/src/database/thetecnoagrarian.db
+      - LOG_LEVEL=info
+      - MAX_FILE_SIZE=10485760
+      - UPLOAD_PATH=/app/src/public/uploads
+      - CSRF_SECRET=${CSRF_SECRET}
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=25
+    volumes:
+      - ./src/database:/app/src/database
+      - ./src/public/uploads:/app/src/public/uploads
+      - ./src/public/images:/app/src/public/images
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s 

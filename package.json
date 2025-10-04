@@ -1,0 +1,30 @@
+{
+  "name": "blog-workspace",
+  "version": "1.0.0",
+  "description": "Monorepo workspace for blog sites powered by blog-core",
+  "private": true,
+  "workspaces": [
+    "blog-core",
+    "fruitionforestgarden",
+    "thetecnoagrarian"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "build:core": "cd blog-core && npm run build",
+    "test:all": "npm run test --workspaces",
+    "start:ffg": "cd fruitionforestgarden && npm start",
+    "start:tta": "cd thetecnoagrarian && npm start",
+    "start:all": "concurrently \"npm run start:ffg\" \"npm run start:tta\"",
+    "dev:ffg": "cd fruitionforestgarden && npm run dev",
+    "dev:tta": "cd thetecnoagrarian && npm run dev",
+    "dev:all": "concurrently \"npm run dev:ffg\" \"npm run dev:tta\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
+
