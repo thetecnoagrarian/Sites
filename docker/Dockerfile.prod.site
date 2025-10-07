@@ -28,8 +28,7 @@ COPY blog-core/src ./src/
 COPY blog-core/README.md ./README.md
 
 # Copy site package.json and install production dependencies
-COPY ${SITE_DIR_NAME}/package*.json ./${SITE_DIR_NAME}/
-WORKDIR /app/${SITE_DIR_NAME}
+COPY ${SITE_DIR_NAME}/package*.json ./
 RUN npm install --omit=dev && npm cache clean --force
 
 # Copy site source code
