@@ -10,8 +10,8 @@ const __dirname = path.dirname(__filename);
 const config = {
     siteName: 'The Tecnoagrarian',
     port: process.env.PORT || 3002,
-    databasePath: path.join(__dirname, 'database/blog.db'),
-    uploadsPath: path.join(__dirname, 'public/uploads'),
+    databasePath: process.env.DATABASE_PATH || path.join(__dirname, 'database/blog.db'),
+    uploadsPath: process.env.UPLOADS_PATH || path.join(__dirname, 'public/uploads'),
     viewsPath: path.join(__dirname, 'views'),
     publicPath: path.join(__dirname, 'public')
 };

@@ -18,22 +18,17 @@ RUN apk add --no-cache \
     curl \
     && rm -rf /var/cache/apk/*
 
-# Copy blog-core package.json and install production dependencies
-COPY blog-core/package*.json ./blog-core/
-WORKDIR /app/blog-core
+# Copy the entire monorepo structure
+COPY . .
+
+# Create a root package.json for workspace management
+RUN echo '{"name": "blog-monorepo", "workspaces": ["blog-core", "'${SITE_DIR_NAME}'"]}' > package.json
+
+# Install all dependencies using workspace
 RUN npm install --omit=dev && npm cache clean --force
 
-# Copy blog-core source code
-COPY blog-core/src ./src/
-COPY blog-core/README.md ./README.md
-
-# Copy site package.json and install production dependencies
-COPY ${SITE_DIR_NAME}/package*.json ./
-RUN npm install --omit=dev && npm cache clean --force
-
-# Copy site source code
-COPY ${SITE_DIR_NAME}/src ./src/
-COPY ${SITE_DIR_NAME}/README.md ./README.md
+# Set working directory to the specific site
+WORKDIR /app/${SITE_DIR_NAME}
 
 # Create necessary directories
 RUN mkdir -p /app/data/database /app/data/uploads /app/logs
@@ -41,7 +36,7 @@ RUN mkdir -p /app/data/database /app/data/uploads /app/logs
 # Set proper permissions
 RUN addgroup -g 1001 -S blog && \
     adduser -S blog -u 1001 -G blog && \
-    chown -R blog:blog /app/data /app/logs
+    chown -R blog:blog /app/data /app/logs /app/${SITE_DIR_NAME}
 
 # Switch to non-root user
 USER blog
