@@ -7,7 +7,8 @@ const router = express.Router();
 router.get('/login', isNotAuthenticated, (req, res) => {
     res.render('auth/login', { 
         title: 'Login',
-        error: req.flash('error')
+        error: req.flash('error'),
+        csrfToken: req.csrfToken()
     });
 });
 
