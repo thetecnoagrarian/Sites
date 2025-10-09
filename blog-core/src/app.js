@@ -104,14 +104,8 @@ export function createBlogApp(config) {
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
 
-    // Session configuration - using file store for persistence
-    const FileStore = require('session-file-store')(session);
+    // Session configuration - using memory store with better configuration
     app.use(session({
-        store: new FileStore({
-            path: '/app/data/sessions',
-            ttl: 86400, // 24 hours
-            retries: 5
-        }),
         secret: process.env.SESSION_SECRET,
         resave: false,
         saveUninitialized: false,
@@ -120,7 +114,8 @@ export function createBlogApp(config) {
             httpOnly: true,
             sameSite: 'lax', // Change from 'strict' to 'lax' for better compatibility
             maxAge: 24 * 60 * 60 * 1000 // 24 hours
-        }
+        },
+        name: 'blog.sid' // Use a custom session name to avoid conflicts
     }));
 
  // CSRF protection
