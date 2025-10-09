@@ -196,6 +196,12 @@ router.get('/posts/new', isAdmin, async (req, res) => {
 
 // Add a POST route for creating a new post
 router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
+    // CSRF validation for multipart forms
+    if (!req.body._csrf) {
+        console.log('Missing CSRF token in request body');
+        req.flash('error', 'Invalid request. Please try again.');
+        return res.redirect('/admin/posts/new');
+    }
     upload.array('image', 25)(req, res, function (err) {
       if (err instanceof multer.MulterError) {
         req.flash('error', 'One or more files are too large. Max size is 20MB.');

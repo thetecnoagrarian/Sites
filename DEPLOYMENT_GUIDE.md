@@ -408,6 +408,59 @@ logs:
 
 ## 🔧 Troubleshooting
 
+### Common Development Issues (Resolved)
+
+#### Route Registration Order Problems
+**Issue**: All routes returning 404 errors
+**Cause**: `blog-core`'s 404 handler was catching all routes before site-specific routes could be registered
+**Solution**: Modified `createBlogApp` to return `app` and `setupFinalHandlers` function. Call `setupFinalHandlers()` after site-specific routes are registered in each site's `app.js`
+
+#### CSRF Token Errors
+**Issue**: `ForbiddenError: invalid csrf token` on login attempts
+**Cause**: `isNotAuthenticated` middleware on POST `/login` route causing redirect loops
+**Solution**: Removed `isNotAuthenticated` middleware from POST routes, kept it only on GET routes. Explicitly pass `csrfToken: req.csrfToken()` to login templates
+
+#### Password Hash Mismatch
+**Issue**: "Invalid username or password" despite correct credentials
+**Cause**: Password hashes in database didn't match bcryptjs format
+**Solution**: Regenerated admin passwords using `bcryptjs.hashSync(password, 10)` directly in database
+
+#### Session Store Schema Issues
+**Issue**: `table sessions has 4 columns but 3 values were supplied`
+**Cause**: Mismatch between `better-sqlite3-session-store` expectations and actual database schema
+**Solution**: Switched to memory-based session store in `blog-core/src/app.js` to avoid persistent schema issues
+
+#### Hardcoded Session Secret
+**Issue**: Insecure fallback `'your-secret-key'` in session configuration
+**Cause**: Development convenience that became security risk
+**Solution**: Removed fallback, require `SESSION_SECRET` environment variable
+
+#### Docker Build Issues
+**Issue**: `npm ci` failed due to missing `package-lock.json`
+**Solution**: Changed to `npm install` in Dockerfiles
+
+**Issue**: `@ffg/blog-core` not found during npm install
+**Cause**: Local package not properly linked in Docker build context
+**Solution**: Created temporary `package.json` with workspaces configuration at `/app` root, then ran `npm install`
+
+**Issue**: `SQLITE_CANTOPEN` and `EACCES: permission denied`
+**Cause**: Incorrect permissions for `blog` user on data directories
+**Solution**: Added explicit `chown -R blog:blog /app/data /app/logs /app/${SITE_DIR_NAME}` in Dockerfile
+
+#### GitHub SSH Authentication Issues
+**Issue**: `Permission denied (publickey)` when cloning/pulling from GitHub
+**Cause**: SSH key not loaded in ssh-agent or wrong GitHub account association
+**Solution**: 
+1. Generate SSH key: `ssh-keygen -t ed25519 -C "deploy@linode-server" -f ~/.ssh/id_ed25519_new`
+2. Add to correct GitHub account (thetecnoagrarian)
+3. Load in ssh-agent: `eval $(ssh-agent -s) && ssh-add ~/.ssh/id_ed25519_new`
+4. Test: `ssh -T git@github.com`
+
+**Issue**: `git pull` fails with "local changes would be overwritten"
+**Solution**: `git stash && git pull origin main` to preserve local changes
+
+### Production Deployment Issues
+
 ### Container won't start:
 - Check logs: `docker-compose -f docker-compose.prod.yml logs <service-name>`
 - Verify environment variables in `.env`
