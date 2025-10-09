@@ -106,7 +106,7 @@ export function createBlogApp(config) {
 
     // Session configuration - using memory store for now to avoid schema issues
     app.use(session({
-        secret: process.env.SESSION_SECRET || 'your-secret-key',
+        secret: process.env.SESSION_SECRET,
         resave: false,
         saveUninitialized: false,
         cookie: {
