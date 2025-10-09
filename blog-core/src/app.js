@@ -6,7 +6,6 @@ import path from 'path';
 import { engine } from 'express-handlebars';
 import flash from 'connect-flash';
 import csurf from 'csurf';
-import BetterSqlite3Store from 'better-sqlite3-session-store';
 import Database from 'better-sqlite3';
 import rateLimit from 'express-rate-limit';
 import compression from 'compression';
@@ -105,14 +104,8 @@ export function createBlogApp(config) {
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
 
-    // Session configuration
-    const sessionStore = new (BetterSqlite3Store(session))({
-        client: db,
-        table: 'sessions'
-    });
-
+    // Session configuration - using memory store for now to avoid schema issues
     app.use(session({
-        store: sessionStore,
         secret: process.env.SESSION_SECRET || 'your-secret-key',
         resave: false,
         saveUninitialized: false,
