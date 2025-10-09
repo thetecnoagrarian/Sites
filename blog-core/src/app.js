@@ -104,8 +104,14 @@ export function createBlogApp(config) {
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
 
-    // Session configuration - using memory store for now to avoid schema issues
+    // Session configuration - using file store for persistence
+    const FileStore = require('session-file-store')(session);
     app.use(session({
+        store: new FileStore({
+            path: '/app/data/sessions',
+            ttl: 86400, // 24 hours
+            retries: 5
+        }),
         secret: process.env.SESSION_SECRET,
         resave: false,
         saveUninitialized: false,
