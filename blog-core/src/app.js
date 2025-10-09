@@ -110,9 +110,9 @@ export function createBlogApp(config) {
         resave: false,
         saveUninitialized: false,
         cookie: {
-            secure: process.env.NODE_ENV === 'production',
+            secure: false, // Temporarily disable secure cookies to debug session issues
             httpOnly: true,
-            sameSite: 'strict',
+            sameSite: 'lax', // Change from 'strict' to 'lax' for better compatibility
             maxAge: 24 * 60 * 60 * 1000 // 24 hours
         }
     }));
