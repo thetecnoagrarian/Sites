@@ -10,6 +10,8 @@ services:
         SITE_PORT: 4000
     container_name: ffg-blog-prod
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=4000
@@ -44,6 +46,8 @@ services:
         SITE_PORT: 4002
     container_name: tta-blog-prod
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=4002
