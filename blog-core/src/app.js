@@ -84,6 +84,7 @@ export function createBlogApp(config) {
                 objectSrc: ["'none'"],
                 mediaSrc: ["'self'"],
                 frameSrc: ["'none'"],
+                formAction: ["'self'", "http://172.236.119.220:4000", "http://172.236.119.220:4002"],
             }
         },
         crossOriginEmbedderPolicy: true,
