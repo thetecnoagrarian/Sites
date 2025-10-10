@@ -119,11 +119,18 @@ export function createBlogApp(config) {
         name: 'blog.sid' // Use a custom session name to avoid conflicts
     }));
 
- // CSRF protection
-    app.use(csurf({ 
-        cookie: false, // We're using sessions, not cookies
-        ignoreMethods: ['GET', 'HEAD', 'OPTIONS'] // Don't require CSRF for read operations
-    }));
+ // CSRF protection - skip for multipart forms
+    app.use((req, res, next) => {
+        // Skip CSRF for multipart form data (handled manually in routes)
+        if (req.get('content-type') && req.get('content-type').includes('multipart/form-data')) {
+            return next();
+        }
+        // Apply CSRF for all other requests
+        return csurf({ 
+            cookie: false, // We're using sessions, not cookies
+            ignoreMethods: ['GET', 'HEAD', 'OPTIONS'] // Don't require CSRF for read operations
+        })(req, res, next);
+    });
 
     // Multer middleware for multipart/form-data parsing (MUST come after CSRF)
     const upload = createUploadMiddleware(path.join(uploadsPath, 'temp'));
