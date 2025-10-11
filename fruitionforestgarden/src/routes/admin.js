@@ -7,6 +7,7 @@ import { isAuthenticated, isAdmin, processImage } from '@ffg/blog-core';
 import postController from '../controllers/postController.js';
 
 const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 // Top-level logger for all admin requests
