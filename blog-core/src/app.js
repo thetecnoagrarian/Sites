@@ -124,20 +124,24 @@ export function createBlogApp(config) {
     
     // CSRF protection middleware
     app.use((req, res, next) => {
-        // Skip CSRF for multipart form data (handled manually in routes)
-        if (req.get('content-type') && req.get('content-type').includes('multipart/form-data')) {
-            return next();
-        }
-        
-        // Skip CSRF for GET, HEAD, OPTIONS
-        if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
-            return next();
-        }
-        
         // Generate or verify CSRF token
         const secret = req.session.csrfSecret || csrfProtection.secretSync();
         req.session.csrfSecret = secret;
         
+        // Always add CSRF token generation method
+        req.csrfToken = () => csrfProtection.create(secret);
+        
+        // Skip CSRF validation for multipart form data (handled manually in routes)
+        if (req.get('content-type') && req.get('content-type').includes('multipart/form-data')) {
+            return next();
+        }
+        
+        // Skip CSRF validation for GET, HEAD, OPTIONS
+        if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+            return next();
+        }
+        
+        // Validate CSRF token for POST, PUT, DELETE
         if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
             const token = req.body._csrf || req.headers['x-csrf-token'];
             if (!token || !csrfProtection.verify(secret, token)) {
@@ -145,8 +149,6 @@ export function createBlogApp(config) {
             }
         }
         
-        // Add CSRF token generation method
-        req.csrfToken = () => csrfProtection.create(secret);
         next();
     });
 
