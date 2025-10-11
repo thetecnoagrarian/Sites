@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import path from 'path';
 import { engine } from 'express-handlebars';
 import flash from 'connect-flash';
-import csurf from 'csurf';
+import csrf from 'csrf';
 import Database from 'better-sqlite3';
 import rateLimit from 'express-rate-limit';
 import compression from 'compression';
@@ -119,17 +119,35 @@ export function createBlogApp(config) {
         name: 'blog.sid' // Use a custom session name to avoid conflicts
     }));
 
- // CSRF protection - skip for multipart forms
+    // Initialize CSRF protection
+    const csrfProtection = new csrf();
+    
+    // CSRF protection middleware
     app.use((req, res, next) => {
         // Skip CSRF for multipart form data (handled manually in routes)
         if (req.get('content-type') && req.get('content-type').includes('multipart/form-data')) {
             return next();
         }
-        // Apply CSRF for all other requests
-        return csurf({ 
-            cookie: false, // We're using sessions, not cookies
-            ignoreMethods: ['GET', 'HEAD', 'OPTIONS'] // Don't require CSRF for read operations
-        })(req, res, next);
+        
+        // Skip CSRF for GET, HEAD, OPTIONS
+        if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+            return next();
+        }
+        
+        // Generate or verify CSRF token
+        const secret = req.session.csrfSecret || csrfProtection.secretSync();
+        req.session.csrfSecret = secret;
+        
+        if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
+            const token = req.body._csrf || req.headers['x-csrf-token'];
+            if (!token || !csrfProtection.verify(secret, token)) {
+                return res.status(403).json({ error: 'Invalid CSRF token' });
+            }
+        }
+        
+        // Add CSRF token generation method
+        req.csrfToken = () => csrfProtection.create(secret);
+        next();
     });
 
     // Multer middleware for multipart/form-data parsing (MUST come after CSRF)
