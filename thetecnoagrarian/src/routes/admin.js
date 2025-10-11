@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import { promises as fs } from 'fs';
 import { fileURLToPath } from 'url';
+import multer from 'multer';
 import { isAuthenticated, isAdmin, Post, Category, User, processImage } from '@ffg/blog-core';
 import postController from '../controllers/postController.js';
 
@@ -196,7 +197,7 @@ router.get('/posts/new', isAdmin, async (req, res) => {
 
 // Add a POST route for creating a new post
 router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
-    upload.array('image', 25)(req, res, function (err) {
+    req.app.locals.upload.array('image', 25)(req, res, function (err) {
       if (err instanceof multer.MulterError) {
         req.flash('error', 'One or more files are too large. Max size is 20MB.');
         return res.redirect('/admin/posts/new');
