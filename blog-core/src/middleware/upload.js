@@ -1,5 +1,6 @@
 import multer from 'multer';
 import { promises as fs } from 'fs';
+import fsSync from 'fs';
 import path from 'path';
 
 // Create uploads directory if it doesn't exist
@@ -15,8 +16,14 @@ const ensureUploadsDir = async (uploadsPath) => {
 
 // Configure multer for file uploads
 export const createUploadMiddleware = (uploadsPath) => {
-    // Ensure uploads directory exists
-    ensureUploadsDir(uploadsPath);
+    // Ensure uploads directory exists synchronously
+    try {
+        fsSync.mkdirSync(uploadsPath, { recursive: true });
+    } catch (error) {
+        if (error.code !== 'EEXIST') {
+            throw error;
+        }
+    }
     
     const storage = multer.diskStorage({
         destination: (req, file, cb) => {
