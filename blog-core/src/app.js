@@ -139,7 +139,10 @@ export function createBlogApp(config) {
 
     // Make CSRF token available to all templates
     app.use((req, res, next) => {
-        res.locals.csrfToken = req.csrfToken();
+        // Only set csrfToken if CSRF middleware was applied
+        if (req.csrfToken) {
+            res.locals.csrfToken = req.csrfToken();
+        }
         next();
     });
 
