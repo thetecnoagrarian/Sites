@@ -317,7 +317,7 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
             console.log('Processing uploaded files...');
             for (const file of req.files) {
                 try {
-                    const processedImage = await processImage(file.path, file.filename);
+                    const processedImage = await processImage(file.path, file.filename, path.join(__dirname, '../public/uploads'));
                     images.push(processedImage);
                     captions.push(req.body.captions?.[images.length - 1] || '');
                     console.log('Processed image:', processedImage);
