@@ -74,33 +74,27 @@ class Post {
             let stmt, result;
             if (created_at) {
                 stmt = db.prepare(`
-                    INSERT INTO posts (title, slug, body, description, excerpt, images, captions, created_at, author_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO posts (title, slug, content, excerpt, created_at, author_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 `);
                 result = stmt.run(
                     title,
                     slug,
                     body,
-                    description,
                     excerpt,
-                    JSON.stringify(images),
-                    JSON.stringify(captions),
                     created_at,
                     author_id
                 );
             } else {
                 stmt = db.prepare(`
-                    INSERT INTO posts (title, slug, body, description, excerpt, images, captions, author_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO posts (title, slug, content, excerpt, author_id)
+                    VALUES (?, ?, ?, ?, ?)
                 `);
                 result = stmt.run(
                     title,
                     slug,
                     body,
-                    description,
                     excerpt,
-                    JSON.stringify(images),
-                    JSON.stringify(captions),
                     author_id
                 );
             }
