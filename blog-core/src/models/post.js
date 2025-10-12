@@ -50,9 +50,9 @@ class Post {
         return checkExistingPost(title, excludeId);
     }
 
-    static create({ title, body, description, excerpt, images = [], captions = [], created_at, author_id, overwriteExisting = false }) {
+    static create({ title, body, content, description, excerpt, images = [], captions = [], created_at, author_id, overwriteExisting = false }) {
         try {
-            console.log('Creating post with:', { title, body, description, excerpt, images, captions, created_at, author_id, overwriteExisting });
+            console.log('Creating post with:', { title, body, content, description, excerpt, images, captions, created_at, author_id, overwriteExisting });
             
             // Check if a post with the same title already exists
             const existingPost = checkExistingPost(title);
@@ -64,7 +64,7 @@ class Post {
             } else if (existingPost && overwriteExisting) {
                 // Update the existing post instead of creating a new one
                 // Update created_at to reflect when the new content was created
-                return Post.update(existingPost.id, { title, body, description, excerpt, images, captions, created_at, author_id });
+                return Post.update(existingPost.id, { title, body, content, description, excerpt, images, captions, created_at, author_id });
             } else {
                 // Generate new unique slug
                 slug = generateUniqueSlug(title);
@@ -72,29 +72,35 @@ class Post {
             
             const db = getDatabase();
             let stmt, result;
+            // Use content if provided, otherwise use body
+            const postContent = content || body;
             if (created_at) {
                 stmt = db.prepare(`
-                    INSERT INTO posts (title, slug, content, excerpt, created_at, author_id)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO posts (title, slug, content, excerpt, images, captions, created_at, author_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 `);
                 result = stmt.run(
                     title,
                     slug,
-                    body,
+                    postContent,
                     excerpt,
+                    JSON.stringify(images),
+                    JSON.stringify(captions),
                     created_at,
                     author_id
                 );
             } else {
                 stmt = db.prepare(`
-                    INSERT INTO posts (title, slug, content, excerpt, author_id)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO posts (title, slug, content, excerpt, images, captions, author_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 `);
                 result = stmt.run(
                     title,
                     slug,
-                    body,
+                    postContent,
                     excerpt,
+                    JSON.stringify(images),
+                    JSON.stringify(captions),
                     author_id
                 );
             }
@@ -144,8 +150,8 @@ class Post {
         }));
     }
 
-    static update(id, { title, body, description, excerpt, images = [], captions = [], created_at, author_id }) {
-        console.log('Updating post ID:', id, 'with data:', { title, body, description, excerpt, images, captions, created_at, author_id });
+    static update(id, { title, body, content, description, excerpt, images = [], captions = [], created_at, author_id }) {
+        console.log('Updating post ID:', id, 'with data:', { title, body, content, description, excerpt, images, captions, created_at, author_id });
         // For updates, we need to check if the slug would conflict with other posts
         const currentPost = Post.findById(id);
         const baseSlug = slugify(title, { lower: true, strict: true });
@@ -175,17 +181,19 @@ class Post {
         
         const db = getDatabase();
         let stmt, result;
+        // Use content if provided, otherwise use body
+        const postContent = content || body;
         if (created_at) {
             stmt = db.prepare(`
                 UPDATE posts 
-                SET title = ?, slug = ?, body = ?, description = ?, 
+                SET title = ?, slug = ?, content = ?, description = ?, 
                     excerpt = ?, images = ?, captions = ?, created_at = ?, author_id = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             `);
             result = stmt.run(
                 title,
                 slug,
-                body,
+                postContent,
                 description,
                 excerpt,
                 JSON.stringify(images),
@@ -197,14 +205,14 @@ class Post {
         } else {
             stmt = db.prepare(`
                 UPDATE posts 
-                SET title = ?, slug = ?, body = ?, description = ?, 
+                SET title = ?, slug = ?, content = ?, description = ?, 
                     excerpt = ?, images = ?, captions = ?, author_id = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             `);
             result = stmt.run(
                 title,
                 slug,
-                body,
+                postContent,
                 description,
                 excerpt,
                 JSON.stringify(images),
