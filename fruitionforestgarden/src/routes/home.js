@@ -142,7 +142,7 @@ router.get('/post/:slug', async (req, res) => {
         }
 
         // Map fields for template compatibility
-        post.content = post.body;
+        // post.content is already correct from database
         post.createdAt = post.created_at;
 
         // Images
