@@ -10,7 +10,7 @@ const DEFAULT_OG = `
 function buildOgTags(post) {
   if (!post) return DEFAULT_OG;
   const title = post.title || 'Fruition Forest Garden';
-  const desc = post.excerpt || 'A blog about our adventure building our homestead on a bare 20 acres in Michigan\'s Upper Peninsula.';
+  const desc = post.excerpt || (post.content ? post.content.substring(0, 160) + '...' : 'A blog about our adventure building our homestead on a bare 20 acres in Michigan\'s Upper Peninsula.');
   const url = `https://www.fruitionforestgarden.com/post/${post.slug || ''}`;
   
   // Debug log for images
