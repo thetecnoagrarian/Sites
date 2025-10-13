@@ -76,7 +76,7 @@ class Post {
             const postContent = content || body;
             if (created_at) {
                 stmt = db.prepare(`
-                    INSERT INTO posts (title, slug, body, description, excerpt, images, captions, created_at, author_id)
+                    INSERT INTO posts (title, slug, content, description, excerpt, images, captions, created_at, author_id)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `);
                 result = stmt.run(
@@ -92,7 +92,7 @@ class Post {
                 );
             } else {
                 stmt = db.prepare(`
-                    INSERT INTO posts (title, slug, body, description, excerpt, images, captions, author_id)
+                    INSERT INTO posts (title, slug, content, description, excerpt, images, captions, author_id)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 `);
                 result = stmt.run(
@@ -188,7 +188,7 @@ class Post {
         if (created_at) {
             stmt = db.prepare(`
                 UPDATE posts 
-                SET title = ?, slug = ?, body = ?, description = ?, 
+                SET title = ?, slug = ?, content = ?, description = ?, 
                     excerpt = ?, images = ?, captions = ?, created_at = ?, author_id = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             `);
@@ -207,7 +207,7 @@ class Post {
         } else {
             stmt = db.prepare(`
                 UPDATE posts 
-                SET title = ?, slug = ?, body = ?, description = ?, 
+                SET title = ?, slug = ?, content = ?, description = ?, 
                     excerpt = ?, images = ?, captions = ?, author_id = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             `);
