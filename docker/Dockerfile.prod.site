@@ -18,6 +18,9 @@ RUN apk add --no-cache \
     curl \
     && rm -rf /var/cache/apk/*
 
+# Update npm to latest version to fix deprecation warnings
+RUN npm install -g npm@latest
+
 # Copy the entire monorepo structure
 COPY . .
 
