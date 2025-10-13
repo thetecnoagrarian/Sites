@@ -302,9 +302,9 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
     
     try {
         // Validate required fields
-        if (!req.body.title || !req.body.body) {
-            console.log('Missing required fields - title or body');
-            req.flash('error', 'Title and body are required');
+        if (!req.body.title || !req.body.content) {
+            console.log('Missing required fields - title or content');
+            req.flash('error', 'Title and content are required');
             return res.redirect('/admin/posts/new');
         }
 
@@ -371,7 +371,7 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
         
         const postData = {
             title: req.body.title,
-            body: req.body.body,
+            content: req.body.content,
             description: req.body.description || '',
             excerpt: req.body.excerpt || '',
             images: images,
@@ -529,7 +529,7 @@ router.post('/dashboard/posts/:id/update', isAdmin, async (req, res) => {
         
         await Post.update(req.params.id, {
             title: req.body.title,
-            body: req.body.body,
+            content: req.body.content,
             description: req.body.description || '',
             excerpt: req.body.excerpt || '',
             images: imageUrls,

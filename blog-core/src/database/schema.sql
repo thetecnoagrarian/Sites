@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
-    body TEXT NOT NULL,
+    content TEXT NOT NULL,
     description TEXT,
     excerpt TEXT,
     images TEXT,          -- JSON array of image paths
