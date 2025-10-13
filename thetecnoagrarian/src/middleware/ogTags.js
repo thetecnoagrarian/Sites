@@ -12,7 +12,7 @@ const generatePostOGTags = (post) => {
     if (!post) return defaultOGTags;
     
     const title = post.title || 'The Tecnoagrarian';
-    const desc = post.excerpt || (post.content ? post.content.substring(0, 160) + '...' : 'Exploring the intersection of technology and agriculture');
+    const desc = post.description || (post.content ? post.content.substring(0, 160) + '...' : 'Exploring the intersection of technology and agriculture');
     const url = `https://www.thetecnoagrarian.com/post/${post.slug || ''}`;
     
     // Default image
