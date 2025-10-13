@@ -52,6 +52,13 @@
                 Upload Images
             </sl-button>
             <input type="file" id="image-input" name="image" accept="image/*" class="file-input" multiple style="display: none;">
+            
+            <!-- Preview area for newly selected images -->
+            <div id="new-images-preview" class="image-preview-container" style="display: none;">
+                <h4>Selected Images</h4>
+                <div id="new-images-list" class="image-sizes"></div>
+            </div>
+            
             {{#if post.images}}
             <div id="existing-images" class="image-preview-container">
                 <h4>Current Images</h4>
@@ -186,5 +193,41 @@
     color: #ccc;
 }
 </style>
+
+<script>
+// Handle image selection and preview
+document.getElementById('image-input').addEventListener('change', function(e) {
+    const files = e.target.files;
+    const previewContainer = document.getElementById('new-images-preview');
+    const imagesList = document.getElementById('new-images-list');
+    
+    if (files.length > 0) {
+        previewContainer.style.display = 'block';
+        imagesList.innerHTML = '';
+        
+        Array.from(files).forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const imageItem = document.createElement('div');
+                imageItem.className = 'image-preview-item';
+                imageItem.innerHTML = `
+                    <img src="${e.target.result}" 
+                         alt="Image preview" 
+                         style="max-width: 100%; height: auto; max-height: 200px;">
+                    <input type="text" name="captions[]" class="form-control" 
+                           placeholder="Enter image caption" 
+                           style="margin-top:0.5rem;" 
+                           value="" />
+                    <span class="size-label">${file.name}</span>
+                `;
+                imagesList.appendChild(imageItem);
+            };
+            reader.readAsDataURL(file);
+        });
+    } else {
+        previewContainer.style.display = 'none';
+    }
+});
+</script>
 
 {{/layouts/admin}} 

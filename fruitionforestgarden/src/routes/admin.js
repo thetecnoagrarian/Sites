@@ -312,16 +312,28 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
         let images = [];
         let captions = [];
         
+        // Get captions from form (handle both captions[] and captions formats)
+        let formCaptions = [];
+        if (req.body['captions[]']) {
+            formCaptions = Array.isArray(req.body['captions[]']) ? req.body['captions[]'] : [req.body['captions[]']];
+        } else if (req.body.captions) {
+            formCaptions = Array.isArray(req.body.captions) ? req.body.captions : [req.body.captions];
+        }
+        console.log('Form captions received:', formCaptions);
+        
         // Process images first, and only continue if all images process successfully
         let imageProcessingFailed = false;
         if (req.files && req.files.length > 0) {
             console.log('Processing uploaded files...');
-            for (const file of req.files) {
+            for (let i = 0; i < req.files.length; i++) {
+                const file = req.files[i];
                 try {
                     const processedImage = await processImage(file.path, file.filename, path.join(__dirname, '../public/uploads'));
                     images.push(processedImage);
-                    captions.push(req.body.captions?.[images.length - 1] || '');
-                    console.log('Processed image:', processedImage);
+                    // Get caption for this image (use index to match image with caption)
+                    const caption = formCaptions[i] || '';
+                    captions.push(caption);
+                    console.log(`Processed image ${i}:`, processedImage, 'with caption:', caption);
                 } catch (imageError) {
                     console.error('Error processing image:', imageError);
                     
