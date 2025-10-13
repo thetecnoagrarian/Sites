@@ -76,13 +76,14 @@ class Post {
             const postContent = content || body;
             if (created_at) {
                 stmt = db.prepare(`
-                    INSERT INTO posts (title, slug, content, excerpt, images, captions, created_at, author_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO posts (title, slug, body, description, excerpt, images, captions, created_at, author_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `);
                 result = stmt.run(
                     title,
                     slug,
                     postContent,
+                    description,
                     excerpt,
                     JSON.stringify(images),
                     JSON.stringify(captions),
@@ -91,13 +92,14 @@ class Post {
                 );
             } else {
                 stmt = db.prepare(`
-                    INSERT INTO posts (title, slug, content, excerpt, images, captions, author_id)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO posts (title, slug, body, description, excerpt, images, captions, author_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 `);
                 result = stmt.run(
                     title,
                     slug,
                     postContent,
+                    description,
                     excerpt,
                     JSON.stringify(images),
                     JSON.stringify(captions),
@@ -186,7 +188,7 @@ class Post {
         if (created_at) {
             stmt = db.prepare(`
                 UPDATE posts 
-                SET title = ?, slug = ?, content = ?, description = ?, 
+                SET title = ?, slug = ?, body = ?, description = ?, 
                     excerpt = ?, images = ?, captions = ?, created_at = ?, author_id = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             `);
@@ -205,7 +207,7 @@ class Post {
         } else {
             stmt = db.prepare(`
                 UPDATE posts 
-                SET title = ?, slug = ?, content = ?, description = ?, 
+                SET title = ?, slug = ?, body = ?, description = ?, 
                     excerpt = ?, images = ?, captions = ?, author_id = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             `);
