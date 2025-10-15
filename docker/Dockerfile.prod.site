@@ -16,7 +16,6 @@ RUN apk add --no-cache \
     g++ \
     bash \
     curl \
-    vips-dev \
     && rm -rf /var/cache/apk/*
 
 # Update npm to latest version to fix deprecation warnings
@@ -30,9 +29,6 @@ RUN echo '{"name": "blog-monorepo", "workspaces": ["blog-core", "'${SITE_DIR_NAM
 
 # Install all dependencies using workspace
 RUN npm install --omit=dev && npm cache clean --force
-
-# Reinstall Sharp for Alpine Linux compatibility
-RUN npm rebuild sharp --platform=linuxmusl --arch=x64
 
 # Set working directory to the specific site
 WORKDIR /app/${SITE_DIR_NAME}
