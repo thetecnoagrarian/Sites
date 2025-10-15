@@ -8,7 +8,7 @@ ARG SITE_PORT
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including Sharp requirements
 RUN apk add --no-cache \
     sqlite \
     python3 \
@@ -16,6 +16,8 @@ RUN apk add --no-cache \
     g++ \
     bash \
     curl \
+    vips-dev \
+    libc6-compat \
     && rm -rf /var/cache/apk/*
 
 # Update npm to latest version to fix deprecation warnings
@@ -29,6 +31,9 @@ RUN echo '{"name": "blog-monorepo", "workspaces": ["blog-core", "'${SITE_DIR_NAM
 
 # Install all dependencies using workspace
 RUN npm install --omit=dev && npm cache clean --force
+
+# Rebuild Sharp for Alpine Linux compatibility
+RUN npm rebuild sharp --platform=linuxmusl --arch=x64
 
 # Set working directory to the specific site
 WORKDIR /app/${SITE_DIR_NAME}
