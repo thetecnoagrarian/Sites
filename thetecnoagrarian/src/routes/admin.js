@@ -280,7 +280,7 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
         
         const postData = {
             title: req.body.title,
-            content: req.body.content,
+            content: req.body.body,
             description: req.body.description || '',
             excerpt: req.body.excerpt || '',
             images: images,
@@ -417,7 +417,7 @@ router.post('/dashboard/posts/:id/update', isAdmin, async (req, res) => {
         
         await Post.update(req.params.id, {
             title: req.body.title,
-            content: req.body.content,
+            content: req.body.body,
             description: req.body.description || '',
             excerpt: req.body.excerpt || '',
             images: imageUrls,
