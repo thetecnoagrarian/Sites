@@ -222,8 +222,8 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
     
     try {
         // Validate required fields
-        if (!req.body.title || !req.body.content) {
-            console.log('Missing required fields - title or content');
+        if (!req.body.title || !req.body.body) {
+            console.log('Missing required fields - title or body');
             req.flash('error', 'Title and content are required');
             return res.redirect('/admin/posts/new');
         }

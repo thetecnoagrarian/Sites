@@ -72,14 +72,14 @@ docker-compose --version
 ls -la ~/.ssh/
 
 # Generate new SSH key for thetecnoagrarian GitHub account (if needed)
-ssh-keygen -t ed25519 -C "deploy@linode-server" -f ~/.ssh/id_ed25519_tta
+ssh-keygen -t ed25519 -C "deploy@linode-server" -f ~/.ssh/id_ed25519_new
 
 # Add SSH key to ssh-agent
 eval "$(ssh-agent -s)"
-ssh-add ~/.ssh/id_ed25519_tta
+ssh-add ~/.ssh/id_ed25519_new
 
 # Display public key to add to GitHub
-cat ~/.ssh/id_ed25519_tta.pub
+cat ~/.ssh/id_ed25519_new.pub
 
 # Test GitHub SSH access
 ssh -T git@github.com
@@ -115,7 +115,7 @@ ssh -T git@github.com
 1. **Copy the public key from Linode server:**
    ```bash
    # On Linode server
-   cat ~/.ssh/id_ed25519_tta.pub
+   cat ~/.ssh/id_ed25519_new.pub
    ```
 
 2. **Add to GitHub:**
