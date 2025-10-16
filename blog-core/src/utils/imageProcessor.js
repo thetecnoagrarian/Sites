@@ -1,5 +1,6 @@
-// Temporarily disable Sharp processing to get containers running
-// TODO: Fix Sharp installation for Alpine Linux
+import sharp from 'sharp';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 const IMAGE_SIZES = {
   thumbnail: { maxWidth: 400, maxHeight: 400 },
@@ -8,17 +9,52 @@ const IMAGE_SIZES = {
 };
 
 export const processImage = async (inputPath, filename, outputDir) => {
-  console.log('Image processing temporarily disabled - Sharp installation issue');
-  
-  // Return placeholder data to prevent errors
-  return {
-    thumbnail: '/uploads/placeholder-thumbnail.jpg',
-    medium: '/uploads/placeholder-medium.jpg', 
-    large: '/uploads/placeholder-large.jpg',
-    originalWidth: 800,
-    originalHeight: 600,
-    originalAspectRatio: 1.33
-  };
+  try {
+    console.log('Processing image:', { inputPath, filename, outputDir });
+    
+    // Ensure output directory exists
+    await fs.mkdir(outputDir, { recursive: true });
+    
+    // Get image metadata
+    const metadata = await sharp(inputPath).metadata();
+    const { width, height } = metadata;
+    const aspectRatio = width / height;
+    
+    // Generate base filename without extension
+    const baseFilename = path.parse(filename).name;
+    
+    const results = {};
+    
+    // Process each size
+    for (const [sizeName, { maxWidth, maxHeight }] of Object.entries(IMAGE_SIZES)) {
+      const outputFilename = `${baseFilename}-${sizeName}.jpg`;
+      const outputPath = path.join(outputDir, outputFilename);
+      
+      // Resize image maintaining aspect ratio
+      await sharp(inputPath)
+        .resize(maxWidth, maxHeight, {
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .jpeg({ quality: 85 })
+        .toFile(outputPath);
+      
+      // Store relative path for web access
+      results[sizeName] = `/uploads/${outputFilename}`;
+    }
+    
+    // Add metadata
+    results.originalWidth = width;
+    results.originalHeight = height;
+    results.originalAspectRatio = aspectRatio;
+    
+    console.log('Image processing completed:', results);
+    return results;
+    
+  } catch (error) {
+    console.error('Error processing image:', error);
+    throw error;
+  }
 };
 
 export { IMAGE_SIZES };
