@@ -226,10 +226,26 @@ export function createBlogApp(config) {
     // Attach user to request if logged in
     app.use(attachUser);
 
-    // Rate limiting
+    // Rate limiting with trusted IPs bypass
     app.use(rateLimit({
         windowMs: 15 * 60 * 1000, // 15 minutes
-        max: process.env.NODE_ENV === 'production' ? 25 : 1000,
+        max: (req) => {
+            // Trusted IPs that bypass rate limiting
+            const trustedIPs = [
+                // Add your IP addresses here for development/deployment
+                // Example: '192.168.1.100', '10.0.0.50'
+            ];
+            
+            const clientIP = req.headers['x-forwarded-for'] || req.ip;
+            
+            // If IP is trusted, allow unlimited requests
+            if (trustedIPs.includes(clientIP)) {
+                return 10000; // Effectively unlimited
+            }
+            
+            // Otherwise use normal rate limits
+            return process.env.NODE_ENV === 'production' ? 25 : 1000;
+        },
         standardHeaders: true,
         legacyHeaders: false,
         message: 'Too many requests from this IP, please try again later.',
