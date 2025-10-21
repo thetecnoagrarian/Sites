@@ -195,6 +195,10 @@
 </style>
 
 <script>
+// Store selected files globally to maintain order
+let selectedFiles = [];
+let fileOrder = [];
+
 // Handle image selection and preview
 document.getElementById('image-input').addEventListener('change', function(e) {
     const files = e.target.files;
@@ -203,31 +207,168 @@ document.getElementById('image-input').addEventListener('change', function(e) {
     
     if (files.length > 0) {
         previewContainer.style.display = 'block';
-        imagesList.innerHTML = '';
         
-        Array.from(files).forEach((file, index) => {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const imageItem = document.createElement('div');
-                imageItem.className = 'image-preview-item';
-                imageItem.innerHTML = `
-                    <img src="${e.target.result}" 
-                         alt="Image preview" 
-                         style="max-width: 100%; height: auto; max-height: 200px;">
-                    <input type="text" name="captions[]" class="form-control" 
-                           placeholder="Enter image caption" 
-                           style="margin-top:0.5rem;" 
-                           value="" />
-                    <span class="size-label">${file.name}</span>
-                `;
-                imagesList.appendChild(imageItem);
-            };
-            reader.readAsDataURL(file);
-        });
+        // Store files and their order
+        selectedFiles = Array.from(files);
+        fileOrder = Array.from({length: files.length}, (_, i) => i);
+        
+        renderImagePreviews();
     } else {
         previewContainer.style.display = 'none';
+        selectedFiles = [];
+        fileOrder = [];
     }
 });
+
+function renderImagePreviews() {
+    const imagesList = document.getElementById('new-images-list');
+    imagesList.innerHTML = '';
+    
+    fileOrder.forEach((fileIndex, displayIndex) => {
+        const file = selectedFiles[fileIndex];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const imageItem = document.createElement('div');
+            imageItem.className = 'image-preview-item draggable';
+            imageItem.draggable = true;
+            imageItem.dataset.fileIndex = fileIndex;
+            imageItem.dataset.displayIndex = displayIndex;
+            
+            imageItem.innerHTML = `
+                <div class="drag-handle" style="cursor: move; padding: 5px; background: #f0f0f0; border-radius: 3px; margin-bottom: 5px;">
+                    <sl-icon name="grip-vertical"></sl-icon> Drag to reorder
+                </div>
+                <img src="${e.target.result}" 
+                     alt="Image preview" 
+                     style="max-width: 100%; height: auto; max-height: 200px;">
+                <input type="text" name="captions[]" class="form-control" 
+                       placeholder="Enter image caption" 
+                       style="margin-top:0.5rem;" 
+                       value="" />
+                <span class="size-label">${file.name}</span>
+                <sl-button variant="danger" size="small" style="margin-top: 5px;" onclick="removeImage(${fileIndex})">
+                    <sl-icon slot="prefix" name="trash"></sl-icon>
+                    Remove
+                </sl-button>
+            `;
+            
+            // Add drag event listeners
+            imageItem.addEventListener('dragstart', handleDragStart);
+            imageItem.addEventListener('dragover', handleDragOver);
+            imageItem.addEventListener('drop', handleDrop);
+            imageItem.addEventListener('dragend', handleDragEnd);
+            
+            imagesList.appendChild(imageItem);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function removeImage(fileIndex) {
+    // Remove from selectedFiles and fileOrder
+    const displayIndex = fileOrder.indexOf(fileIndex);
+    if (displayIndex > -1) {
+        fileOrder.splice(displayIndex, 1);
+        selectedFiles.splice(fileIndex, 1);
+        
+        // Update fileOrder indices
+        fileOrder = fileOrder.map(index => index > fileIndex ? index - 1 : index);
+        
+        // Re-render
+        renderImagePreviews();
+        
+        // Update the file input
+        updateFileInput();
+    }
+}
+
+function updateFileInput() {
+    // Create a new FileList with files in the correct order
+    const dt = new DataTransfer();
+    fileOrder.forEach(fileIndex => {
+        dt.items.add(selectedFiles[fileIndex]);
+    });
+    document.getElementById('image-input').files = dt.files;
+}
+
+// Drag and drop functionality
+let draggedElement = null;
+
+function handleDragStart(e) {
+    draggedElement = this;
+    this.style.opacity = '0.5';
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', this.outerHTML);
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
+    }
+    
+    if (draggedElement !== this) {
+        const draggedIndex = parseInt(draggedElement.dataset.displayIndex);
+        const targetIndex = parseInt(this.dataset.displayIndex);
+        
+        // Swap in fileOrder array
+        const temp = fileOrder[draggedIndex];
+        fileOrder[draggedIndex] = fileOrder[targetIndex];
+        fileOrder[targetIndex] = temp;
+        
+        // Re-render
+        renderImagePreviews();
+        
+        // Update the file input
+        updateFileInput();
+    }
+    
+    return false;
+}
+
+function handleDragEnd(e) {
+    this.style.opacity = '';
+    draggedElement = null;
+}
+
+// Add some CSS for better drag and drop experience
+const style = document.createElement('style');
+style.textContent = `
+    .draggable {
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+    .draggable:hover {
+        border-color: #007bff;
+    }
+    .draggable.dragging {
+        opacity: 0.5;
+        transform: rotate(5deg);
+    }
+    .image-preview-item {
+        position: relative;
+        margin-bottom: 20px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        background: white;
+    }
+    .drag-handle {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        color: #666;
+    }
+`;
+document.head.appendChild(style);
 </script>
 
 {{/layouts/admin}} 
