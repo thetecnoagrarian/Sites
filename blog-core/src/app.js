@@ -176,6 +176,12 @@ export function createBlogApp(config) {
         immutable: process.env.NODE_ENV === 'production'
     }));
 
+    // Serve uploads directory separately
+    app.use('/uploads', express.static(uploadsPath, {
+        maxAge: process.env.NODE_ENV === 'production' ? '30d' : 0,
+        immutable: process.env.NODE_ENV === 'production'
+    }));
+
     // Register Handlebars helpers
     const defaultHelpers = {
         formatDateInput: function(date) {
