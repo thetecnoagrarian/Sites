@@ -206,38 +206,56 @@
 </style>
 
 <script>
-// Wait for DOM to be ready
-document.addEventListener('DOMContentLoaded', function() {
-    // Store selected files globally to maintain order
-    let selectedFiles = [];
-    let fileOrder = [];
+// Store selected files globally to maintain order
+let selectedFiles = [];
+let fileOrder = [];
 
-    // Handle image selection and preview
-    const imageInput = document.getElementById('image-input');
-    if (!imageInput) {
-        console.error('Image input element not found');
-        return;
+// Drag and drop functionality
+let draggedElement = null;
+
+function handleDragStart(e) {
+    draggedElement = this;
+    this.style.opacity = '0.5';
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', this.outerHTML);
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault();
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation();
     }
     
-    imageInput.addEventListener('change', function(e) {
-    const files = e.target.files;
-    const previewContainer = document.getElementById('new-images-preview');
-    const imagesList = document.getElementById('new-images-list');
-    
-    if (files.length > 0) {
-        previewContainer.style.display = 'block';
+    if (draggedElement !== this) {
+        const draggedIndex = parseInt(draggedElement.dataset.displayIndex);
+        const targetIndex = parseInt(this.dataset.displayIndex);
         
-        // Store files and their order
-        selectedFiles = Array.from(files);
-        fileOrder = Array.from({length: files.length}, (_, i) => i);
+        // Swap in fileOrder array
+        const temp = fileOrder[draggedIndex];
+        fileOrder[draggedIndex] = fileOrder[targetIndex];
+        fileOrder[targetIndex] = temp;
         
+        // Re-render
         renderImagePreviews();
-    } else {
-        previewContainer.style.display = 'none';
-        selectedFiles = [];
-        fileOrder = [];
+        
+        // Update the file input
+        updateFileInput();
     }
-});
+    
+    return false;
+}
+
+function handleDragEnd(e) {
+    this.style.opacity = '';
+    draggedElement = null;
+}
 
 function renderImagePreviews() {
     const imagesList = document.getElementById('new-images-list');
@@ -315,52 +333,34 @@ function updateFileInput() {
     document.getElementById('image-input').files = dt.files;
 }
 
-// Drag and drop functionality
-let draggedElement = null;
-
-function handleDragStart(e) {
-    draggedElement = this;
-    this.style.opacity = '0.5';
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', this.outerHTML);
-}
-
-function handleDragOver(e) {
-    if (e.preventDefault) {
-        e.preventDefault();
-    }
-    e.dataTransfer.dropEffect = 'move';
-    return false;
-}
-
-function handleDrop(e) {
-    if (e.stopPropagation) {
-        e.stopPropagation();
+// Wait for DOM to be ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle image selection and preview
+    const imageInput = document.getElementById('image-input');
+    if (!imageInput) {
+        console.error('Image input element not found');
+        return;
     }
     
-    if (draggedElement !== this) {
-        const draggedIndex = parseInt(draggedElement.dataset.displayIndex);
-        const targetIndex = parseInt(this.dataset.displayIndex);
+    imageInput.addEventListener('change', function(e) {
+        const files = e.target.files;
+        const previewContainer = document.getElementById('new-images-preview');
         
-        // Swap in fileOrder array
-        const temp = fileOrder[draggedIndex];
-        fileOrder[draggedIndex] = fileOrder[targetIndex];
-        fileOrder[targetIndex] = temp;
-        
-        // Re-render
-        renderImagePreviews();
-        
-        // Update the file input
-        updateFileInput();
-    }
-    
-    return false;
-}
-
-function handleDragEnd(e) {
-    this.style.opacity = '';
-    draggedElement = null;
-}
+        if (files.length > 0) {
+            previewContainer.style.display = 'block';
+            
+            // Store files and their order
+            selectedFiles = Array.from(files);
+            fileOrder = Array.from({length: files.length}, (_, i) => i);
+            
+            renderImagePreviews();
+        } else {
+            previewContainer.style.display = 'none';
+            selectedFiles = [];
+            fileOrder = [];
+        }
+    });
+});
 
 // Add some CSS for better drag and drop experience
 const style = document.createElement('style');
@@ -393,8 +393,6 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
-
-}); // End DOMContentLoaded
 </script>
 
 {{/layouts/admin}} 
