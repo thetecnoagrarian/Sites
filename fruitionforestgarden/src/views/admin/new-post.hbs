@@ -255,7 +255,7 @@ function renderImagePreviews() {
             
             imageItem.innerHTML = `
                 <div class="drag-handle" style="cursor: move; padding: 5px; background: #f0f0f0; border-radius: 3px; margin-bottom: 5px;">
-                    <sl-icon name="grip-vertical"></sl-icon> Drag to reorder
+                    <span style="font-size: 16px;">⋮⋮</span> Drag to reorder
                 </div>
                 <img src="${e.target.result}" 
                      alt="Image preview" 
@@ -265,10 +265,9 @@ function renderImagePreviews() {
                        style="margin-top:0.5rem;" 
                        value="" />
                 <span class="size-label">${file.name}</span>
-                <sl-button variant="danger" size="small" style="margin-top: 5px;" onclick="removeImage(${fileIndex})">
-                    <sl-icon slot="prefix" name="trash"></sl-icon>
-                    Remove
-                </sl-button>
+                <button type="button" class="btn btn-danger btn-sm" style="margin-top: 5px;" data-file-index="${fileIndex}">
+                    🗑️ Remove
+                </button>
             `;
             
             // Add drag event listeners
@@ -276,6 +275,12 @@ function renderImagePreviews() {
             imageItem.addEventListener('dragover', handleDragOver);
             imageItem.addEventListener('drop', handleDrop);
             imageItem.addEventListener('dragend', handleDragEnd);
+            
+            // Add remove button event listener
+            const removeBtn = imageItem.querySelector('button[data-file-index]');
+            removeBtn.addEventListener('click', function() {
+                removeImage(parseInt(this.dataset.fileIndex));
+            });
             
             imagesList.appendChild(imageItem);
         };
