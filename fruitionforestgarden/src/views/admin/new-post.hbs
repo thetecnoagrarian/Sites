@@ -224,6 +224,12 @@ function handleDragOver(e) {
         e.preventDefault();
     }
     e.dataTransfer.dropEffect = 'move';
+    
+    // Add visual feedback for drop zones
+    if (this.classList.contains('drop-zone')) {
+        this.classList.add('drag-over');
+    }
+    
     return false;
 }
 
@@ -232,20 +238,41 @@ function handleDrop(e) {
         e.stopPropagation();
     }
     
-    if (draggedElement !== this) {
+    if (draggedElement) {
         const draggedIndex = parseInt(draggedElement.dataset.displayIndex);
-        const targetIndex = parseInt(this.dataset.displayIndex);
+        let targetIndex;
         
-        // Swap in fileOrder array
-        const temp = fileOrder[draggedIndex];
-        fileOrder[draggedIndex] = fileOrder[targetIndex];
-        fileOrder[targetIndex] = temp;
+        // Check if dropping on a drop zone
+        if (this.classList.contains('drop-zone')) {
+            const position = this.dataset.position;
+            if (position === 'start') {
+                targetIndex = 0;
+            } else {
+                targetIndex = parseInt(position) + 1;
+            }
+        } else {
+            // Dropping on another image
+            targetIndex = parseInt(this.dataset.displayIndex);
+        }
         
-        // Re-render
-        renderImagePreviews();
-        
-        // Update the file input
-        updateFileInput();
+        if (draggedIndex !== targetIndex) {
+            // Remove dragged item from fileOrder
+            const draggedFileIndex = fileOrder.splice(draggedIndex, 1)[0];
+            
+            // Adjust target index if we removed an item before it
+            if (targetIndex > draggedIndex) {
+                targetIndex--;
+            }
+            
+            // Insert at new position
+            fileOrder.splice(targetIndex, 0, draggedFileIndex);
+            
+            // Re-render
+            renderImagePreviews();
+            
+            // Update the file input
+            updateFileInput();
+        }
     }
     
     return false;
@@ -254,11 +281,20 @@ function handleDrop(e) {
 function handleDragEnd(e) {
     this.style.opacity = '';
     draggedElement = null;
+    
+    // Remove visual feedback from all drop zones
+    document.querySelectorAll('.drop-zone').forEach(zone => {
+        zone.classList.remove('drag-over');
+    });
 }
 
 function renderImagePreviews() {
     const imagesList = document.getElementById('new-images-list');
     imagesList.innerHTML = '';
+    
+    // Add drop zone at the beginning
+    const startDropZone = createDropZone('start', 'Drop here to make first');
+    imagesList.appendChild(startDropZone);
     
     fileOrder.forEach((fileIndex, displayIndex) => {
         const file = selectedFiles[fileIndex];
@@ -300,9 +336,31 @@ function renderImagePreviews() {
             });
             
             imagesList.appendChild(imageItem);
+            
+            // Add drop zone after each image
+            const dropZone = createDropZone(displayIndex, `Drop here to insert after image ${displayIndex + 1}`);
+            imagesList.appendChild(dropZone);
         };
         reader.readAsDataURL(file);
     });
+}
+
+function createDropZone(position, text) {
+    const dropZone = document.createElement('div');
+    dropZone.className = 'drop-zone';
+    dropZone.dataset.position = position;
+    dropZone.innerHTML = `
+        <div class="drop-zone-content">
+            <div class="drop-zone-line"></div>
+            <div class="drop-zone-text">${text}</div>
+        </div>
+    `;
+    
+    // Add drop zone event listeners
+    dropZone.addEventListener('dragover', handleDragOver);
+    dropZone.addEventListener('drop', handleDrop);
+    
+    return dropZone;
 }
 
 function removeImage(fileIndex) {
@@ -389,6 +447,57 @@ style.textContent = `
         gap: 5px;
         font-size: 12px;
         color: #666;
+    }
+    
+    /* Drop Zone Styles */
+    .drop-zone {
+        height: 40px;
+        margin: 10px 0;
+        border: 2px dashed #ccc;
+        border-radius: 8px;
+        background: #f8f9fa;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        opacity: 0.6;
+    }
+    
+    .drop-zone:hover {
+        border-color: #007bff;
+        background: #e3f2fd;
+        opacity: 1;
+    }
+    
+    .drop-zone.drag-over {
+        border-color: #28a745;
+        background: #d4edda;
+        opacity: 1;
+        transform: scale(1.02);
+    }
+    
+    .drop-zone-content {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .drop-zone-line {
+        width: 30px;
+        height: 2px;
+        background: #007bff;
+        border-radius: 1px;
+    }
+    
+    .drop-zone-text {
+        font-size: 12px;
+        color: #666;
+        font-weight: 500;
+    }
+    
+    .drop-zone.drag-over .drop-zone-text {
+        color: #28a745;
+        font-weight: 600;
     }
 `;
 document.head.appendChild(style);
