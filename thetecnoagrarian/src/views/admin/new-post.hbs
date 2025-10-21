@@ -195,12 +195,20 @@
 </style>
 
 <script>
-// Store selected files globally to maintain order
-let selectedFiles = [];
-let fileOrder = [];
+// Wait for DOM to be ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Store selected files globally to maintain order
+    let selectedFiles = [];
+    let fileOrder = [];
 
-// Handle image selection and preview
-document.getElementById('image-input').addEventListener('change', function(e) {
+    // Handle image selection and preview
+    const imageInput = document.getElementById('image-input');
+    if (!imageInput) {
+        console.error('Image input element not found');
+        return;
+    }
+    
+    imageInput.addEventListener('change', function(e) {
     const files = e.target.files;
     const previewContainer = document.getElementById('new-images-preview');
     const imagesList = document.getElementById('new-images-list');
@@ -369,6 +377,8 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+}); // End DOMContentLoaded
 </script>
 
 {{/layouts/admin}} 
