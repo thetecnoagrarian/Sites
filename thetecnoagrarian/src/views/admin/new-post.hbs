@@ -198,106 +198,80 @@
 let selectedFiles = [];
 let fileOrder = [];
 
-// Drag and drop functionality
-let draggedElement = null;
-
-function handleDragStart(e) {
-    draggedElement = this;
-    this.style.opacity = '0.5';
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', this.outerHTML);
-}
-
-function handleDragOver(e) {
-    if (e.preventDefault) {
-        e.preventDefault();
-    }
-    e.dataTransfer.dropEffect = 'move';
-    
-    // Add visual feedback for drop zones
-    if (this.classList.contains('drop-zone')) {
-        this.classList.add('drag-over');
-    }
-    
-    return false;
-}
-
-function handleDrop(e) {
-    if (e.stopPropagation) {
-        e.stopPropagation();
-    }
-    
-    if (draggedElement) {
-        const draggedIndex = parseInt(draggedElement.dataset.displayIndex);
-        let targetIndex;
+// Simple up/down button functionality
+function moveImageUp(displayIndex) {
+    if (displayIndex > 0) {
+        // Swap with previous item
+        const currentFileIndex = fileOrder[displayIndex];
+        const previousFileIndex = fileOrder[displayIndex - 1];
         
-        // Check if dropping on a drop zone
-        if (this.classList.contains('drop-zone')) {
-            const position = this.dataset.position;
-            if (position === 'start') {
-                targetIndex = 0;
-            } else {
-                targetIndex = parseInt(position) + 1;
-            }
-        } else {
-            // Dropping on another image
-            targetIndex = parseInt(this.dataset.displayIndex);
-        }
+        fileOrder[displayIndex] = previousFileIndex;
+        fileOrder[displayIndex - 1] = currentFileIndex;
         
-        if (draggedIndex !== targetIndex) {
-            // Remove dragged item from fileOrder
-            const draggedFileIndex = fileOrder.splice(draggedIndex, 1)[0];
-            
-            // Adjust target index if we removed an item before it
-            if (targetIndex > draggedIndex) {
-                targetIndex--;
-            }
-            
-            // Insert at new position
-            fileOrder.splice(targetIndex, 0, draggedFileIndex);
-            
-            // Re-render
-            renderImagePreviews();
-            
-            // Update the file input
-            updateFileInput();
-        }
+        // Re-render
+        renderImagePreviews();
+        
+        // Update the file input
+        updateFileInput();
     }
-    
-    return false;
 }
 
-function handleDragEnd(e) {
-    this.style.opacity = '';
-    draggedElement = null;
-    
-    // Remove visual feedback from all drop zones
-    document.querySelectorAll('.drop-zone').forEach(zone => {
-        zone.classList.remove('drag-over');
-    });
+function moveImageDown(displayIndex) {
+    if (displayIndex < fileOrder.length - 1) {
+        // Swap with next item
+        const currentFileIndex = fileOrder[displayIndex];
+        const nextFileIndex = fileOrder[displayIndex + 1];
+        
+        fileOrder[displayIndex] = nextFileIndex;
+        fileOrder[displayIndex + 1] = currentFileIndex;
+        
+        // Re-render
+        renderImagePreviews();
+        
+        // Update the file input
+        updateFileInput();
+    }
 }
 
 function renderImagePreviews() {
     const imagesList = document.getElementById('new-images-list');
     imagesList.innerHTML = '';
     
-    // Add drop zone at the beginning
-    const startDropZone = createDropZone('start', 'Drop here to make first');
-    imagesList.appendChild(startDropZone);
-    
     fileOrder.forEach((fileIndex, displayIndex) => {
         const file = selectedFiles[fileIndex];
         const reader = new FileReader();
         reader.onload = function(e) {
             const imageItem = document.createElement('div');
-            imageItem.className = 'image-preview-item draggable';
-            imageItem.draggable = true;
+            imageItem.className = 'image-preview-item';
             imageItem.dataset.fileIndex = fileIndex;
             imageItem.dataset.displayIndex = displayIndex;
             
+            // Create up/down buttons
+            const upButton = displayIndex > 0 ? 
+                `<button type="button" class="btn btn-sm btn-outline-primary move-btn" onclick="moveImageUp(${displayIndex})" title="Move Up">
+                    ↑ Move Up
+                </button>` : 
+                `<button type="button" class="btn btn-sm btn-outline-secondary move-btn" disabled title="Already at top">
+                    ↑ Move Up
+                </button>`;
+                
+            const downButton = displayIndex < fileOrder.length - 1 ? 
+                `<button type="button" class="btn btn-sm btn-outline-primary move-btn" onclick="moveImageDown(${displayIndex})" title="Move Down">
+                    ↓ Move Down
+                </button>` : 
+                `<button type="button" class="btn btn-sm btn-outline-secondary move-btn" disabled title="Already at bottom">
+                    ↓ Move Down
+                </button>`;
+            
             imageItem.innerHTML = `
-                <div class="drag-handle" style="cursor: move; padding: 5px; background: #f0f0f0; border-radius: 3px; margin-bottom: 5px;">
-                    <span style="font-size: 16px;">⋮⋮</span> Drag to reorder
+                <div class="image-controls">
+                    <div class="move-buttons">
+                        ${upButton}
+                        ${downButton}
+                    </div>
+                    <div class="position-indicator">
+                        Position: ${displayIndex + 1} of ${fileOrder.length}
+                    </div>
                 </div>
                 <img src="${e.target.result}" 
                      alt="Image preview" 
@@ -307,16 +281,10 @@ function renderImagePreviews() {
                        style="margin-top:0.5rem;" 
                        value="" />
                 <span class="size-label">${file.name}</span>
-                <button type="button" class="btn btn-danger btn-sm" style="margin-top: 5px;" data-file-index="${fileIndex}">
+                <button type="button" class="btn btn-danger btn-sm remove-btn" data-file-index="${fileIndex}">
                     🗑️ Remove
                 </button>
             `;
-            
-            // Add drag event listeners
-            imageItem.addEventListener('dragstart', handleDragStart);
-            imageItem.addEventListener('dragover', handleDragOver);
-            imageItem.addEventListener('drop', handleDrop);
-            imageItem.addEventListener('dragend', handleDragEnd);
             
             // Add remove button event listener
             const removeBtn = imageItem.querySelector('button[data-file-index]');
@@ -325,31 +293,9 @@ function renderImagePreviews() {
             });
             
             imagesList.appendChild(imageItem);
-            
-            // Add drop zone after each image
-            const dropZone = createDropZone(displayIndex, `Drop here to insert after image ${displayIndex + 1}`);
-            imagesList.appendChild(dropZone);
         };
         reader.readAsDataURL(file);
     });
-}
-
-function createDropZone(position, text) {
-    const dropZone = document.createElement('div');
-    dropZone.className = 'drop-zone';
-    dropZone.dataset.position = position;
-    dropZone.innerHTML = `
-        <div class="drop-zone-content">
-            <div class="drop-zone-line"></div>
-            <div class="drop-zone-text">${text}</div>
-        </div>
-    `;
-    
-    // Add drop zone event listeners
-    dropZone.addEventListener('dragover', handleDragOver);
-    dropZone.addEventListener('drop', handleDrop);
-    
-    return dropZone;
 }
 
 function removeImage(fileIndex) {
@@ -408,85 +354,79 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Add some CSS for better drag and drop experience
+// Add CSS for the new up/down button interface
 const style = document.createElement('style');
 style.textContent = `
-    .draggable {
-        transition: all 0.3s ease;
-        border: 2px solid transparent;
-    }
-    .draggable:hover {
-        border-color: #007bff;
-    }
-    .draggable.dragging {
-        opacity: 0.5;
-        transform: rotate(5deg);
-    }
     .image-preview-item {
         position: relative;
         margin-bottom: 20px;
-        padding: 10px;
+        padding: 15px;
         border: 1px solid #ddd;
-        border-radius: 5px;
-        background: white;
-    }
-    .drag-handle {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        font-size: 12px;
-        color: #666;
-    }
-    
-    /* Drop Zone Styles */
-    .drop-zone {
-        height: 40px;
-        margin: 10px 0;
-        border: 2px dashed #ccc;
         border-radius: 8px;
-        background: #f8f9fa;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         transition: all 0.3s ease;
-        opacity: 0.6;
     }
     
-    .drop-zone:hover {
+    .image-preview-item:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         border-color: #007bff;
-        background: #e3f2fd;
-        opacity: 1;
     }
     
-    .drop-zone.drag-over {
-        border-color: #28a745;
-        background: #d4edda;
-        opacity: 1;
-        transform: scale(1.02);
-    }
-    
-    .drop-zone-content {
+    .image-controls {
         display: flex;
+        justify-content: space-between;
         align-items: center;
-        gap: 10px;
+        margin-bottom: 10px;
+        padding: 8px;
+        background: #f8f9fa;
+        border-radius: 5px;
     }
     
-    .drop-zone-line {
-        width: 30px;
-        height: 2px;
-        background: #007bff;
-        border-radius: 1px;
+    .move-buttons {
+        display: flex;
+        gap: 5px;
     }
     
-    .drop-zone-text {
+    .move-btn {
+        font-size: 12px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+    }
+    
+    .move-btn:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .move-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    
+    .position-indicator {
         font-size: 12px;
         color: #666;
         font-weight: 500;
+        background: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
     }
     
-    .drop-zone.drag-over .drop-zone-text {
-        color: #28a745;
-        font-weight: 600;
+    .remove-btn {
+        margin-top: 8px;
+        width: 100%;
+    }
+    
+    .size-label {
+        display: block;
+        text-align: center;
+        margin-top: 0.5rem;
+        font-size: 0.875rem;
+        color: #666;
+        font-weight: 500;
     }
 `;
 document.head.appendChild(style);
