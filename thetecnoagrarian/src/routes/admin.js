@@ -246,7 +246,7 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
             for (let i = 0; i < req.files.length; i++) {
                 const file = req.files[i];
                 try {
-                    const processedImage = await processImage(file.path, file.filename, path.join(__dirname, '../public/uploads'));
+                    const processedImage = await processImage(file.path, file.filename, process.env.UPLOADS_PATH || '/app/data/uploads');
                     images.push(processedImage);
                     // Get caption for this image (use index to match image with caption)
                     const caption = formCaptions[i] || '';
@@ -390,7 +390,7 @@ router.post('/dashboard/posts/:id/update', isAdmin, async (req, res) => {
             // Add new images
             imageUrls = [];
             for (const file of req.files) {
-                const newImageUrls = await processImage(file.path, file.filename);
+                const newImageUrls = await processImage(file.path, file.filename, process.env.UPLOADS_PATH || '/app/data/uploads');
                 imageUrls.push(newImageUrls);
             }
         }
