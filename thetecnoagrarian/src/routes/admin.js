@@ -401,7 +401,7 @@ router.post('/dashboard/posts/:id/update', isAdmin, async (req, res) => {
         }
         
         // If no new images were uploaded, use existing images with updated captions
-        if (req.files && req.files.length === 0) {
+        if (!req.files || req.files.length === 0) {
             // Keep existing images but update captions
             imageUrls = post.images || [];
             // Ensure captions array matches image array length
