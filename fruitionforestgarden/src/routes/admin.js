@@ -524,6 +524,11 @@ router.post('/dashboard/posts/:id/update', isAdmin, async (req, res) => {
             captions = Array.isArray(req.body.captions) ? req.body.captions : [req.body.captions];
         }
         
+        console.log('Update route - Raw captions from form:', req.body['captions[]']);
+        console.log('Update route - Processed captions array:', captions);
+        console.log('Update route - Post images:', post.images);
+        console.log('Update route - Post captions:', post.captions);
+        
         // If no new images were uploaded, use existing images with updated captions
         if (!req.files || req.files.length === 0) {
             // Keep existing images but update captions
