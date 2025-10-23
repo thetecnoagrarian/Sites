@@ -573,15 +573,28 @@ async function updatePostHandler(req, res) {
             console.log('Update route - Processed created_at:', created_at);
         }
         
-        await Post.update(req.params.id, {
+        console.log('Update route - About to call Post.update with:', {
+            id: req.params.id,
             title: req.body.title,
-            content: req.body.content,
+            body: req.body.body,
             description: req.body.description || '',
             excerpt: req.body.excerpt || '',
             images: imageUrls,
             captions: captions,
             created_at: created_at
         });
+        
+        await Post.update(req.params.id, {
+            title: req.body.title,
+            body: req.body.body,
+            description: req.body.description || '',
+            excerpt: req.body.excerpt || '',
+            images: imageUrls,
+            captions: captions,
+            created_at: created_at
+        });
+        
+        console.log('Update route - Post.update completed successfully');
         // Update categories for the post
         const categoryIds = Array.isArray(req.body.categories) ? req.body.categories : (req.body.categories ? [req.body.categories] : []);
         // Remove all existing categories

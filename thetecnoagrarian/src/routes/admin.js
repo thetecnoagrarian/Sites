@@ -451,7 +451,7 @@ async function updatePostHandler(req, res) {
         
         await Post.update(req.params.id, {
             title: req.body.title,
-            content: req.body.body,
+            body: req.body.body,
             description: req.body.description || '',
             excerpt: req.body.excerpt || '',
             images: imageUrls,
