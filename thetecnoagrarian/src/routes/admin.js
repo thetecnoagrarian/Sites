@@ -359,7 +359,22 @@ router.get('/posts/:id/edit', isAdmin, async (req, res) => {
 });
 
 // Add a POST route for updating a post
-router.post('/admin/dashboard/posts/:id/update', isAdmin, async (req, res) => {
+router.post('/admin/dashboard/posts/:id/update', isAdmin, (req, res, next) => {
+    req.app.locals.upload.array('image', 25)(req, res, function (err) {
+        if (err instanceof multer.MulterError) {
+            req.flash('error', 'One or more files are too large. Max size is 20MB.');
+            return res.redirect(`/admin/posts/${req.params.id}/edit`);
+        } else if (err) {
+            req.flash('error', 'File upload error: ' + err.message);
+            return res.redirect(`/admin/posts/${req.params.id}/edit`);
+        }
+        
+        // Continue with the update logic
+        updatePostHandler(req, res);
+    });
+});
+
+async function updatePostHandler(req, res) {
     try {
         // Post and processImage are already imported from @ffg/blog-core
         const post = Post.findById(req.params.id);
@@ -472,7 +487,7 @@ router.post('/admin/dashboard/posts/:id/update', isAdmin, async (req, res) => {
         req.flash('error', 'Error updating post');
         res.redirect('/admin/dashboard');
     }
-});
+}
 
 // Analytics dashboard - temporarily disabled until analytics model is added to core
 /*
