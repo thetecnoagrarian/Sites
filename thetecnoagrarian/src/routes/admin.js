@@ -359,7 +359,7 @@ router.get('/posts/:id/edit', isAdmin, async (req, res) => {
 });
 
 // Add a POST route for updating a post
-router.post('/dashboard/posts/:id/update', isAdmin, async (req, res) => {
+router.post('/admin/dashboard/posts/:id/update', isAdmin, async (req, res) => {
     try {
         // Post and processImage are already imported from @ffg/blog-core
         const post = Post.findById(req.params.id);

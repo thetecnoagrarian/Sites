@@ -480,7 +480,7 @@ router.get('/posts/:id/edit', isAdmin, async (req, res) => {
 });
 
 // Add a POST route for updating a post
-router.post('/dashboard/posts/:id/update', isAdmin, async (req, res) => {
+router.post('/admin/dashboard/posts/:id/update', isAdmin, async (req, res) => {
     try {
         console.log('Update route - CSRF token from form:', req.body._csrf);
         console.log('Update route - Session ID:', req.sessionID);
