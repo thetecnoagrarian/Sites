@@ -518,15 +518,29 @@ router.post('/dashboard/posts/:id/update', isAdmin, async (req, res) => {
                 imageUrls.push(newImageUrls);
             }
         }
-        // Get captions from form
+        // Get captions from form - handle both existing and new images
         let captions = Array.isArray(req.body['captions[]']) ? req.body['captions[]'] : (req.body['captions[]'] ? [req.body['captions[]']] : []);
         if (!captions.length && req.body.captions) {
             captions = Array.isArray(req.body.captions) ? req.body.captions : [req.body.captions];
         }
-        if (captions.length < imageUrls.length) {
-            while (captions.length < imageUrls.length) captions.push('');
-        } else if (captions.length > imageUrls.length) {
-            captions = captions.slice(0, imageUrls.length);
+        
+        // If no new images were uploaded, use existing images with updated captions
+        if (req.files && req.files.length === 0) {
+            // Keep existing images but update captions
+            imageUrls = post.images || [];
+            // Ensure captions array matches image array length
+            if (captions.length < imageUrls.length) {
+                while (captions.length < imageUrls.length) captions.push('');
+            } else if (captions.length > imageUrls.length) {
+                captions = captions.slice(0, imageUrls.length);
+            }
+        } else {
+            // New images were uploaded - ensure captions match new image count
+            if (captions.length < imageUrls.length) {
+                while (captions.length < imageUrls.length) captions.push('');
+            } else if (captions.length > imageUrls.length) {
+                captions = captions.slice(0, imageUrls.length);
+            }
         }
         console.log('Update route - Raw created_at from form:', req.body.created_at);
         
