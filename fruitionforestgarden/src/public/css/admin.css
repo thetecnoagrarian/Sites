@@ -370,20 +370,24 @@ sl-button[variant="danger"]::part(base) {
     margin-bottom: 1rem;
 }
 
-/* Upload Images Button Styling */
-.btn-upload-images {
+/* Upload Images Button Styling - More specific selectors */
+.btn.btn-primary.btn-sm.btn-upload-images {
     width: 30%;
     text-align: left;
     margin-left: 0;
     margin-right: auto;
+    display: inline-block;
 }
 
-/* Event Date Input Styling */
-.form-control[type="date"],
-.form-control[name="event_date"] {
+/* Event Date Input Styling - More specific selectors */
+.form-group .form-control[type="date"],
+.form-group .form-control[name="created_at"],
+.form-group input[name="created_at"],
+.form-group #created_at {
     width: 30%;
     margin-left: 0;
     margin-right: auto;
+    display: block;
 }
 
 .file-drop-zone:hover,
