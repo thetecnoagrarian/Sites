@@ -238,6 +238,7 @@ export function createBlogApp(config) {
         max: (req) => {
             // Trusted IPs that bypass rate limiting
             const trustedIPs = [
+                '129.222.46.17', // User's IP address for testing
                 // Add your IP addresses here for development/deployment
                 // Example: '192.168.1.100', '10.0.0.50'
             ];
