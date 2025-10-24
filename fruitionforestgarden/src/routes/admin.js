@@ -57,7 +57,8 @@ router.get('/dashboard', isAdmin, async (req, res) => {
             categories,
             success: req.flash('success'),
             error: req.flash('error'),
-            user: req.user
+            user: req.user,
+            isAdmin: true
         });
         console.log('Dashboard rendered successfully');
     } catch (error) {
@@ -192,7 +193,8 @@ router.get('/posts/new', isAdmin, async (req, res) => {
         res.render('admin/new-post', {
             title: 'New Post',
             categories,
-            user: req.user
+            user: req.user,
+            isAdmin: true
         });
     } catch (error) {
         console.error('Error loading new post form:', error);
@@ -470,7 +472,8 @@ router.get('/posts/:id/edit', isAdmin, async (req, res) => {
             title: 'Edit Post',
             post,
             categories,
-            user: req.user
+            user: req.user,
+            isAdmin: true
         });
     } catch (error) {
         console.error('Error loading post for edit:', error);
