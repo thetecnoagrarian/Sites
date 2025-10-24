@@ -359,7 +359,7 @@ router.get('/posts/:id/edit', isAdmin, async (req, res) => {
 });
 
 // Add a POST route for updating a post
-router.post('/admin/dashboard/posts/:id/update', isAdmin, (req, res, next) => {
+router.post('/dashboard/posts/:id/update', isAdmin, (req, res, next) => {
     req.app.locals.upload.array('image', 25)(req, res, function (err) {
         if (err instanceof multer.MulterError) {
             req.flash('error', 'One or more files are too large. Max size is 20MB.');
