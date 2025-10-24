@@ -232,34 +232,34 @@ export function createBlogApp(config) {
     // Attach user to request if logged in
     app.use(attachUser);
 
-    // Rate limiting temporarily disabled for image migration
-    // app.use(rateLimit({
-    //     windowMs: 15 * 60 * 1000, // 15 minutes
-    //     max: (req) => {
-    //         // Trusted IPs that bypass rate limiting
-    //         const trustedIPs = [
-    //             // Add your IP addresses here for development/deployment
-    //             // Example: '192.168.1.100', '10.0.0.50'
-    //         ];
-    //         
-    //         const clientIP = req.headers['x-forwarded-for'] || req.ip;
-    //         
-    //         // If IP is trusted, allow unlimited requests
-    //         if (trustedIPs.includes(clientIP)) {
-    //             return 10000; // Effectively unlimited
-    //         }
-    //         
-    //         // Otherwise use normal rate limits
-    //         return process.env.NODE_ENV === 'production' ? 25 : 1000;
-    //     },
-    //     standardHeaders: true,
-    //     legacyHeaders: false,
-    //     message: 'Too many requests from this IP, please try again later.',
-    //     keyGenerator: (req) => {
-    //         // Use X-Forwarded-For if available, otherwise use IP
-    //         return req.headers['x-forwarded-for'] || req.ip;
-    //     }
-    // }));
+    // Rate limiting for production security
+    app.use(rateLimit({
+        windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes default
+        max: (req) => {
+            // Trusted IPs that bypass rate limiting
+            const trustedIPs = [
+                // Add your IP addresses here for development/deployment
+                // Example: '192.168.1.100', '10.0.0.50'
+            ];
+            
+            const clientIP = req.headers['x-forwarded-for'] || req.ip;
+            
+            // If IP is trusted, allow unlimited requests
+            if (trustedIPs.includes(clientIP)) {
+                return 10000; // Effectively unlimited
+            }
+            
+            // Otherwise use environment-based rate limits
+            return parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || (process.env.NODE_ENV === 'production' ? 25 : 1000);
+        },
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: 'Too many requests from this IP, please try again later.',
+        keyGenerator: (req) => {
+            // Use X-Forwarded-For if available, otherwise use IP
+            return req.headers['x-forwarded-for'] || req.ip;
+        }
+    }));
 
     // Health check endpoint
     app.get('/health', (req, res) => {
