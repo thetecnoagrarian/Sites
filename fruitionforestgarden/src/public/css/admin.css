@@ -290,6 +290,33 @@ form {
     box-shadow: 0 0 0 2px rgba(44, 62, 80, 0.1);
 }
 
+/* Consistent font styling for all form controls - using proper specificity */
+.form-group .form-control {
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+}
+
+/* Specific rules for different input types to override browser defaults */
+.form-group input[type="date"] {
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+}
+
+.form-group input[name="captions[]"] {
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+}
+
+/* Ensure all textareas also use consistent fonts */
+.form-group textarea {
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+}
+
 .form-text {
     font-size: 0.875rem;
     color: #666;
