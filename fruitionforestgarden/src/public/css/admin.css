@@ -4,6 +4,8 @@
     max-width: 1200px;
     margin: 2rem auto;
     padding: 0 1rem;
+    /* Remove box-shadow from outer container */
+    box-shadow: none;
 }
 
 .admin-container h1 {
