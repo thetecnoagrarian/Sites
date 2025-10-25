@@ -489,15 +489,18 @@ async function updatePostHandler(req, res) {
     }
 }
 
-// Analytics dashboard - temporarily disabled until analytics model is added to core
-/*
+// Analytics dashboard
 router.get('/analytics', isAdmin, async (req, res) => {
     try {
-        // Analytics model not available in core package yet
-        // const Analytics = require('../models/analytics');
+        const Analytics = require('../models/analytics');
+        
+        // Get row limits from query parameters with defaults
+        const pageViewLimit = parseInt(req.query.pageViewLimit) || 25;
+        const activityLimit = parseInt(req.query.activityLimit) || 25;
+        
         const totalStats = Analytics.getTotalStats();
-        const pageViewStats = Analytics.getPageViewStats(30);
-        const recentActivity = Analytics.getRecentActivity(20);
+        const pageViewStats = Analytics.getPageViewStats(30, pageViewLimit);
+        const recentActivity = Analytics.getRecentActivity(activityLimit);
         const dbHealth = Analytics.checkDatabaseHealth();
         
         res.render('admin/analytics', {
@@ -507,7 +510,9 @@ router.get('/analytics', isAdmin, async (req, res) => {
             pageViewStats,
             recentActivity,
             dbHealth,
-            csrfToken: req.csrfToken()
+            pageViewLimit,
+            activityLimit,
+            isAdmin: true
         });
     } catch (error) {
         console.error('Error loading analytics:', error);
@@ -515,21 +520,17 @@ router.get('/analytics', isAdmin, async (req, res) => {
         res.redirect('/admin/dashboard');
     }
 });
-*/
 
-// Analytics health check API - temporarily disabled
-/*
+// Analytics health check API
 router.get('/analytics/health', isAdmin, async (req, res) => {
     try {
-        // Analytics model not available in core package yet
-        // const Analytics = require('../models/analytics');
+        const Analytics = require('../models/analytics');
         const health = Analytics.checkDatabaseHealth();
         res.json(health);
     } catch (error) {
         res.status(500).json({ error: 'Health check failed', details: error.message });
     }
 });
-*/
 
 // User management
 

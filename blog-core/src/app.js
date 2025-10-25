@@ -77,7 +77,9 @@ export function createBlogApp(config) {
                 fontSrc: [
                     "'self'",
                     "https://cdnjs.cloudflare.com",
-                    "https://cdn.jsdelivr.net"
+                    "https://cdn.jsdelivr.net",
+                    "https://fonts.googleapis.com",
+                    "https://fonts.gstatic.com"
                 ],
                 imgSrc: ["'self'", "data:", "blob:", "https://cdn.jsdelivr.net"],
                 connectSrc: ["'self'", "https://cdn.jsdelivr.net", "data:"],
@@ -231,6 +233,43 @@ export function createBlogApp(config) {
 
     // Attach user to request if logged in
     app.use(attachUser);
+
+    // Bot protection middleware
+    app.use((req, res, next) => {
+        const userAgent = req.headers['user-agent'] || '';
+        const clientIP = req.headers['x-forwarded-for'] || req.ip;
+        
+        // Block common bot patterns
+        const botPatterns = [
+            /bot/i, /crawler/i, /spider/i, /scraper/i,
+            /curl/i, /wget/i, /python/i, /java/i,
+            /nikto/i, /sqlmap/i, /nmap/i, /masscan/i,
+            /zgrab/i, /gobuster/i, /dirb/i, /dirbuster/i
+        ];
+        
+        // Block requests for sensitive files
+        const sensitivePaths = [
+            '/.env', '/.env.local', '/.env.production',
+            '/config/database.yml', '/config/secrets.yml',
+            '/wp-admin', '/wp-login', '/phpmyadmin',
+            '/adminer', '/.git', '/.svn', '/.htaccess',
+            '/backup', '/backups', '/.backup'
+        ];
+        
+        // Check for bot user agents
+        if (botPatterns.some(pattern => pattern.test(userAgent))) {
+            logger.warn(`Bot detected: ${userAgent} from ${clientIP}`);
+            return res.status(403).json({ error: 'Access denied' });
+        }
+        
+        // Check for sensitive file requests
+        if (sensitivePaths.some(path => req.path.includes(path))) {
+            logger.warn(`Sensitive file access attempt: ${req.path} from ${clientIP}`);
+            return res.status(404).json({ error: 'Not found' });
+        }
+        
+        next();
+    });
 
     // Rate limiting for production security
     app.use(rateLimit({
