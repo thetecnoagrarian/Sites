@@ -275,27 +275,22 @@ app.use(helmet({
 
 ## 🔐 Environment & Secrets Management
 
-### Current Issues
-- **Password Management**: Multiple passwords scattered across different systems
-- **SSH Key Management**: Need to organize and document SSH key usage
-- **Environment Variables**: Need centralized .env management for production
+### ✅ Production Environment Setup (COMPLETED)
+Location: `/opt/Sites/.env` on Linode server
 
-### Production Environment Setup (TODO)
-Create `.env.example` file:
 ```bash
 # Database Configuration
 DATABASE_PATH=/app/data/blog.db
 UPLOADS_PATH=/app/data/uploads
 
 # Security
-SESSION_SECRET=your-super-secret-session-key-here
-CSRF_SECRET=your-csrf-secret-here
-ADMIN_PASSWORD=your-secure-admin-password
+SESSION_SECRET=[secure-random-string]
+CSRF_SECRET=[secure-random-string]
 
 # Application Settings
 NODE_ENV=production
 LOG_LEVEL=warn
-MAX_FILE_SIZE=10485760
+MAX_FILE_SIZE=52428800  # 50MB for ~20 images
 
 # Rate Limiting
 RATE_LIMIT_WINDOW_MS=900000
@@ -305,12 +300,34 @@ RATE_LIMIT_MAX_REQUESTS=25
 TRUSTED_IPS=129.222.46.17
 ```
 
-### Authentication Cleanup Tasks
-1. **Document all current passwords** and their purposes
-2. **Consolidate SSH keys** and document their usage
-3. **Create secure password management** system
-4. **Set up environment variable** management for production
-5. **Implement secrets rotation** schedule
+### ✅ SSH Key Management (COMPLETED)
+
+**Active SSH Keys:**
+- **Local Machine** (`~/.ssh/id_ed25519_tta`): TTA-MacBook-Deploy-Key-2025
+  - Fingerprint: `SHA256:B3Ab3+nEj7iFfNaefpgNFPPUZNSVWt2X9QSMqTxsTJs`
+  - Purpose: Local MacBook deployment and GitHub authentication
+  - GitHub: Deployed as "Personal MacBook Key" → **Rename to: TTA-MacBook-Deploy-Key-2025**
+
+- **Server** (`~/.ssh/id_ed25519_new`): TTA-Linode-Deploy-Key-2025
+  - Fingerprint: `SHA256:XJQiXEgpuEZX5lA8Rzm5yVcI9dWUZb4jIDp6VX/bhrQ`
+  - Purpose: Server deployment from Linode
+  - GitHub: Deployed as "Linode Server Deploy - New Setup" → **Rename to: TTA-Linode-Deploy-Key-2025**
+
+**1Password Keys to Update:**
+1. Delete: `Deploy Key - Fruition Forest Garden - June 2024` (old key, no longer used)
+2. Delete: `local github_ed25519` (old key, no longer used)
+3. Rename: `id_ed25519_tta` → `TTA-MacBook-Deploy-Key-2025`
+4. Rename: `TTAGitHubSSH Key` → `TTA-Linode-Deploy-Key-2025`
+
+**GitHub Account Cleanup:**
+- **thetecnoagrarian account**: Delete and re-add 2 keys with new names
+- **fruitionforestgarden account**: Delete "local github_ed25519" key
+
+### Authentication Workflow
+- **Admin Passwords**: Managed through application database
+- **SSH Keys**: 1Password for secure storage
+- **Environment Variables**: Centralized in `/opt/Sites/.env`
+- **Secrets Rotation**: No rotation schedule currently implemented
 
 ---
 
