@@ -10,8 +10,9 @@ const __dirname = path.dirname(__filename);
 const config = {
     siteName: 'The Tecnoagrarian',
     port: process.env.PORT || 3002,
-    databasePath: process.env.DATABASE_PATH || path.join(__dirname, 'database/blog.db'),
-    uploadsPath: process.env.UPLOADS_PATH || path.join(__dirname, 'public/uploads'),
+    // Prefer container data volume by default to avoid read-only src paths
+    databasePath: process.env.DATABASE_PATH || '/app/data/blog.db',
+    uploadsPath: process.env.UPLOADS_PATH || '/app/data/uploads',
     viewsPath: path.join(__dirname, 'views'),
     publicPath: path.join(__dirname, 'public')
 };
@@ -19,6 +20,13 @@ const config = {
 async function startApp() {
     // Create the blog app
     const { app, setupFinalHandlers } = createBlogApp(config);
+
+    // Log effective paths to help diagnose environment issues
+    console.log('[TTA] Effective config:', {
+        databasePath: config.databasePath,
+        uploadsPath: config.uploadsPath,
+        nodeEnv: process.env.NODE_ENV,
+    });
 
     // Import and use site-specific routes (after database initialization)
     const homeRoutes = await import('./routes/home.js');
