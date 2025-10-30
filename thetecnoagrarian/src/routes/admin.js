@@ -280,7 +280,7 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
         
         const postData = {
             title: req.body.title,
-            content: req.body.body,
+            body: req.body.body,  // Fixed: Changed 'content' to 'body' to match Post.create() expectation
             description: req.body.description || '',
             excerpt: req.body.excerpt || '',
             images: images,

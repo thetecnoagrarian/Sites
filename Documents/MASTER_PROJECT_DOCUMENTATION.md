@@ -23,10 +23,11 @@
 ## 🎯 Project Overview
 
 ### What This Is
-A monorepo containing two blog sites deployed to Linode server using Docker Compose for side-by-side testing before full migration:
+A monorepo containing two blog sites deployed to Linode server using Docker Compose:
 
-- **Fruition Forest Garden**: `https://ffg-new.fruitionforestgarden.com` (port 4000)
-- **The Tecnoagrarian**: `https://tta-new.thetecnoagrarian.com` (port 4002)
+- **Fruition Forest Garden**: `https://ffg-new.fruitionforestgarden.com` (port 4000) - Test subdomain
+- **The Tecnoagrarian**: `https://thetecnoagrarian.com` (port 4002) - Production domain ✅
+- **The Tecnoagrarian (WWW)**: `https://www.thetecnoagrarian.com` (port 4002) - Production domain ✅
 
 ### Technology Stack
 - **Backend**: Node.js with Express
@@ -81,16 +82,16 @@ A monorepo containing two blog sites deployed to Linode server using Docker Comp
 ### **HIGH PRIORITY (Must Do Before Launch)**
 1. ✅ **Caption updates tested** - Working perfectly on live sites!
 2. ✅ **Image Display Verification** - All image functionality working perfectly!
-3. **🔒 Security & SSL Verification** - Verify SSL certificates and security headers
-4. **📱 Cross-Browser Compatibility** - Test on Chrome, Firefox, Safari, Edge, mobile
-5. **🔐 Environment & Secrets Management** - Create production .env files
-6. **🔑 Authentication Cleanup** - Organize passwords and SSH keys
+3. ✅ **Security & SSL Verification** - SSL certificates verified, security headers configured
+4. **📱 Cross-Browser Compatibility** - Test plan created, manual testing required (see `CROSS_BROWSER_COMPATIBILITY_TEST.md`)
+5. ✅ **Environment & Secrets Management** - Production .env configured on server
+6. ✅ **Authentication Cleanup** - SSH keys organized, agent forwarding implemented
 
 ### **MEDIUM PRIORITY (Should Do Before Launch)**
 7. **⚡ Performance Testing** - Check page load times and concurrent users
 8. **🔍 OG Tags & Social Sharing** - Test Open Graph tags and Twitter cards
 9. **💾 Backup & Recovery Procedures** - Set up automated backups and test restoration
-10. **🛡️ Security Hardening** - Add helmet, CSP, security headers
+10. ✅ **Security Hardening** - Helmet, CSP, security headers implemented and verified
 11. **🤖 CI/CD Setup** - GitHub Actions for linting and testing
 
 ### **LOW PRIORITY (Can Do After Launch)**
@@ -103,8 +104,17 @@ A monorepo containing two blog sites deployed to Linode server using Docker Comp
 ## 🛠️ Architecture & Technical Details
 
 ### Application URLs
-- **Fruition Forest Garden**: `https://ffg-new.fruitionforestgarden.com` (port 4000) ✅
-- **The Tecnoagrarian**: `https://tta-new.thetecnoagrarian.com` (port 4002) ✅
+
+**Production Domains:**
+- **The Tecnoagrarian**: `https://thetecnoagrarian.com` (port 4002) ✅
+- **The Tecnoagrarian (WWW)**: `https://www.thetecnoagrarian.com` (port 4002) ✅
+- **Fruition Forest Garden**: `https://fruitionforestgarden.com` (if configured) ✅
+
+**Test Subdomains:**
+- **Fruition Forest Garden (Test)**: `https://ffg-new.fruitionforestgarden.com` (port 4000) ✅
+
+**Decommissioned:**
+- ~~`tta-new.thetecnoagrarian.com`~~ - Decommissioned October 29, 2025 (migrated to production domain)
 
 ### Database Details
 - **Type**: SQLite ✅
@@ -130,6 +140,21 @@ A monorepo containing two blog sites deployed to Linode server using Docker Comp
   - `SESSION_SECRET` (from .env file) ✅
   - `RATE_LIMIT_MAX_REQUESTS=25` ✅ (Production setting)
 - **Volume Permissions**: ✅ FIXED - Both `sites_ffg_data` and `sites_tta_data` volumes have correct ownership
+
+### Nginx Configuration
+
+**Active Sites:**
+- `/etc/nginx/sites-available/thetecnoagrarian` → `thetecnoagrarian.com` & `www.thetecnoagrarian.com` (production) ✅
+- `/etc/nginx/sites-available/fruitionforestgarden` → `fruitionforestgarden.com` (production) ✅
+- `/etc/nginx/sites-available/monorepo-test` → `ffg-new.fruitionforestgarden.com` (test) ✅
+
+**SSL Certificates:**
+- Managed by Certbot (Let's Encrypt)
+- Auto-renewal configured
+- HTTP to HTTPS redirects enabled for all sites
+
+**Decommissioned:**
+- `tta-new.thetecnoagrarian.com` removed from Nginx config (October 29, 2025) ✅
 
 ---
 
@@ -250,26 +275,30 @@ ssh deploy@172.236.119.220 "docker builder prune -a -f"
 - [x] File upload validation
 - [x] SQL injection protection
 - [x] Rate limiting enabled
-- [ ] SSL certificate verification
-- [ ] Security headers verification (helmet, CSP)
-- [ ] Cross-site scripting (XSS) protection review
-- [ ] Session cookie security flags (secure, httpOnly, sameSite)
+- [x] SSL certificate verification - ✅ Both domains have valid Let's Encrypt certificates
+- [x] Security headers verification (helmet, CSP) - ✅ All security headers properly configured
+- [x] Cross-site scripting (XSS) protection review - ✅ CSP and helmet configured
+- [x] Session cookie security flags (secure, httpOnly, sameSite) - ✅ Implemented
+- [x] Bot protection - ✅ Active middleware in place
+- [x] HTTP Strict Transport Security (HSTS) - ✅ Configured with 6-month max-age
 
-### Security Hardening (TODO)
-```javascript
-// Add helmet middleware for security headers
-const helmet = require('helmet');
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-}));
-```
+### ✅ Security Hardening (IMPLEMENTED)
+
+**Helmet Middleware** configured in `blog-core/src/app.js`:
+- ✅ Content Security Policy (CSP) with comprehensive directives
+- ✅ Strict Transport Security (HSTS) with 6-month max-age and includeSubDomains
+- ✅ X-Content-Type-Options: nosniff
+- ✅ X-Frame-Options: SAMEORIGIN
+- ✅ Cross-Origin policies (COEP, COOP, CORP)
+- ✅ Referrer Policy: strict-origin-when-cross-origin
+- ✅ Bot protection middleware active
+- ✅ Security cookie flags (HttpOnly, SameSite=Lax, Secure)
+
+**SSL/TLS Status:**
+- ✅ **Fruition Forest Garden**: Valid Let's Encrypt certificate (expires ~January 2026)
+- ✅ **The Tecnoagrarian**: Valid Let's Encrypt certificate for production domain
+- ✅ HTTP to HTTPS redirects configured in Nginx
+- ✅ Certificate auto-renewal via Certbot
 
 ---
 
@@ -302,16 +331,36 @@ TRUSTED_IPS=129.222.46.17
 
 ### ✅ SSH Key Management (COMPLETED)
 
+**SSH Agent Forwarding (IMPLEMENTED):**
+- **Method**: 1Password SSH Agent forwarding from local machine to server
+- **Local Config** (`~/.ssh/config`):
+  ```ssh-config
+  Host 172.236.119.220
+    ForwardAgent yes
+    IdentityAgent ~/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock
+  ```
+- **Server Config** (`~/.ssh/config`): Updated to allow forwarded agent keys
+  ```ssh-config
+  Host github.com
+    ForwardAgent yes
+    IdentitiesOnly no
+    IdentityFile ~/.ssh/id_ed25519_new
+  ```
+- **Result**: Server can now use 1Password-managed keys for GitHub operations without passphrase prompts
+- **Status**: ✅ Working - `git pull` and other GitHub operations work seamlessly
+
 **Active SSH Keys:**
 - **Local Machine** (`~/.ssh/id_ed25519_tta`): TTA-MacBook-Deploy-Key-2025
   - Fingerprint: `SHA256:B3Ab3+nEj7iFfNaefpgNFPPUZNSVWt2X9QSMqTxsTJs`
-  - Purpose: Local MacBook deployment and GitHub authentication
+  - Purpose: Local MacBook deployment and GitHub authentication (forwarded to server)
   - GitHub: Deployed as "Personal MacBook Key" → **Rename to: TTA-MacBook-Deploy-Key-2025**
+  - Managed by: 1Password SSH Agent
 
 - **Server** (`~/.ssh/id_ed25519_new`): TTA-Linode-Deploy-Key-2025
   - Fingerprint: `SHA256:XJQiXEgpuEZX5lA8Rzm5yVcI9dWUZb4jIDp6VX/bhrQ`
-  - Purpose: Server deployment from Linode
+  - Purpose: Fallback key for server deployment from Linode
   - GitHub: Deployed as "Linode Server Deploy - New Setup" → **Rename to: TTA-Linode-Deploy-Key-2025**
+  - Status: Has passphrase, but no longer needed for git operations (agent forwarding used instead)
 
 **1Password Keys to Update:**
 1. Delete: `Deploy Key - Fruition Forest Garden - June 2024` (old key, no longer used)
@@ -396,6 +445,16 @@ echo "Backup completed: $DATE"
 
 ## 📝 Changelog
 
+### Version 2.2.0 - October 29, 2025
+- ✅ **Domain Migration**: The Tecnoagrarian migrated from test subdomain to production domain
+- ✅ **Production Domain**: `thetecnoagrarian.com` and `www.thetecnoagrarian.com` now live
+- ✅ **Subdomain Decommissioning**: `tta-new.thetecnoagrarian.com` removed from Nginx
+- ✅ **SSL Certificate**: Dedicated Let's Encrypt certificate for production domain
+- ✅ **SSH Agent Forwarding**: Implemented 1Password SSH agent forwarding for seamless GitHub operations
+- ✅ **Documentation**: Consolidated all documentation into single master file
+- ✅ **Security Hardening**: Marked complete (all security headers and CSP implemented)
+- ✅ **Cross-Browser Testing**: Test plan created with compatibility analysis
+
 ### Version 2.1.0 - October 25, 2025
 - ✅ **Image Preview Layout**: Responsive grid layout implemented
 - ✅ **Font Consistency**: All textboxes standardized to Arial 16px
@@ -432,6 +491,14 @@ This master document consolidates all previous documentation files:
 - ✅ fruitionforestgarden-README.md
 - ✅ thetecnoagrarian-README.md
 - ✅ thetecnoagrarian-SECURITY.md
+- ✅ SECURITY_SSL_VERIFICATION_REPORT.md
+- ✅ TECNOAGRARIAN_DOMAIN_SETUP.md
+- ✅ nginx-ssl-fix-instructions.md
+- ✅ setup-thetecnoagrarian-com-manual.txt
+
+**Active Documentation Files:**
+- `MASTER_PROJECT_DOCUMENTATION.md` - This file (single source of truth)
+- `ENVIRONMENT_TEMPLATE.md` - Template for production `.env` configuration
 
 ### Next Steps
 1. **Complete Pre-Launch Checklist** items 3-6 (High Priority)
@@ -442,7 +509,7 @@ This master document consolidates all previous documentation files:
 
 ---
 
-**Last Updated**: October 25, 2025  
-**Status**: **PRODUCTION READY** - All core functionality operational  
-**Priority**: **HIGH** - Complete pre-launch checklist for production deployment  
-**Next Milestone**: Security verification and environment setup
+**Last Updated**: October 29, 2025  
+**Status**: **PRODUCTION READY** - All core functionality operational, production domains live  
+**Priority**: **MEDIUM** - Continue with pre-launch checklist items (cross-browser testing, performance)  
+**Next Milestone**: Email configuration, cross-browser testing, performance optimization
