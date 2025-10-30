@@ -83,8 +83,8 @@ router.get('/category/:slug', async (req, res) => {
             });
         }
 
-        const { Post } = await import('@ffg/blog-core');
-        const posts = Post.findByCategory(category.id, limit, offset) || [];
+        // Use Category.getPosts() instead of Post.findByCategory()
+        const posts = Category.getPosts(category.id, limit, offset) || [];
         res.render('category', {
             title: category.name,
             category,
