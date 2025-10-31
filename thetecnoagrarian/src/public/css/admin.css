@@ -31,7 +31,7 @@
     padding: 0 1rem;
     /* Remove box-shadow from outer container */
     box-shadow: none;
-    background: var(--white);
+    background-color: var(--white);
     color: var(--black); /* Default all text to black unless in buttons */
 }
 
@@ -47,12 +47,12 @@
     padding: 7rem;
     max-width: 1200px;
     margin: 0 auto;
-    background: var(--white);
+    background-color: var(--white);
 }
 
 /* Set white background on main element in admin layout */
 body > main {
-    background: var(--white);
+    background-color: var(--white);
 }
 
 .message {
@@ -91,17 +91,12 @@ body > main {
 }
 
 .admin-section {
-    background: var(--white);
+    background-color: var(--primary-light);
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
     margin-bottom: 2rem;
     padding: 1.5rem;
     color: var(--black); /* Default all text to black unless in buttons */
-}
-
-.admin-section sl-button,
-.admin-section button {
-    /* Buttons keep their default colors */
 }
 
 .admin-section h2 {
