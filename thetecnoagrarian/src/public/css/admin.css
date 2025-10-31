@@ -31,7 +31,7 @@
     padding: 0 1rem;
     /* Remove box-shadow from outer container */
     box-shadow: none;
-    background: transparent; /* No background color */
+    background: var(--white);
     color: var(--black); /* Default all text to black unless in buttons */
 }
 
@@ -47,6 +47,12 @@
     padding: 7rem;
     max-width: 1200px;
     margin: 0 auto;
+    background: var(--white);
+}
+
+/* Set white background on main element in admin layout */
+body > main {
+    background: var(--white);
 }
 
 .message {
@@ -85,7 +91,7 @@
 }
 
 .admin-section {
-    /* Removed blue background per user request */
+    background: var(--white);
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
     margin-bottom: 2rem;
