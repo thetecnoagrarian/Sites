@@ -31,6 +31,7 @@
     padding: 0 1rem;
     /* Remove box-shadow from outer container */
     box-shadow: none;
+    background: transparent; /* No background color */
     color: var(--black); /* Default all text to black unless in buttons */
 }
 
