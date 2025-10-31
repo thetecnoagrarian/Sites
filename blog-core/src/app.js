@@ -276,16 +276,32 @@ export function createBlogApp(config) {
         windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes default
         max: (req) => {
             // Trusted IPs that bypass rate limiting
-            const trustedIPs = [
-                '129.222.46.17', // User's IP address for testing
-                // Add your IP addresses here for development/deployment
-                // Example: '192.168.1.100', '10.0.0.50'
-            ];
+            // Read from environment variable or use defaults
+            const trustedIPsEnv = process.env.TRUSTED_IPS || '129.222.46.17,129.222.46.40';
+            const trustedIPs = trustedIPsEnv.split(',').map(ip => ip.trim()).filter(ip => ip.length > 0);
             
-            const clientIP = req.headers['x-forwarded-for'] || req.ip;
+            // Get client IP (handle X-Forwarded-For which may contain multiple IPs)
+            let clientIP = req.headers['x-forwarded-for'] || req.ip;
+            // X-Forwarded-For can be a comma-separated list, take the first one
+            if (clientIP.includes(',')) {
+                clientIP = clientIP.split(',')[0].trim();
+            }
+            
+            // Check if client IP matches any trusted IP or is in the same subnet
+            const isTrusted = trustedIPs.some(trustedIP => {
+                // Exact match
+                if (clientIP === trustedIP) return true;
+                // Subnet match (e.g., 129.222.46.*)
+                if (trustedIP.includes('*')) {
+                    const pattern = trustedIP.replace(/\*/g, '.*');
+                    const regex = new RegExp(`^${pattern}$`);
+                    return regex.test(clientIP);
+                }
+                return false;
+            });
             
             // If IP is trusted, allow unlimited requests
-            if (trustedIPs.includes(clientIP)) {
+            if (isTrusted) {
                 return 10000; // Effectively unlimited
             }
             
