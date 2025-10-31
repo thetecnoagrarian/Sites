@@ -50,11 +50,16 @@ router.get('/dashboard', isAdmin, async (req, res) => {
         
         console.log('Rendering dashboard template...');
         res.render('admin/dashboard', {
+            layout: 'layouts/admin',
             title: 'Admin Dashboard',
             posts,
             categories,
             success: req.flash('success'),
             error: req.flash('error'),
+            messages: {
+                success: req.flash('success'),
+                error: req.flash('error')
+            },
             user: req.user,
             csrfToken: req.csrfToken()
         });
