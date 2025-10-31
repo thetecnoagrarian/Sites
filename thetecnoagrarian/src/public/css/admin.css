@@ -25,13 +25,14 @@
 .admin-nav-brand a:hover .logo-image {
     transform: scale(1.1);
 }
+/* Override style.css's .admin-container background - this needs higher specificity */
 .admin-container {
     max-width: 1200px;
     margin: 2rem auto;
     padding: 0 1rem;
     /* Remove box-shadow from outer container */
     box-shadow: none;
-    background-color: white;
+    background-color: white !important; /* Need !important to override style.css */
     color: var(--black); /* Default all text to black unless in buttons */
 }
 
