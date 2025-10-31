@@ -84,7 +84,7 @@
 }
 
 .admin-section {
-    background: var(--primary-light); /* Keep the blue background they like */
+    /* Removed blue background per user request */
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
     margin-bottom: 2rem;
