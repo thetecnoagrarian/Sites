@@ -66,7 +66,8 @@ export function createBlogApp(config) {
                     "'self'",
                     "'unsafe-inline'",
                     "https://cdnjs.cloudflare.com",
-                    "https://cdn.jsdelivr.net"
+                    "https://cdn.jsdelivr.net",
+                    "https://fonts.googleapis.com"
                 ],
                 scriptSrc: [
                     "'self'",
