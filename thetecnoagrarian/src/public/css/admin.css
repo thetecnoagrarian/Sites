@@ -114,6 +114,11 @@ th, td {
 th {
     background-color: var(--primary-light);
     font-weight: 600;
+    color: var(--primary);
+}
+
+tbody tr:hover {
+    background-color: rgba(74, 144, 226, 0.05);
 }
 
 /* Forms */
@@ -121,27 +126,7 @@ form {
     display: inline-block;
 }
 
-.posts-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-}
-
-.posts-table th,
-.posts-table td {
-    padding: 0.75rem;
-    text-align: left;
-    border-bottom: 1px solid var(--gray);
-}
-
-.posts-table th {
-    background-color: var(--primary-light);
-    font-weight: 600;
-}
-
-.posts-table tr:hover {
-    background-color: var(--primary-light);
-}
+/* Posts table uses same styling as general table, no need for separate class */
 
 .actions {
     display: flex;
@@ -154,13 +139,19 @@ form {
 }
 
 .category-form {
-    display: flex;
-    gap: 1rem;
     margin-bottom: 1.5rem;
 }
 
+.category-form .form-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0;
+}
+
 .category-form input {
-    flex: 1;
+    width: auto;
+    min-width: 200px;
     padding: 0.5rem;
     border: 1px solid var(--gray);
     border-radius: var(--border-radius);
@@ -195,7 +186,7 @@ form {
     background-color: var(--primary-light);
     padding: 1.5rem;
     border-radius: var(--border-radius);
-    box-shadow: var(--box-shadow);
+    /* Removed box-shadow per user request */
 }
 
 /* Admin Header & Navigation */
