@@ -1559,37 +1559,9 @@
 
 /***************************************************************
  *  ADMIN DASHBOARD STYLES
+ *  NOTE: All admin-specific styles moved to admin.css
  ***************************************************************/
-.admin-container {
-    max-width: 1200px;
-    margin: 2rem auto;
-    padding: 2rem;
-    /* background-color removed - handled in admin.css */
-    border-radius: var(--border-radius);
-    box-shadow: var(--box-shadow);
-}
-
-.admin-actions {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-
-.admin-button {
-    display: inline-block;
-    background-color: var(--dark-gray);
-    color: var(--white);
-    padding: 0.8rem 1.5rem;
-    border-radius: 4px;
-    text-decoration: none;
-    border: none;
-    cursor: pointer;
-    font-size: 1rem;
-}
-
-  .admin-button:hover {
-    background-color: var(--secondary);
-  }
+/* Admin styles removed - see admin.css */
 
 .success-message {
     background-color: var(--success);
@@ -1667,14 +1639,7 @@
 }
 
 @media (max-width: 768px) {
-    .admin-actions {
-        flex-direction: column;
-    }
-    
-    .admin-button {
-        width: 100%;
-        text-align: center;
-    }
+    /* Admin responsive styles moved to admin.css */
     
     .category-form .form-group {
         flex-direction: column;
@@ -1759,16 +1724,13 @@ sl-button::part(base):hover {
 }
 
 /* Primary buttons - override with our custom primary color using specific selectors */
-.admin-container sl-button[variant="primary"]::part(base),
-.admin-section sl-button[variant="primary"]::part(base),
+/* Admin button styles moved to admin.css - keeping only search-box here */
 .search-box sl-button[variant="primary"]::part(base) {
     --sl-color-primary-600: var(--primary);
     --sl-color-primary-500: var(--primary);
     --sl-color-primary-400: var(--primary-dark);
 }
 
-.admin-container sl-button[variant="primary"]::part(base):hover,
-.admin-section sl-button[variant="primary"]::part(base):hover,
 .search-box sl-button[variant="primary"]::part(base):hover {
     --sl-color-primary-600: var(--primary-dark);
     --sl-color-primary-500: var(--primary-dark);
