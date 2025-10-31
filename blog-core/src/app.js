@@ -173,16 +173,17 @@ export function createBlogApp(config) {
     app.use(flash());
 
     // Static files with cache
+    // TODO: Re-enable aggressive caching (30d, immutable) once design is finalized
     const staticPath = publicPath || path.join(process.cwd(), 'src/public');
     app.use(express.static(staticPath, {
-        maxAge: process.env.NODE_ENV === 'production' ? '30d' : 0,
-        immutable: process.env.NODE_ENV === 'production'
+        maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0, // Reduced from 30d during active development
+        immutable: false // Disabled during active development to allow cache-busting
     }));
 
-    // Serve uploads directory separately
+    // Serve uploads directory separately (keep longer cache for images)
     app.use('/uploads', express.static(uploadsPath, {
-        maxAge: process.env.NODE_ENV === 'production' ? '30d' : 0,
-        immutable: process.env.NODE_ENV === 'production'
+        maxAge: process.env.NODE_ENV === 'production' ? '7d' : 0, // Images can cache longer
+        immutable: false
     }));
 
     // Register Handlebars helpers
