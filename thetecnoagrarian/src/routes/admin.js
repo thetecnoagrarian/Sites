@@ -50,7 +50,7 @@ router.get('/dashboard', isAdmin, async (req, res) => {
         
         console.log('Rendering dashboard template...');
         res.render('admin/dashboard', {
-            layout: 'layouts/admin',
+            layout: 'admin',
             title: 'Admin Dashboard',
             posts,
             categories,
