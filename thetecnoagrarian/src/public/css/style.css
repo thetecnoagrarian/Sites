@@ -22,7 +22,12 @@
 --error: #e74c3c;           /* Red */
 --info: #3498db;            /* Light Blue */
   
-
+    /* NEUTRALS */
+    --black: #1c1c1c;
+    --dark-gray: #535151;
+    --gray: #b0aba1;
+    --gray-light: #fafafa;
+    --white: #ffffff;
   
     /* TYPOGRAPHY & SIZING */
     --font-size-base: 1rem;
