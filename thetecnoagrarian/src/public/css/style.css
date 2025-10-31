@@ -1564,7 +1564,7 @@
     max-width: 1200px;
     margin: 2rem auto;
     padding: 2rem;
-    background-color: var(--primary-light);
+    /* background-color removed - handled in admin.css */
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
 }
