@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{title}} - Admin Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="/css/style.css?v=20251031-1400">
-    <link rel="stylesheet" href="/css/admin.css?v=20251031-1400">
+    <link rel="stylesheet" href="/css/style.css?v=20251031-1500">
+    <link rel="stylesheet" href="/css/admin.css?v=20251031-1500">
     <!-- Shoelace components -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css" />
     <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace.js"></script>
@@ -46,6 +46,9 @@
                     <span>Admin Dashboard</span>
                 </a>
             </div>
+            <button class="admin-hamburger" aria-label="Toggle menu">
+                <i class="fas fa-bars"></i>
+            </button>
             <div class="admin-nav-links">
                 <sl-button href="/admin/analytics" variant="text" class="{{#if activeAnalytics}}active{{/if}}">Analytics</sl-button>
                 <sl-button href="/admin/categories" variant="text" class="{{#if activeCategories}}active{{/if}}">Categories</sl-button>
@@ -63,6 +66,8 @@
             </div>
         </nav>
     </header>
+
+    <div class="admin-menu-overlay hidden"></div>
 
     <main>
         {{{body}}}
