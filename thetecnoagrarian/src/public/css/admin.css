@@ -227,13 +227,13 @@ form {
 
 .admin-nav {
     background-color: var(--primary-color);
-    padding: 1rem;
+    padding: 0.75rem 1rem; /* Reduced by 25% */
     color: #fff;
     display: flex;
     justify-content: space-between;
     align-items: center;
     position: relative;
-    min-height: 60px;
+    min-height: auto;
     max-height: none;
     height: auto;
 }
@@ -251,11 +251,13 @@ form {
     border: none;
     cursor: pointer;
     padding: 0.5rem;
-    color: #fff;
+    color: #fff !important;
     font-size: 1.6rem;
     z-index: 10001;
     flex-shrink: 0;
     margin-left: auto;
+    position: relative;
+    line-height: 1;
 }
 
 .admin-hamburger:hover {
@@ -263,7 +265,8 @@ form {
 }
 
 .admin-hamburger i {
-    display: block;
+    display: block !important;
+    color: #fff !important;
 }
 
 .admin-nav-links {
@@ -646,11 +649,35 @@ sl-button[variant="danger"]::part(base) {
         justify-content: center;
         width: 44px;
         height: 44px;
+        min-width: 44px;
+        min-height: 44px;
         padding: 0.5rem;
+        margin-left: 0.5rem;
+        order: 10; /* Place after nav-brand to ensure it's on the right */
+    }
+    
+    .admin-hamburger i {
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        font-size: 1.5rem !important;
+        color: #fff !important;
+        line-height: 1;
+        font-family: "Font Awesome 6 Free" !important;
+        font-weight: 900 !important;
+    }
+    
+    /* Fallback if Font Awesome doesn't load - use Unicode bars */
+    .admin-hamburger::before {
+        content: '\2630';
+        display: none;
+        font-size: 1.5rem;
+        color: #fff;
+        line-height: 1;
     }
     
     .admin-nav {
-        padding: 0.75rem 1rem;
+        padding: 0.5625rem 0.75rem; /* Reduced by 25% from 0.75rem 1rem */
         min-height: auto;
         height: auto !important;
         max-height: none;
