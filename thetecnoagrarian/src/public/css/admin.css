@@ -623,18 +623,34 @@ sl-button[variant="danger"]::part(base) {
     }
     
     /* Mobile Navigation */
+    .admin-header {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
     .admin-hamburger {
         display: block;
     }
     
     .admin-nav {
-        padding: 1rem;
+        padding: 0;
     }
     
+    .admin-nav-brand {
+        flex: 1;
+    }
+    
+    /* Hide nav links on mobile - they'll be in a slide-out menu */
     .admin-nav-links {
+        display: none; /* Hidden by default on mobile */
+    }
+    
+    /* When menu is open, show the slide-out menu */
+    .admin-header.nav-open .admin-nav-links {
+        display: flex;
         position: fixed;
         top: 0;
-        right: -100%;
+        right: 0;
         width: 280px;
         height: 100vh;
         background-color: var(--primary-color);
@@ -642,14 +658,9 @@ sl-button[variant="danger"]::part(base) {
         align-items: flex-start;
         padding: 2rem 1rem;
         gap: 1rem;
-        transition: right 0.3s ease;
         z-index: 10000;
         box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
         overflow-y: auto;
-    }
-    
-    .admin-header.nav-open .admin-nav-links {
-        right: 0;
     }
     
     .admin-nav-links sl-button,
