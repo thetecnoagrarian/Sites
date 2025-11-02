@@ -227,7 +227,7 @@ form {
 
 .admin-nav {
     background-color: var(--primary-color);
-    padding: 0.75rem 1rem; /* Reduced by 25% */
+    padding: 0.5625rem 0.75rem; /* Reduced by 25% again (was 0.75rem 1rem) */
     color: #fff;
     display: flex;
     justify-content: space-between;
@@ -654,6 +654,10 @@ sl-button[variant="danger"]::part(base) {
         padding: 0.5rem;
         margin-left: 0.5rem;
         order: 10; /* Place after nav-brand to ensure it's on the right */
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        border: 2px solid rgba(255, 255, 255, 0.9) !important;
+        border-radius: 4px;
+        position: relative;
     }
     
     .admin-hamburger i {
@@ -667,17 +671,30 @@ sl-button[variant="danger"]::part(base) {
         font-weight: 900 !important;
     }
     
-    /* Fallback if Font Awesome doesn't load - use Unicode bars */
-    .admin-hamburger::before {
-        content: '\2630';
-        display: none;
+    /* Fallback Unicode hamburger icon - always visible as backup */
+    .admin-hamburger::after {
+        content: '☰';
+        display: block;
         font-size: 1.5rem;
         color: #fff;
         line-height: 1;
+        font-family: Arial, sans-serif;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+        opacity: 0.3; /* Subtle fallback if Font Awesome loads */
+    }
+    
+    /* Hide fallback if Font Awesome icon is visible */
+    .admin-hamburger i.fa-bars {
+        position: relative;
+        z-index: 1;
     }
     
     .admin-nav {
-        padding: 0.5625rem 0.75rem; /* Reduced by 25% from 0.75rem 1rem */
+        padding: 0.421875rem 0.5625rem; /* Reduced by 25% again (was 0.5625rem 0.75rem) */
         min-height: auto;
         height: auto !important;
         max-height: none;
