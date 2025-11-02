@@ -650,15 +650,13 @@ sl-button[variant="danger"]::part(base) {
         min-width: 44px;
         min-height: 44px;
         padding: 0.5rem;
-        margin-left: auto;
-        margin-right: 0;
+        margin: 0 0 0 auto;
         order: 999;
         background-color: rgba(255, 255, 255, 0.15);
         border: 2px solid rgba(255, 255, 255, 0.9);
         border-radius: 4px;
         position: relative;
-        flex-shrink: 0;
-        align-self: flex-end;
+        flex: 0 0 auto;
     }
     
     .admin-hamburger i {
@@ -678,17 +676,13 @@ sl-button[variant="danger"]::part(base) {
     
     .admin-nav-brand {
         flex: 0 1 auto;
-        margin-right: 0;
+        margin-right: auto;
+        min-width: 0;
         max-width: calc(100% - 60px);
     }
     
     .admin-header {
         height: auto;
-    }
-    
-    .admin-nav-brand {
-        flex: 1;
-        min-width: 0; /* Allow text to truncate */
     }
     
     .admin-nav-brand span {
