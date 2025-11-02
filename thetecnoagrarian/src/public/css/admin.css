@@ -209,13 +209,12 @@ form {
 
 /* Admin Header & Navigation */
 .admin-header {
-    background-color: var(--primary-color);
+    background-color: var(--primary);
     color: #fff;
     padding: 0;
     margin-bottom: 0;
     position: relative;
     height: auto;
-    max-height: none;
     overflow: visible;
 }
 
@@ -226,15 +225,14 @@ form {
 }
 
 .admin-nav {
-    background-color: var(--primary-color);
-    padding: 0.5625rem 0.75rem; /* Reduced by 25% again (was 0.75rem 1rem) */
+    background-color: var(--primary);
+    padding: 0.5625rem 0.75rem;
     color: #fff;
     display: flex;
     justify-content: space-between;
     align-items: center;
     position: relative;
     min-height: auto;
-    max-height: none;
     height: auto;
 }
 
@@ -251,7 +249,7 @@ form {
     border: none;
     cursor: pointer;
     padding: 0.5rem;
-    color: #fff !important;
+    color: #fff;
     font-size: 1.6rem;
     z-index: 10001;
     flex-shrink: 0;
@@ -265,8 +263,8 @@ form {
 }
 
 .admin-hamburger i {
-    display: block !important;
-    color: #fff !important;
+    display: block;
+    color: #fff;
 }
 
 .admin-nav-links {
@@ -459,7 +457,7 @@ sl-button[variant="danger"]::part(base) {
 
 .file-drop-zone:hover,
 .file-drop-zone.dragover {
-    border-color: var(--primary-color);
+    border-color: var(--primary);
     background-color: rgba(44, 62, 80, 0.05);
 }
 
@@ -469,7 +467,7 @@ sl-button[variant="danger"]::part(base) {
 
 .drop-zone-text i {
     font-size: 2.5rem;
-    color: var(--primary-color);
+    color: var(--primary);
     margin-bottom: 1rem;
 }
 
@@ -644,7 +642,7 @@ sl-button[variant="danger"]::part(base) {
     }
     
     .admin-hamburger {
-        display: flex !important;
+        display: flex;
         align-items: center;
         justify-content: center;
         width: 44px;
@@ -653,56 +651,28 @@ sl-button[variant="danger"]::part(base) {
         min-height: 44px;
         padding: 0.5rem;
         margin-left: 0.5rem;
-        order: 10; /* Place after nav-brand to ensure it's on the right */
-        background-color: rgba(255, 255, 255, 0.1) !important;
-        border: 2px solid rgba(255, 255, 255, 0.9) !important;
+        order: 10;
+        background-color: rgba(255, 255, 255, 0.15);
+        border: 2px solid rgba(255, 255, 255, 0.9);
         border-radius: 4px;
         position: relative;
     }
     
     .admin-hamburger i {
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        font-size: 1.5rem !important;
-        color: #fff !important;
-        line-height: 1;
-        font-family: "Font Awesome 6 Free" !important;
-        font-weight: 900 !important;
-    }
-    
-    /* Fallback Unicode hamburger icon - always visible as backup */
-    .admin-hamburger::after {
-        content: '☰';
         display: block;
         font-size: 1.5rem;
         color: #fff;
         line-height: 1;
-        font-family: Arial, sans-serif;
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        pointer-events: none;
-        opacity: 0.3; /* Subtle fallback if Font Awesome loads */
-    }
-    
-    /* Hide fallback if Font Awesome icon is visible */
-    .admin-hamburger i.fa-bars {
-        position: relative;
-        z-index: 1;
     }
     
     .admin-nav {
-        padding: 0.421875rem 0.5625rem; /* Reduced by 25% again (was 0.5625rem 0.75rem) */
+        padding: 0.421875rem 0.5625rem;
         min-height: auto;
-        height: auto !important;
-        max-height: none;
+        height: auto;
     }
     
     .admin-header {
-        height: auto !important;
-        max-height: none;
+        height: auto;
     }
     
     .admin-nav-brand {
@@ -727,7 +697,7 @@ sl-button[variant="danger"]::part(base) {
         right: 0;
         width: 280px;
         height: 100vh;
-        background-color: var(--primary-color);
+        background-color: var(--primary);
         flex-direction: column;
         align-items: flex-start;
         padding: 2rem 1rem;
