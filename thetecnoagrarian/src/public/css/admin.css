@@ -650,12 +650,14 @@ sl-button[variant="danger"]::part(base) {
         min-width: 44px;
         min-height: 44px;
         padding: 0.5rem;
-        margin-left: 0.5rem;
-        order: 10;
+        margin-left: auto;
+        margin-right: 0;
+        order: 999;
         background-color: rgba(255, 255, 255, 0.15);
         border: 2px solid rgba(255, 255, 255, 0.9);
         border-radius: 4px;
         position: relative;
+        flex-shrink: 0;
     }
     
     .admin-hamburger i {
@@ -669,6 +671,12 @@ sl-button[variant="danger"]::part(base) {
         padding: 0.421875rem 0.5625rem;
         min-height: auto;
         height: auto;
+        justify-content: space-between;
+    }
+    
+    .admin-nav-brand {
+        flex: 0 1 auto;
+        margin-right: auto;
     }
     
     .admin-header {
