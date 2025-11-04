@@ -25,13 +25,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const hamburger = document.querySelector('.hamburger');
     const header = document.querySelector('header');
     const menuOverlay = document.querySelector('.menu-overlay');
-    
-    if (hamburger && header && menuOverlay) {
+
+    if (hamburger) {
         hamburger.addEventListener('click', function() {
             header.classList.toggle('nav-open');
             menuOverlay.classList.toggle('hidden');
         });
-        
+    }
+
+    if (menuOverlay) {
         menuOverlay.addEventListener('click', function() {
             header.classList.remove('nav-open');
             menuOverlay.classList.add('hidden');
