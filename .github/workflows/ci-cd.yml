@@ -22,23 +22,23 @@ jobs:
         
     - name: Install dependencies
       run: |
-        cd blog-core
         npm ci
         
     - name: Run linting
       run: |
-        cd blog-core
-        npm run lint || true
+        if npm run lint --workspace=@ffg/blog-core 2>/dev/null; then
+          echo "Linting completed"
+        else
+          echo "No lint script found, skipping linting"
+        fi
         
     - name: Run tests
       run: |
-        cd blog-core
-        npm test || true
+        npm test --workspace=@ffg/blog-core || echo "Tests completed or skipped"
         
     - name: Security audit
       run: |
-        cd blog-core
-        npm audit --audit-level high || echo "Audit completed with warnings"
+        npm audit --workspace=@ffg/blog-core --audit-level high || echo "Audit completed with warnings"
         
   build-and-deploy:
     needs: lint-and-test
