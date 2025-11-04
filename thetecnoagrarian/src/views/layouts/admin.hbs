@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{title}} - Admin Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="/css/style.css?v=20251101-1245">
-    <link rel="stylesheet" href="/css/admin.css?v=20251101-1245">
+    <link rel="stylesheet" href="/css/style.css?v=20251101-1300">
+    <link rel="stylesheet" href="/css/admin.css?v=20251101-1300">
     <!-- Shoelace components -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css" />
     <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace.js"></script>
@@ -38,36 +38,34 @@
     </style>
 </head>
 <body>
-    <header class="admin-header">
-        <nav class="admin-nav">
-            <div class="admin-nav-brand">
-                <a href="/admin">
-                    <img src="/images/TTA.PNG" alt="The Tecnoagrarian Logo" class="logo-image">
-                    <span>Admin Dashboard</span>
-                </a>
+    <header>
+        <div class="site-header">
+            <div class="site-logo">
+                <a href="/admin"><img src="/images/TTA.PNG" alt="The Tecnoagrarian Logo" class="logo-image"></a>
             </div>
-            <button class="admin-hamburger" aria-label="Toggle menu">
+            <button class="hamburger">
                 <i class="fas fa-bars"></i>
             </button>
-            <div class="admin-nav-links">
-                <sl-button href="/admin/analytics" variant="text" class="{{#if activeAnalytics}}active{{/if}}">Analytics</sl-button>
-                <sl-button href="/admin/categories" variant="text" class="{{#if activeCategories}}active{{/if}}">Categories</sl-button>
-                <sl-button href="/" variant="text" target="_blank">View Site</sl-button>
-                {{#if user.isAdmin}}
-                <sl-button href="/admin/posts/new" variant="text">New Post</sl-button>
-                {{/if}}
-                <form action="/logout" method="POST" style="display: inline;">
-                    <input type="hidden" name="_csrf" value="{{csrfToken}}">
-                    <sl-button type="submit" variant="danger" size="small">
-                        <sl-icon slot="prefix" name="box-arrow-right"></sl-icon>
-                        Logout
-                    </sl-button>
-                </form>
-            </div>
-        </nav>
+            <nav>
+                <ul>
+                    <li><a href="/admin/analytics">Analytics</a></li>
+                    <li><a href="/admin/categories">Categories</a></li>
+                    <li><a href="/" target="_blank">View Site</a></li>
+                    {{#if user.isAdmin}}
+                    <li><a href="/admin/posts/new">New Post</a></li>
+                    {{/if}}
+                    <li>
+                        <form action="/logout" method="POST" style="display: inline;">
+                            <input type="hidden" name="_csrf" value="{{csrfToken}}">
+                            <button type="submit" class="logout" style="background: none; border: none; padding: 0; cursor: pointer; color: inherit; font: inherit; text-decoration: none;">Logout</button>
+                        </form>
+                    </li>
+                </ul>
+            </nav>
+        </div>
     </header>
 
-    <div class="admin-menu-overlay hidden"></div>
+    <div class="menu-overlay hidden"></div>
 
     <main>
         {{{body}}}

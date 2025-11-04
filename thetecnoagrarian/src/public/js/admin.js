@@ -21,20 +21,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Admin mobile menu functionality
-    const adminHamburger = document.querySelector('.admin-hamburger');
-    const adminHeader = document.querySelector('.admin-header');
-    const adminMenuOverlay = document.querySelector('.admin-menu-overlay');
+    // Mobile menu functionality (uses main header classes)
+    const hamburger = document.querySelector('.hamburger');
+    const header = document.querySelector('header');
+    const menuOverlay = document.querySelector('.menu-overlay');
     
-    if (adminHamburger && adminHeader && adminMenuOverlay) {
-        adminHamburger.addEventListener('click', function() {
-            adminHeader.classList.toggle('nav-open');
-            adminMenuOverlay.classList.toggle('hidden');
+    if (hamburger && header && menuOverlay) {
+        hamburger.addEventListener('click', function() {
+            header.classList.toggle('nav-open');
+            menuOverlay.classList.toggle('hidden');
         });
         
-        adminMenuOverlay.addEventListener('click', function() {
-            adminHeader.classList.remove('nav-open');
-            adminMenuOverlay.classList.add('hidden');
+        menuOverlay.addEventListener('click', function() {
+            header.classList.remove('nav-open');
+            menuOverlay.classList.add('hidden');
         });
     }
 }); 
