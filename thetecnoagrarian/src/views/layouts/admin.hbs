@@ -41,7 +41,7 @@
     <header>
         <div class="site-header">
             <div class="site-logo">
-                <a href="/admin"><img src="/images/TTA.PNG" alt="The Tecnoagrarian Logo" class="logo-image"></a>
+                <a href="/" target="_blank"><img src="/images/TTA.PNG" alt="The Tecnoagrarian Logo" class="logo-image"></a>
             </div>
             <button class="hamburger">
                 <i class="fas fa-bars"></i>
@@ -50,9 +50,8 @@
                 <ul>
                     <li><a href="/admin/analytics">Analytics</a></li>
                     <li><a href="/admin/categories">Categories</a></li>
-                    <li><a href="/" target="_blank">View Site</a></li>
                     {{#if user.isAdmin}}
-                    <li><a href="/admin/posts/new">New Post</a></li>
+            
                     {{/if}}
                     <li>
                         <form action="/logout" method="POST" style="display: inline;">
