@@ -2,6 +2,7 @@ import 'dotenv/config';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createBlogApp } from '@ffg/blog-core';
+import analyticsMiddleware from './middleware/analytics.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +28,9 @@ async function startApp() {
         uploadsPath: config.uploadsPath,
         nodeEnv: process.env.NODE_ENV,
     });
+
+    // Apply analytics middleware (must be after database initialization)
+    app.use(analyticsMiddleware);
 
     // Import and use site-specific routes (after database initialization)
     const homeRoutes = await import('./routes/home.js');
