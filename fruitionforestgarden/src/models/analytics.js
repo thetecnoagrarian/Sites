@@ -1,4 +1,6 @@
-const db = require('./db');
+import { getDatabase } from '@ffg/blog-core';
+
+const db = getDatabase();
 
 class Analytics {
     static init() {
@@ -181,4 +183,4 @@ class Analytics {
     }
 }
 
-module.exports = Analytics;
+export default Analytics;

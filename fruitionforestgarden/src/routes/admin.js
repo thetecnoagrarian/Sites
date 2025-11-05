@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import multer from 'multer';
 import { isAuthenticated, isAdmin, processImage } from '@ffg/blog-core';
 import postController from '../controllers/postController.js';
+import Analytics from '../models/analytics.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -632,8 +633,6 @@ async function updatePostHandler(req, res) {
 // Analytics dashboard
 router.get('/analytics', isAdmin, async (req, res) => {
     try {
-        const Analytics = require('../models/analytics');
-        
         // Get row limits from query parameters with defaults
         const pageViewLimit = parseInt(req.query.pageViewLimit) || 25;
         const activityLimit = parseInt(req.query.activityLimit) || 25;
@@ -644,6 +643,7 @@ router.get('/analytics', isAdmin, async (req, res) => {
         const dbHealth = Analytics.checkDatabaseHealth();
         
         res.render('admin/analytics', {
+            layout: 'admin',
             title: 'Analytics Dashboard',
             user: req.user,
             totalStats,
@@ -651,7 +651,9 @@ router.get('/analytics', isAdmin, async (req, res) => {
             recentActivity,
             dbHealth,
             pageViewLimit,
-            activityLimit
+            activityLimit,
+            isAdmin: true,
+            csrfToken: req.csrfToken()
         });
     } catch (error) {
         console.error('Error loading analytics:', error);
@@ -663,7 +665,6 @@ router.get('/analytics', isAdmin, async (req, res) => {
 // Analytics health check API
 router.get('/analytics/health', isAdmin, async (req, res) => {
     try {
-        const Analytics = require('../models/analytics');
         const health = Analytics.checkDatabaseHealth();
         res.json(health);
     } catch (error) {
