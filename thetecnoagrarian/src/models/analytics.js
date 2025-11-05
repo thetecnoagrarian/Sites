@@ -1,4 +1,6 @@
-const db = require('./db');
+import { getDatabase } from '@ffg/blog-core';
+
+const db = getDatabase();
 
 class Analytics {
     static init() {
@@ -87,7 +89,7 @@ class Analytics {
         }
     }
 
-    static getPageViewStats(days = 30) {
+    static getPageViewStats(days = 30, limit = 25) {
         try {
             const stmt = db.prepare(`
                 SELECT 
@@ -98,8 +100,9 @@ class Analytics {
                 WHERE timestamp >= datetime('now', '-${days} days')
                 GROUP BY page_path
                 ORDER BY views DESC
+                LIMIT ?
             `);
-            return stmt.all();
+            return stmt.all(limit);
         } catch (error) {
             console.error('Error getting page view stats:', error);
             return [];
@@ -180,4 +183,4 @@ class Analytics {
     }
 }
 
-module.exports = Analytics;
+export default Analytics;

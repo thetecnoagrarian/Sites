@@ -1,4 +1,4 @@
-const Analytics = require('../models/analytics');
+import Analytics from '../models/analytics.js';
 
 // Initialize analytics tables - ensure they exist
 try {
@@ -42,4 +42,4 @@ const analyticsMiddleware = (req, res, next) => {
     next();
 };
 
-module.exports = analyticsMiddleware;
+export default analyticsMiddleware;

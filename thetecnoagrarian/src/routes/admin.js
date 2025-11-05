@@ -2,13 +2,10 @@ import express from 'express';
 import path from 'path';
 import { promises as fs } from 'fs';
 import { fileURLToPath } from 'url';
-import { createRequire } from 'module';
 import multer from 'multer';
 import { isAuthenticated, isAdmin, Post, Category, User, processImage } from '@ffg/blog-core';
 import postController from '../controllers/postController.js';
-
-const require = createRequire(import.meta.url);
-const Analytics = require('../models/analytics');
+import Analytics from '../models/analytics.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
