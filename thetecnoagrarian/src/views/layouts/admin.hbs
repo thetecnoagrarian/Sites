@@ -49,19 +49,18 @@
             <nav>
                 <ul>
                     <li><a href="/admin/analytics">Analytics</a></li>
-                    <li><a href="/admin/categories">Categories</a></li>
-                    {{#if user.isAdmin}}
+                {{#if user.isAdmin}}
             
-                    {{/if}}
+                {{/if}}
                     <li>
-                        <form action="/logout" method="POST" style="display: inline;">
-                            <input type="hidden" name="_csrf" value="{{csrfToken}}">
+                <form action="/logout" method="POST" style="display: inline;">
+                    <input type="hidden" name="_csrf" value="{{csrfToken}}">
                             <button type="submit" class="logout">Logout</button>
-                        </form>
+                </form>
                     </li>
                 </ul>
             </nav>
-        </div>
+            </div>
     </header>
 
     <div class="menu-overlay hidden"></div>

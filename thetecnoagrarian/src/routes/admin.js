@@ -154,11 +154,11 @@ router.post('/categories/update', isAdmin, (req, res) => {
 
         Category.update(categoryId, name);
         req.flash('success', 'Category updated successfully');
-        res.redirect('/admin/categories');
+        res.redirect('/admin/dashboard');
     } catch (error) {
         console.error('Error updating category:', error);
         req.flash('error', 'Failed to update category');
-        res.redirect('/admin/categories');
+        res.redirect('/admin/dashboard');
     }
 });
 
