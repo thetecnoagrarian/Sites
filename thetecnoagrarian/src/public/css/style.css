@@ -492,46 +492,18 @@
     flex: 1;
   }
   
-  .search-form-main sl-button {
-    flex-shrink: 0;
-    border-radius: var(--border-radius);
-  }
-  
-  .search-form-main sl-button::part(base) {
-    border-radius: var(--border-radius);
-  }
-  
-  .search-form-main sl-button::part(base):hover {
-    background-color: var(--primary-dark);
-  }
-  
-  .search-form-main sl-button::part(base):focus {
-    background-color: var(--primary-dark);
-  }
-  
-  /* Shoelace button overrides for search area */
-  .search-form-main sl-button[variant="primary"]::part(base) {
-    background-color: var(--primary);
-    border-color: var(--primary);
-  }
-  
-  .search-form-main sl-button[variant="primary"]::part(base):hover {
-    background-color: var(--primary-dark);
-    border-color: var(--primary-dark);
-  }
-  
   /***************************************************************
-   *  CATEGORIES DROPDOWN IN SEARCH AREA
+   *  SEARCH ACTIONS CONTAINER (HOLDS BOTH BUTTONS)
    ***************************************************************/
-  .categories-dropdown {
-    position: relative;
+  .search-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
   }
   
+  /* Shared styling for both search button and categories button */
+  .search-button,
   .categories-toggle {
-    background: var(--primary);
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
     border-radius: var(--border-radius);
     font-size: 1rem;
     font-weight: bold;
@@ -539,14 +511,45 @@
     cursor: pointer;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
     transition: background-color 0.3s ease;
-    width: 267px;
-    justify-content: center;
+    min-width: 267px;
+    box-sizing: border-box;
+  }
+  
+  /* Shoelace button styling */
+  .search-button::part(base) {
+    border-radius: var(--border-radius);
+    background-color: var(--primary);
+    border-color: var(--primary);
+    min-width: 267px;
+    box-sizing: border-box;
+  }
+  
+  .search-button::part(base):hover,
+  .search-button::part(base):focus {
+    background-color: var(--primary-dark);
+    border-color: var(--primary-dark);
+  }
+  
+  /* Categories button styling (matches search button) */
+  .categories-toggle {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
   }
   
   .categories-toggle:hover {
     background: var(--primary-dark);
+  }
+  
+  /***************************************************************
+   *  CATEGORIES DROPDOWN IN SEARCH AREA
+   ***************************************************************/
+  .categories-dropdown {
+    position: relative;
   }
   
   .categories-menu {
@@ -797,35 +800,34 @@
       max-width: 100%;
     }
     
-    .search-form-main sl-input,
-    .search-form-main sl-button {
+    .search-form-main sl-input {
       width: 100%;
     }
     
-    .search-form-main sl-button::part(base) {
+    .search-actions {
+      flex-direction: column;
       width: 100%;
+      gap: 1rem;
+    }
+    
+    /* Both buttons share the same styling on mobile */
+    .search-button,
+    .categories-toggle {
+      width: 100%;
+      max-width: 100%;
+      min-width: auto;
+      box-sizing: border-box;
+    }
+    
+    .search-button::part(base) {
+      width: 100%;
+      max-width: 100%;
+      min-width: auto;
       box-sizing: border-box;
     }
     
     .categories-dropdown {
       width: 100%;
-    }
-    
-    .categories-toggle {
-      width: 100%;
-      max-width: 100%;
-      box-sizing: border-box;
-      justify-content: center;
-    }
-    
-    /* Ensure buttons match exactly on mobile phones */
-    @media (max-width: 768px) {
-      .search-form-main sl-button::part(base),
-      .categories-toggle {
-        width: 100%;
-        max-width: 100%;
-        box-sizing: border-box;
-      }
     }
     
     .categories-menu {
