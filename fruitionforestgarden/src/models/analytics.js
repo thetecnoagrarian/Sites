@@ -1,9 +1,12 @@
 import { getDatabase } from '@ffg/blog-core';
 
-const db = getDatabase();
-
 class Analytics {
+    static getDb() {
+        return getDatabase();
+    }
+
     static init() {
+        const db = this.getDb();
         // Create analytics table if it doesn't exist
         db.exec(`
             CREATE TABLE IF NOT EXISTS page_views (
@@ -30,6 +33,7 @@ class Analytics {
 
     static recordPageView(pagePath, userAgent, ipAddress, referrer) {
         try {
+            const db = this.getDb();
             // Validate input data
             if (!pagePath || typeof pagePath !== 'string') {
                 console.warn('Invalid page path for analytics:', pagePath);
@@ -65,6 +69,7 @@ class Analytics {
 
     static recordUniqueVisitor(sessionId) {
         try {
+            const db = this.getDb();
             // Try to update existing visitor
             let stmt = db.prepare(`
                 UPDATE unique_visitors 
@@ -91,6 +96,7 @@ class Analytics {
 
     static getPageViewStats(days = 30, limit = 25) {
         try {
+            const db = this.getDb();
             const stmt = db.prepare(`
                 SELECT 
                     page_path,
@@ -111,6 +117,7 @@ class Analytics {
 
     static getTotalStats() {
         try {
+            const db = this.getDb();
             const pageViews = db.prepare('SELECT COUNT(*) as count FROM page_views').get();
             const uniqueVisitors = db.prepare('SELECT COUNT(*) as count FROM unique_visitors').get();
             const todayViews = db.prepare(`
@@ -132,6 +139,7 @@ class Analytics {
 
     static getRecentActivity(limit = 10) {
         try {
+            const db = this.getDb();
             const stmt = db.prepare(`
                 SELECT page_path, ip_address, timestamp
                 FROM page_views 
@@ -148,6 +156,7 @@ class Analytics {
     // Check database health and table integrity
     static checkDatabaseHealth() {
         try {
+            const db = this.getDb();
             // Check if tables exist and have data
             const pageViewsCount = db.prepare('SELECT COUNT(*) as count FROM page_views').get();
             const uniqueVisitorsCount = db.prepare('SELECT COUNT(*) as count FROM unique_visitors').get();
