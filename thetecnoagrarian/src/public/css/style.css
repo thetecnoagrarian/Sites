@@ -493,20 +493,13 @@
   }
   
   /***************************************************************
-   *  SEARCH ACTIONS CONTAINER (HOLDS BOTH BUTTONS)
+   *  CATEGORIES BUTTON STYLING
    ***************************************************************/
-  .search-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1rem;
-    max-width: 267px;
-    flex: 1;
-  }
-  
-  /* Shared styling for both search button and categories button */
-  .search-button,
   .categories-toggle {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
     border-radius: var(--border-radius);
     font-size: 1rem;
     font-weight: bold;
@@ -518,30 +511,8 @@
     gap: 0.5rem;
     transition: background-color 0.3s ease;
     width: 100%;
+    max-width: 267px;
     box-sizing: border-box;
-  }
-  
-  /* Shoelace button styling */
-  .search-button::part(base) {
-    border-radius: var(--border-radius);
-    background-color: var(--primary);
-    border-color: var(--primary);
-    width: 100%;
-    box-sizing: border-box;
-  }
-  
-  .search-button::part(base):hover,
-  .search-button::part(base):focus {
-    background-color: var(--primary-dark);
-    border-color: var(--primary-dark);
-  }
-  
-  /* Categories button styling (matches search button) */
-  .categories-toggle {
-    background: var(--primary);
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
   }
   
   .categories-toggle:hover {
@@ -807,30 +778,14 @@
       width: 100%;
     }
     
-    .search-actions {
-      flex-direction: column;
+    .categories-dropdown {
       width: 100%;
-      max-width: 100%;
-      gap: 1rem;
     }
     
-    /* Both buttons share the same styling on mobile */
-    .search-button,
     .categories-toggle {
       width: 100%;
       max-width: 100%;
-      flex: none;
       box-sizing: border-box;
-    }
-    
-    .search-button::part(base) {
-      width: 100%;
-      max-width: 100%;
-      box-sizing: border-box;
-    }
-    
-    .categories-dropdown {
-      width: 100%;
     }
     
     .categories-menu {

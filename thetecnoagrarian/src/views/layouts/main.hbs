@@ -21,7 +21,7 @@
     <!-- Open Graph Meta Tags for Social Sharing -->
     <!-- Removed static OG tags: these are now injected dynamically per page -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="/css/style.css?v=20251106-0215" media="all">
+    <link rel="stylesheet" href="/css/style.css?v=20251106-0230" media="all">
     {{#if isAdmin}}
     <link rel="stylesheet" href="/css/admin.css?v=20251106-0100" media="all">
     {{/if}}
@@ -64,21 +64,15 @@
                 <form id="search-form" action="/search" method="GET" class="search-form-main">
                     <sl-input type="text" name="q" placeholder="Search posts..." size="large"></sl-input>
                 </form>
-                <div class="search-actions">
-                    <sl-button type="submit" form="search-form" variant="primary" size="large" class="search-button">
-                        <sl-icon slot="prefix" name="search"></sl-icon>
-                        Search
-                    </sl-button>
-                    <div class="categories-dropdown">
-                        <button type="button" class="categories-toggle">
-                            Categories <i class="fas fa-chevron-down"></i>
-                        </button>
-                        <div class="categories-menu">
-                            <div class="categories-grid">
-                                {{#each sidebarCategories}}
-                                <a href="/category/{{this.slug}}" class="category-link">{{this.name}}</a>
-                                {{/each}}
-                            </div>
+                <div class="categories-dropdown">
+                    <button type="button" class="categories-toggle">
+                        Categories <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="categories-menu">
+                        <div class="categories-grid">
+                            {{#each sidebarCategories}}
+                            <a href="/category/{{this.slug}}" class="category-link">{{this.name}}</a>
+                            {{/each}}
                         </div>
                     </div>
                 </div>
