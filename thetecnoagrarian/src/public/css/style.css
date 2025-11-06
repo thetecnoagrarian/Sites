@@ -802,13 +802,30 @@
       width: 100%;
     }
     
+    .search-form-main sl-button::part(base) {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
     .categories-dropdown {
       width: 100%;
     }
     
     .categories-toggle {
       width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
       justify-content: center;
+    }
+    
+    /* Ensure buttons match exactly on mobile phones */
+    @media (max-width: 768px) {
+      .search-form-main sl-button::part(base),
+      .categories-toggle {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
     }
     
     .categories-menu {
