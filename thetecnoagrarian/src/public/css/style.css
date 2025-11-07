@@ -766,9 +766,9 @@
     .categories-menu {
       position: absolute;
       top: 100%;
-      right: 0;
+      left: 50%;
+      right: auto;
       bottom: auto;
-      left: auto;
       background: white;
       border: 1px solid var(--gray);
       border-radius: var(--border-radius);
@@ -776,7 +776,7 @@
       min-width: clamp(400px, 50vw, 600px);
       max-height: none;
       overflow: visible;
-      transform: translateY(-10px);
+      transform: translateX(-50%) translateY(-10px);
       transition: all 0.3s ease;
       z-index: 1000;
       padding: var(--spacing-lg);
@@ -810,7 +810,7 @@
     .categories-dropdown:hover .categories-menu {
       opacity: 1;
       visibility: visible;
-      transform: translateY(0);
+      transform: translateX(-50%) translateY(0);
     }
   }
   
