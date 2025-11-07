@@ -33,7 +33,7 @@
             </sl-carousel-item>
             {{/each}}
         </sl-carousel>
-        <div id="carousel-caption" class="carousel-caption" style="margin-top: 1em;"></div>
+        <div id="carousel-caption" class="carousel-caption" style="margin-top: 1em; display: none;"></div>
         
         <!-- Pass server-side captions directly to JavaScript -->
         <script>
@@ -54,7 +54,12 @@
 
             function updateCaption(index = 0) {
                 const caption = captions[index] || '';
-                captionDiv.textContent = caption;
+                if (caption && caption.trim()) {
+                    captionDiv.textContent = caption;
+                    captionDiv.style.display = 'block';
+                } else {
+                    captionDiv.style.display = 'none';
+                }
             }
 
             // Listen for slide change events
@@ -215,14 +220,16 @@
 
 .carousel-caption {
   white-space: pre-line;
-  background: var(--blue-slate);
+  background: var(--blue-slate, #2c3e50);
   color: #fff;
-  padding: 0.5em 1em;
-  border-radius: 0.2em;
-  margin-top: 0.5em;
+  padding: 0.75em 1em;
+  border-radius: 0.4em;
+  margin-top: 1em;
   text-align: center;
   font-size: 1rem;
   max-width: 100%;
+  display: block;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 </style>
 

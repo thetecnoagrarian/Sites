@@ -30,7 +30,13 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     /* Record video on failure */
     video: 'retain-on-failure',
+    /* Increase timeout for production testing (bot protection may slow responses) */
+    actionTimeout: 15000,
+    navigationTimeout: 30000,
   },
+  
+  /* Global test timeout */
+  timeout: 60000,
 
   /* Configure projects for major browsers */
   projects: [
