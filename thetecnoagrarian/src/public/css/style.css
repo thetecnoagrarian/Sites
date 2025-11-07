@@ -577,7 +577,6 @@
     border-bottom: 1px solid var(--gray);
     width: 100%;
     box-sizing: border-box;
-    overflow-x: hidden;
   }
   
   .search-container {
