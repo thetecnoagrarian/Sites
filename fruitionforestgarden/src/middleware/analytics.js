@@ -6,18 +6,18 @@ let initialized = false;
 const analyticsMiddleware = (req, res, next) => {
     // Initialize analytics tables lazily (only once, after database is ready)
     if (!initialized) {
-        try {
-            Analytics.init();
+try {
+    Analytics.init();
             initialized = true;
-            console.log('✅ Analytics tables initialized successfully');
-        } catch (error) {
+    console.log('✅ Analytics tables initialized successfully');
+} catch (error) {
             // Only log error if it's not a "database not initialized" error
             if (!error.message.includes('Database not initialized')) {
-                console.error('❌ Error initializing analytics tables:', error);
+    console.error('❌ Error initializing analytics tables:', error);
             }
             // Don't block requests if analytics initialization fails
         }
-    }
+}
 
     // Skip tracking for static assets and admin routes
     if (req.path.startsWith('/css') || 

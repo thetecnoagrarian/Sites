@@ -27,7 +27,7 @@
 
 ---
 
-## ✅ Automated Server Response Tests
+##✅  Automated Server Response Tests
 
 ### HTTP Headers & Security
 
@@ -79,28 +79,29 @@ curl -A "Mozilla/5.0" https://thetecnoagrarian.com
 ### Desktop Browsers
 
 #### **Chrome (Latest)**
-- [ ] Home page loads correctly
-- [ ] Navigation menu works
-- [ ] Post pages display correctly
-- [ ] Images load and lightbox works
-- [ ] Search functionality works
-- [ ] Admin login works
-- [ ] Admin dashboard displays correctly
-- [ ] Form submissions work
-- [ ] Image upload works
-- [ ] Responsive design (resize window)
+- [ ✅ ] Home page loads correctly
+- [ ✅ ] Navigation menu works
+- [✅  ] Post pages display correctly
+- [✅  ] Images load and lightbox works
+- [ ✅ ] Search functionality works
+   [✅ ] Category functionality works
+- [ ✅ ] Admin login works
+- [✅ ] Admin dashboard displays correctly
+- [ ✅ ] Form submissions work
+- [ ✅ ] Image upload works
+- [ ✅ ] Responsive design (resize window)
 
 #### **Firefox (Latest)**
-- [ ] Home page loads correctly
-- [ ] Navigation menu works
-- [ ] Post pages display correctly
-- [ ] Images load and lightbox works
-- [ ] Search functionality works
-- [ ] Admin login works
-- [ ] Admin dashboard displays correctly
-- [ ] Form submissions work
-- [ ] Image upload works
-- [ ] Responsive design (resize window)
+- [ ✅] Home page loads correctly
+- [ ✅] Navigation menu works
+- [ ✅] Post pages display correctly
+- [ ✅] Images load and lightbox works
+- [✅ ] Search functionality works
+- [✅ ] Admin login works
+- [✅ ] Admin dashboard displays correctly
+- [ ✅] Form submissions work
+- [✅ ] Image upload works
+- [ ✅] Responsive design (resize window)
 
 #### **Safari (macOS)**
 - [ ] Home page loads correctly
