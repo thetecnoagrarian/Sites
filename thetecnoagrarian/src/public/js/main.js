@@ -152,7 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Toggle current dropdown
             if (dropdownMenu) {
-                dropdownMenu.classList.toggle('active');
+            dropdownMenu.classList.toggle('active');
             }
         });
     });
