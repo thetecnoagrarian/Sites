@@ -105,3 +105,10 @@ Thumbs.db
 tmp/
 temp/
 
+# Playwright test results
+test-results/
+playwright-report/
+playwright/.cache/
+tests/screenshots/
+test-results.json
+
