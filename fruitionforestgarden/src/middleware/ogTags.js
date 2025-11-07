@@ -5,6 +5,11 @@ const DEFAULT_OG = `
   <meta property="og:image" content="https://www.fruitionforestgarden.com/images/HeroCamp.png" />
   <meta property="og:image:alt" content="Aerial view of Fruition Forest Garden" />
   <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:site" content="@fruitionforestgarden" />
+  <meta name="twitter:title" content="Fruition Forest Garden" />
+  <meta name="twitter:description" content="A blog about our adventure building our homestead on a bare 20 acres in Michigan's Upper Peninsula." />
+  <meta name="twitter:image" content="https://www.fruitionforestgarden.com/images/HeroCamp.png" />
 `;
 
 function buildOgTags(post) {
@@ -36,6 +41,11 @@ function buildOgTags(post) {
     <meta property="og:image" content="${image}" />
     <meta property="og:image:alt" content="${imageAlt.replace(/"/g, '&quot;')}" />
     <meta property="og:type" content="article" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@fruitionforestgarden" />
+    <meta name="twitter:title" content="${title.replace(/"/g, '&quot;')}" />
+    <meta name="twitter:description" content="${desc.replace(/"/g, '&quot;')}" />
+    <meta name="twitter:image" content="${image}" />
   `;
 }
 

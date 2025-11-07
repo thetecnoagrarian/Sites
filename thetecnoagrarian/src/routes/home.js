@@ -46,11 +46,15 @@ router.get('/', async (req, res) => {
 
         const totalPages = Math.ceil(totalCount / limit) || 1;
 
+        // Add default OG tags for home page
+        const ogTags = buildOgTags(null);
+
         res.render('home', {
             title: 'Home',
             posts,
             currentPage: page,
-            pages: Array.from({ length: totalPages }, (_, i) => i + 1)
+            pages: Array.from({ length: totalPages }, (_, i) => i + 1),
+            ogTags
         });
     } catch (error) {
         console.error('Error loading home page:', error);
@@ -63,8 +67,10 @@ router.get('/', async (req, res) => {
 
 // About page
 router.get('/about', (req, res) => {
+    const ogTags = buildOgTags(null);
     res.render('about', {
-        title: 'About'
+        title: 'About',
+        ogTags
     });
 });
 
