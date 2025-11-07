@@ -510,7 +510,6 @@
     justify-content: center;
     gap: 0.5rem;
     transition: background-color 0.3s ease;
-    width: 50%;
     margin: 0 auto;
     box-sizing: border-box;
   }
