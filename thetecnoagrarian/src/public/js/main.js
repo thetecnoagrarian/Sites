@@ -84,16 +84,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Open modal when categories button is clicked
+    // Open modal when categories button is clicked (mobile only)
     if (categoriesToggle) {
         categoriesToggle.addEventListener('click', function(e) {
-            // Check if we're on mobile (window width <= 1133px)
-            if (window.innerWidth <= 1133) {
+            // Only open modal on mobile (window width <= 768px to match CSS breakpoint)
+            if (window.innerWidth <= 768) {
                 e.preventDefault();
                 e.stopPropagation();
                 openCategoriesModal();
+            } else {
+                // On desktop, prevent click functionality - hover only
+                e.preventDefault();
+                e.stopPropagation();
             }
-            // On desktop, let the hover behavior work (no preventDefault)
         });
     }
     
@@ -127,8 +130,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const categoryLinks = categoriesMenu.querySelectorAll('.category-link');
         categoryLinks.forEach(link => {
             link.addEventListener('click', function() {
-                // Only close on mobile
-                if (window.innerWidth <= 1133) {
+                // Only close on mobile (window width <= 768px to match CSS breakpoint)
+                if (window.innerWidth <= 768) {
                     closeCategoriesModal();
                 }
             });
