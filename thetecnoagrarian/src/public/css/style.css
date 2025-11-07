@@ -525,6 +525,11 @@
     position: relative;
   }
   
+  /* Hide backdrop on desktop */
+  .categories-backdrop {
+    display: none;
+  }
+  
   .categories-menu {
     position: absolute;
     top: 100%;
@@ -541,6 +546,11 @@
     z-index: 1000;
     padding: 2rem;
     margin-top: 0.5rem;
+  }
+  
+  /* Hide header on desktop */
+  .categories-menu-header {
+    display: none;
   }
   
   .categories-grid {
@@ -786,36 +796,128 @@
     .categories-toggle {
       margin: 0;
       box-sizing: border-box;
+      width: 100%;
     }
     
-    .categories-menu {
-      position: static;
-      opacity: 1;
-      visibility: visible;
-      transform: none;
-      box-shadow: none;
-      border: none;
-      background: transparent;
-      padding: 0;
-      margin-top: 0;
+    /* Categories backdrop overlay for mobile */
+    .categories-backdrop {
       display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 9999;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .categories-backdrop.active {
+      display: block;
+      opacity: 1;
+    }
+    
+    /* Bottom sheet modal for categories on mobile */
+    .categories-menu {
+      position: fixed !important;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      top: auto !important;
+      background: white;
+      border-radius: 20px 20px 0 0;
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
+      max-height: 70vh;
+      min-width: auto !important;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 10000;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      opacity: 1 !important;
+      visibility: visible !important;
     }
     
     .categories-menu.active {
-      display: block;
+      transform: translateY(0);
+    }
+    
+    /* Header for bottom sheet - show on mobile */
+    .categories-menu-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--gray);
+      background: white;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    
+    .categories-menu-header h3 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--black);
+    }
+    
+    .categories-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      color: var(--gray);
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background-color 0.2s ease;
+    }
+    
+    .categories-close:hover {
+      background-color: var(--gray-light);
+      color: var(--black);
+    }
+    
+    /* Scrollable content area - override desktop grid */
+    .categories-grid {
+      display: flex !important;
+      flex-direction: column;
+      grid-template-columns: none !important;
+      gap: 0;
+      max-height: calc(70vh - 70px);
+      overflow-y: auto;
+      padding: 0.5rem 0;
+      -webkit-overflow-scrolling: touch;
     }
     
     .category-link {
-      color: var(--gray-light);
-      padding: 0.5rem 1rem;
-      background: rgba(255, 255, 255, 0.05);
-      margin-bottom: 0.25rem;
-      border-radius: 4px;
+      display: block;
+      padding: 1rem 1.5rem;
+      color: var(--black);
+      text-decoration: none;
+      font-size: 1rem;
+      border-bottom: 1px solid var(--gray-light);
+      transition: background-color 0.2s ease;
+      background: white;
     }
     
+    .category-link:last-child {
+      border-bottom: none;
+    }
+    
+    .category-link:active,
     .category-link:hover {
-      background-color: var(--primary);
-      color: #ffffff;
+      background-color: var(--primary-light);
+      color: var(--primary);
     }
     
     /* Make dropdown menus full width on mobile */

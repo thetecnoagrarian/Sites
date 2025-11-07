@@ -62,23 +62,98 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Mobile dropdown functionality
-    const dropdownToggles = document.querySelectorAll('.dropdown-toggle, .categories-toggle');
+    // Categories bottom sheet modal functionality (mobile)
+    const categoriesToggle = document.querySelector('.categories-toggle');
+    const categoriesMenu = document.querySelector('.categories-menu');
+    const categoriesBackdrop = document.querySelector('.categories-backdrop');
+    const categoriesClose = document.querySelector('.categories-close');
+    
+    function openCategoriesModal() {
+        if (categoriesMenu && categoriesBackdrop) {
+            categoriesMenu.classList.add('active');
+            categoriesBackdrop.classList.add('active');
+            document.body.style.overflow = 'hidden'; // Prevent scrolling
+        }
+    }
+    
+    function closeCategoriesModal() {
+        if (categoriesMenu && categoriesBackdrop) {
+            categoriesMenu.classList.remove('active');
+            categoriesBackdrop.classList.remove('active');
+            document.body.style.overflow = ''; // Restore scrolling
+        }
+    }
+    
+    // Open modal when categories button is clicked
+    if (categoriesToggle) {
+        categoriesToggle.addEventListener('click', function(e) {
+            // Check if we're on mobile (window width <= 1133px)
+            if (window.innerWidth <= 1133) {
+                e.preventDefault();
+                e.stopPropagation();
+                openCategoriesModal();
+            }
+            // On desktop, let the hover behavior work (no preventDefault)
+        });
+    }
+    
+    // Close modal when backdrop is clicked
+    if (categoriesBackdrop) {
+        categoriesBackdrop.addEventListener('click', function(e) {
+            if (e.target === categoriesBackdrop) {
+                closeCategoriesModal();
+            }
+        });
+    }
+    
+    // Close modal when close button is clicked
+    if (categoriesClose) {
+        categoriesClose.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeCategoriesModal();
+        });
+    }
+    
+    // Close modal with escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && categoriesMenu && categoriesMenu.classList.contains('active')) {
+            closeCategoriesModal();
+        }
+    });
+    
+    // Close modal when a category link is clicked (on mobile)
+    if (categoriesMenu) {
+        const categoryLinks = categoriesMenu.querySelectorAll('.category-link');
+        categoryLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                // Only close on mobile
+                if (window.innerWidth <= 1133) {
+                    closeCategoriesModal();
+                }
+            });
+        });
+    }
+    
+    // Mobile dropdown functionality (for other dropdowns)
+    const dropdownToggles = document.querySelectorAll('.dropdown-toggle');
     dropdownToggles.forEach(toggle => {
         toggle.addEventListener('click', function(e) {
             e.preventDefault();
-            const dropdown = this.closest('.dropdown, .mega-dropdown, .categories-dropdown');
-            const dropdownMenu = dropdown.querySelector('.dropdown-menu, .mega-menu, .categories-menu');
+            const dropdown = this.closest('.dropdown, .mega-dropdown');
+            const dropdownMenu = dropdown.querySelector('.dropdown-menu, .mega-menu');
             
             // Close other dropdowns
-            document.querySelectorAll('.dropdown-menu, .mega-menu, .categories-menu').forEach(menu => {
+            document.querySelectorAll('.dropdown-menu, .mega-menu').forEach(menu => {
                 if (menu !== dropdownMenu) {
                     menu.classList.remove('active');
                 }
             });
             
             // Toggle current dropdown
-            dropdownMenu.classList.toggle('active');
+            if (dropdownMenu) {
+                dropdownMenu.classList.toggle('active');
+            }
         });
     });
 });
