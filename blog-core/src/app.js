@@ -175,6 +175,15 @@ export function createBlogApp(config) {
     // Static files with cache
     // TODO: Re-enable aggressive caching (30d, immutable) once design is finalized
     const staticPath = publicPath || path.join(process.cwd(), 'src/public');
+    
+    // Ensure .JPG files are served with correct MIME type
+    app.use((req, res, next) => {
+        if (req.path.toLowerCase().endsWith('.jpg') || req.path.endsWith('.JPG')) {
+            res.type('image/jpeg');
+        }
+        next();
+    });
+    
     app.use(express.static(staticPath, {
         maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0, // Reduced from 30d during active development
         immutable: false // Disabled during active development to allow cache-busting
