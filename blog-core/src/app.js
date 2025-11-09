@@ -176,10 +176,19 @@ export function createBlogApp(config) {
     // TODO: Re-enable aggressive caching (30d, immutable) once design is finalized
     const staticPath = publicPath || path.join(process.cwd(), 'src/public');
     
-    // Ensure .JPG files are served with correct MIME type
+    // Ensure image files are served with correct MIME type
     app.use((req, res, next) => {
-        if (req.path.toLowerCase().endsWith('.jpg') || req.path.endsWith('.JPG')) {
+        const pathLower = req.path.toLowerCase();
+        if (pathLower.endsWith('.jpg') || req.path.endsWith('.JPG')) {
             res.type('image/jpeg');
+        } else if (pathLower.endsWith('.png') || req.path.endsWith('.PNG')) {
+            res.type('image/png');
+        } else if (pathLower.endsWith('.jpeg')) {
+            res.type('image/jpeg');
+        } else if (pathLower.endsWith('.gif')) {
+            res.type('image/gif');
+        } else if (pathLower.endsWith('.webp')) {
+            res.type('image/webp');
         }
         next();
     });

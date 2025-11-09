@@ -46,8 +46,8 @@ router.get('/', async (req, res) => {
 
         const totalPages = Math.ceil(totalCount / limit) || 1;
 
-        // Add default OG tags for home page
-        const ogTags = buildOgTags(null);
+        // Add default OG tags for home page (pass req for dynamic base URL)
+        const ogTags = buildOgTags(null, req);
 
         res.render('home', {
             title: 'Home',
@@ -67,7 +67,7 @@ router.get('/', async (req, res) => {
 
 // About page
 router.get('/about', (req, res) => {
-    const ogTags = buildOgTags(null);
+    const ogTags = buildOgTags(null, req);
     res.render('about', {
         title: 'About',
         ogTags
@@ -182,7 +182,7 @@ router.get('/post/:slug', async (req, res) => {
         post.multipleImages = Array.isArray(post.imageList) && post.imageList.length > 1;
 
         res.locals.post = post; // Make post available to template
-        const ogTags = buildOgTags(post);
+        const ogTags = buildOgTags(post, req);
         res.render('posts/show', {
             title: post.title,
             post,

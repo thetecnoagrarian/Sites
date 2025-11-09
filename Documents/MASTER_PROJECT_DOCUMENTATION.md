@@ -82,10 +82,12 @@ A monorepo containing two blog sites deployed to Linode server using Docker Comp
 - ✅ Admin dashboard shadow optimization
 
 ### 🧹 **RECENT CLEANUP**
-- **Docker Cleanup**: Reclaimed 6.56GB of disk space
-- **Disk Usage**: Reduced from 62% to 36% usage
-- **Images**: Cleaned up 14 unused Docker images
-- **Build Cache**: Cleared 3.51GB of build cache
+- **Docker Cleanup (November 9, 2025)**: Reclaimed 12.5GB of disk space
+  - Removed unused Docker images: 2.81GB
+  - Cleared build cache: 9.72GB
+  - Cleaned old backups: additional space freed
+- **Disk Usage**: Reduced from 100% to 61% usage
+- **OG Tags Fix**: Updated HeroCamp.JPG to HeroCamp.png for proper MIME type handling
 
 ---
 
@@ -101,8 +103,10 @@ A monorepo containing two blog sites deployed to Linode server using Docker Comp
 
 ### **MEDIUM PRIORITY (Should Do Before Launch)**
 7. **⚡ Performance Testing** - Check page load times and concurrent users
-8. **🔍 OG Tags & Social Sharing** - Test Open Graph tags and Twitter cards
-9. **💾 Backup & Recovery Procedures** - Set up automated backups and test restoration
+8. **🔍 OG Tags & Social Sharing** - ✅ IMPLEMENTED - Open Graph tags and Twitter cards configured with HeroCamp.png
+   - ⏳ **PENDING**: Test with Facebook Debugger and Twitter Card Validator
+9. **💾 Backup & Recovery Procedures** - ✅ Automated backup script implemented
+   - ⏳ **PENDING**: Test backup restoration procedure
 10. ✅ **Security Hardening** - Helmet, CSP, security headers implemented and verified
 11. **🤖 CI/CD Setup** - GitHub Actions for linting and testing
 
@@ -224,6 +228,27 @@ ssh deploy@172.236.119.220 "cd /opt/Sites && docker-compose -f docker-compose.pr
 
 ## 🧪 Testing & Troubleshooting
 
+### 📊 Testing Summary
+
+**✅ COMPLETED (100% Tested)**:
+- ✅ Cross-browser compatibility (36 Playwright tests passing)
+- ✅ Responsive design (mobile, tablet, desktop)
+- ✅ SSL certificates and security headers
+- ✅ Admin authentication and security
+- ✅ Post creation and editing
+- ✅ Image upload and processing
+- ✅ Database operations
+- ✅ Server deployment and container management
+- ✅ Caption updates
+- ✅ Image display
+- ✅ Rate limiting
+- ✅ Docker cleanup and disk space management
+
+**⏳ PENDING (Needs Testing)**:
+- ⏳ OG tags and social sharing validation
+- ⏳ Performance testing (load times, concurrent users)
+- ⏳ Backup restoration procedures
+
 ### ✅ Automated Testing (Playwright)
 **Status**: ✅ **COMPLETE** (November 7, 2025)
 
@@ -291,9 +316,21 @@ npm run test:e2e:report
 - [x] SSL certificates and security headers - ✅ **VERIFIED** (Let's Encrypt, all headers configured)
 
 ### ⏳ PENDING TESTS
-- [ ] OG tags and social sharing
-- [ ] Performance and load times
-- [ ] Backup and recovery procedures
+- [ ] **OG Tags & Social Sharing** - Implementation complete, needs validation:
+  - [ ] Test homepage OG tags with Facebook Debugger (https://developers.facebook.com/tools/debug/)
+  - [ ] Test post OG tags with Facebook Debugger
+  - [ ] Test Twitter Card Validator (https://cards-dev.twitter.com/validator)
+  - [ ] Verify HeroCamp.png displays correctly in social media previews
+- [ ] **Performance Testing** - Check page load times and concurrent users:
+  - [ ] Homepage load time (target: < 2 seconds)
+  - [ ] Post page load time (target: < 3 seconds)
+  - [ ] Image loading performance
+  - [ ] Concurrent user handling (stress test)
+- [ ] **Backup & Recovery Procedures** - Automated backup script implemented:
+  - [ ] Test database backup restoration
+  - [ ] Test uploads backup restoration
+  - [ ] Verify backup cleanup (14-day retention)
+  - [ ] Test full system recovery procedure
 
 ### Troubleshooting Commands
 ```bash
@@ -310,9 +347,11 @@ ssh deploy@172.236.119.220 "df -h"
 # Check Docker space usage
 ssh deploy@172.236.119.220 "docker system df"
 
-# Clean up Docker (when needed)
-ssh deploy@172.236.119.220 "docker image prune -a -f"
-ssh deploy@172.236.119.220 "docker builder prune -a -f"
+# Clean up Docker (when needed) - Reclaims significant space
+ssh deploy@172.236.119.220 "docker image prune -a -f && docker builder prune -a -f"
+
+# Clean up old backups (keep last 7 days)
+ssh deploy@172.236.119.220 "find /opt/Sites/backups -type f -mtime +7 -delete"
 ```
 
 ---
@@ -476,36 +515,60 @@ docker-compose -f docker-compose.prod.yml restart thetecnoagrarian fruitionfores
 ## 💾 Backup & Recovery
 
 ### Current Backup Status
-- **Manual Backups**: Available but not automated
-- **Database Backups**: SQLite files can be copied
-- **Image Backups**: Upload directories need backup strategy
+- ✅ **Automated Backups**: Script implemented (`scripts/backup.sh` and `scripts/backup.js`)
+- ✅ **Database Backups**: SQLite files backed up automatically
+- ✅ **Image Backups**: Upload directories included in backups
+- ⏳ **Recovery Testing**: Pending validation of restoration procedures
 
-### Automated Backup Script (TODO)
-Create `scripts/backup.sh`:
+### Automated Backup Script
+**Status**: ✅ **IMPLEMENTED**
+
+Backup scripts are available in multiple formats:
+- `scripts/backup.sh` - Bash script for container execution
+- `scripts/backup-host.sh` - Host-side script that runs container backups
+- `src/scripts/backup.js` - Node.js backup script (per site)
+
+**Backup Process**:
+1. Creates timestamped backup directory
+2. Backs up database (`blog.db`)
+3. Backs up uploads directory (compressed)
+4. Cleans up old backups (retention: 14 days)
+
+**Manual Backup Commands**:
 ```bash
-#!/bin/bash
-DATE=$(date +"%Y-%m-%d_%H-%M")
-BACKUP_DIR="/app/backups"
+# Run backup for Fruition Forest Garden
+ssh deploy@172.236.119.220 "docker exec ffg-blog-prod /app/scripts/backup.sh"
 
-# Create backup directory if it doesn't exist
-mkdir -p $BACKUP_DIR
+# Run backup for The Tecnoagrarian
+ssh deploy@172.236.119.220 "docker exec tta-blog-prod /app/scripts/backup.sh"
 
-# Backup database
-cp /app/data/blog.db $BACKUP_DIR/blog_$DATE.db
-
-# Backup uploads
-tar -czf $BACKUP_DIR/uploads_$DATE.tar.gz /app/data/uploads/
-
-# Clean up old backups (keep 14 days)
-find $BACKUP_DIR -type f -mtime +14 -delete
-
-echo "Backup completed: $DATE"
+# Run host-side backup (backs up both sites)
+ssh deploy@172.236.119.220 "/opt/Sites/scripts/backup-host.sh"
 ```
 
+**Backup Location**: 
+- Container: `/app/backups/` inside each container
+- Host: `/opt/Sites/backups/` on server (mapped from volumes)
+
 ### Recovery Procedures
-1. **Database Recovery**: Restore from backup SQLite file
-2. **Image Recovery**: Extract from backup tar.gz
-3. **Full System Recovery**: Rebuild containers and restore data
+**Status**: ⏳ **NEEDS TESTING**
+
+1. **Database Recovery**: 
+   - Stop container
+   - Copy backup SQLite file to `/app/data/blog.db`
+   - Restart container
+   - ⏳ **PENDING**: Test this procedure
+
+2. **Image Recovery**: 
+   - Extract backup tar.gz to `/app/data/uploads/`
+   - Verify file permissions
+   - ⏳ **PENDING**: Test this procedure
+
+3. **Full System Recovery**: 
+   - Rebuild containers
+   - Restore database and uploads from backups
+   - Verify all functionality
+   - ⏳ **PENDING**: Test this procedure
 
 ---
 
@@ -537,6 +600,12 @@ echo "Backup completed: $DATE"
 ---
 
 ## 📝 Changelog
+
+### Version 2.4.0 - November 9, 2025
+- ✅ **Docker Cleanup**: Reclaimed 12.5GB disk space (removed unused images and build cache)
+- ✅ **OG Tags Fix**: Updated HeroCamp.JPG to HeroCamp.png for proper MIME type and social sharing
+- ✅ **502 Bad Gateway Fix**: Resolved disk space issue causing container restarts
+- ✅ **Disk Space Management**: Implemented cleanup procedures for Docker and backups
 
 ### Version 2.3.0 - November 7, 2025
 - ✅ **Responsive Design Refactor**: Modern hybrid approach (fluid CSS + single breakpoint)
@@ -619,7 +688,7 @@ This master document consolidates all previous documentation files:
 
 ---
 
-**Last Updated**: November 7, 2025  
+**Last Updated**: November 9, 2025  
 **Status**: **PRODUCTION READY** - All core functionality operational, production domains live  
 **Priority**: **LOW** - Core features complete, automated testing in place  
-**Next Milestone**: Performance optimization, backup automation, CI/CD enhancements
+**Next Milestone**: OG tags validation, backup restoration testing, performance optimization

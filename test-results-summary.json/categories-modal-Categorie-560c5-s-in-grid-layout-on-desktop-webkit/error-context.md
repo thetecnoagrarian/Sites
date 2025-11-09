@@ -1,0 +1,94 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "The Tecnoagrarian Logo" [ref=e5]:
+        - /url: /
+        - img "The Tecnoagrarian Logo" [ref=e6]
+      - text: 
+      - navigation [ref=e7]:
+        - list [ref=e8]:
+          - listitem [ref=e9]:
+            - link "Home" [ref=e10]:
+              - /url: /
+          - listitem [ref=e11]:
+            - link "About" [ref=e12]:
+              - /url: /about
+          - listitem [ref=e13]:
+            - link "Login" [ref=e14]:
+              - /url: /login
+  - generic [ref=e17]:
+    - textbox [ref=e23]:
+      - /placeholder: Search posts...
+    - generic [ref=e24]:
+      - button "Categories " [ref=e25] [cursor=pointer]:
+        - text: Categories
+        - generic [ref=e26]: 
+      - generic [ref=e27]:
+        - text: 
+        - generic [ref=e28]:
+          - link "Agriculture" [ref=e29]:
+            - /url: /category/agriculture
+          - link "Coffee Drinks" [ref=e30]:
+            - /url: /category/coffee-drinks
+          - link "Cooking" [ref=e31]:
+            - /url: /category/cooking
+          - link "ESP32" [ref=e32]:
+            - /url: /category/esp32
+          - link "Home Assistant" [ref=e33]:
+            - /url: /category/home-assistant
+          - link "Kittens" [ref=e34]:
+            - /url: /category/kittens
+          - link "Puppies" [ref=e35]:
+            - /url: /category/puppies
+          - link "Technology" [ref=e36]:
+            - /url: /category/technology
+          - link "snuggles" [ref=e37]:
+            - /url: /category/snuggles
+          - link "solar power" [ref=e38]:
+            - /url: /category/solar-power
+  - generic [ref=e39]:
+    - main [ref=e40]:
+      - heading "The Tecnoagrarian" [level=1] [ref=e42]
+      - img "Black and White Mountain Scene" [ref=e44]
+      - generic [ref=e45]:
+        - heading "Recent Posts" [level=2] [ref=e46]
+        - generic [ref=e47]:
+          - 'link "Title Title Excerpt Event: October 30, 2025 Posted: October 30, 2025 By: tta_admin" [ref=e48]':
+            - /url: /post/title
+            - generic [ref=e50] [cursor=pointer]:
+              - img "Title" [ref=e52]
+              - generic [ref=e53]:
+                - heading "Title" [level=3] [ref=e54]
+                - paragraph [ref=e55]: Excerpt
+                - generic [ref=e56]:
+                  - generic [ref=e57]: "Event: October 30, 2025"
+                  - generic [ref=e58]: "Posted: October 30, 2025"
+                  - generic [ref=e59]: "By: tta_admin"
+          - 'link "Title 2 Title 2 Excerpt Event: January 6, 2025 Posted: October 31, 2025" [ref=e60]':
+            - /url: /post/title-2
+            - generic [ref=e62] [cursor=pointer]:
+              - img "Title 2" [ref=e64]
+              - generic [ref=e65]:
+                - heading "Title 2" [level=3] [ref=e66]
+                - paragraph [ref=e67]: Excerpt
+                - generic [ref=e68]:
+                  - generic [ref=e69]: "Event: January 6, 2025"
+                  - generic [ref=e70]: "Posted: October 31, 2025"
+        - link "1" [ref=e72]:
+          - /url: /?page=1
+    - contentinfo [ref=e73]:
+      - generic [ref=e74]:
+        - link "" [ref=e75]:
+          - /url: https://www.facebook.com/
+          - generic [ref=e76]: 
+        - link "" [ref=e77]:
+          - /url: https://github.com/
+          - generic [ref=e78]: 
+        - link "" [ref=e79]:
+          - /url: https://x.com/
+          - generic [ref=e80]: 
+      - paragraph [ref=e81]: © 2025 The Tecnoagrarian. All rights reserved.
+```

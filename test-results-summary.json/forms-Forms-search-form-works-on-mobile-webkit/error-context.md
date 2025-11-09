@@ -1,0 +1,87 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "The Tecnoagrarian Logo" [ref=e5]:
+        - /url: /
+        - img "The Tecnoagrarian Logo" [ref=e6]
+      - button "" [ref=e7] [cursor=pointer]:
+        - generic [ref=e8]: 
+  - generic [ref=e11]:
+    - textbox [ref=e17]:
+      - /placeholder: Search posts...
+    - generic [ref=e18]:
+      - button "Categories " [ref=e19] [cursor=pointer]:
+        - text: Categories
+        - generic [ref=e20]: 
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - heading "Categories" [level=3] [ref=e23]
+          - button "Close categories" [ref=e24] [cursor=pointer]:
+            - generic [ref=e25]: 
+        - generic [ref=e26]:
+          - link "Agriculture" [ref=e27]:
+            - /url: /category/agriculture
+          - link "Coffee Drinks" [ref=e28]:
+            - /url: /category/coffee-drinks
+          - link "Cooking" [ref=e29]:
+            - /url: /category/cooking
+          - link "ESP32" [ref=e30]:
+            - /url: /category/esp32
+          - link "Home Assistant" [ref=e31]:
+            - /url: /category/home-assistant
+          - link "Kittens" [ref=e32]:
+            - /url: /category/kittens
+          - link "Puppies" [ref=e33]:
+            - /url: /category/puppies
+          - link "Technology" [ref=e34]:
+            - /url: /category/technology
+          - link "snuggles" [ref=e35]:
+            - /url: /category/snuggles
+          - link "solar power" [ref=e36]:
+            - /url: /category/solar-power
+  - generic [ref=e37]:
+    - main [ref=e38]:
+      - heading "The Tecnoagrarian" [level=1] [ref=e40]
+      - img "Black and White Mountain Scene" [ref=e42]
+      - generic [ref=e43]:
+        - heading "Recent Posts" [level=2] [ref=e44]
+        - generic [ref=e45]:
+          - 'link "Title Title Excerpt Event: October 30, 2025 Posted: October 30, 2025 By: tta_admin" [ref=e46]':
+            - /url: /post/title
+            - generic [ref=e48] [cursor=pointer]:
+              - img "Title" [ref=e50]
+              - generic [ref=e51]:
+                - heading "Title" [level=3] [ref=e52]
+                - paragraph [ref=e53]: Excerpt
+                - generic [ref=e54]:
+                  - generic [ref=e55]: "Event: October 30, 2025"
+                  - generic [ref=e56]: "Posted: October 30, 2025"
+                  - generic [ref=e57]: "By: tta_admin"
+          - 'link "Title 2 Title 2 Excerpt Event: January 6, 2025 Posted: October 31, 2025" [ref=e58]':
+            - /url: /post/title-2
+            - generic [ref=e60] [cursor=pointer]:
+              - img "Title 2" [ref=e62]
+              - generic [ref=e63]:
+                - heading "Title 2" [level=3] [ref=e64]
+                - paragraph [ref=e65]: Excerpt
+                - generic [ref=e66]:
+                  - generic [ref=e67]: "Event: January 6, 2025"
+                  - generic [ref=e68]: "Posted: October 31, 2025"
+        - link "1" [ref=e70]:
+          - /url: /?page=1
+    - contentinfo [ref=e71]:
+      - generic [ref=e72]:
+        - link "" [ref=e73]:
+          - /url: https://www.facebook.com/
+          - generic [ref=e74]: 
+        - link "" [ref=e75]:
+          - /url: https://github.com/
+          - generic [ref=e76]: 
+        - link "" [ref=e77]:
+          - /url: https://x.com/
+          - generic [ref=e78]: 
+      - paragraph [ref=e79]: © 2025 The Tecnoagrarian. All rights reserved.
+```
