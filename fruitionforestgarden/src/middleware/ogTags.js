@@ -2,14 +2,14 @@ const DEFAULT_OG = `
   <meta property="og:title" content="Fruition Forest Garden" />
   <meta property="og:description" content="A blog about our adventure building our homestead on a undeveloped 20 acres in Michigan's Upper Peninsula." />
   <meta property="og:url" content="https://www.fruitionforestgarden.com/" />
-  <meta property="og:image" content="https://www.fruitionforestgarden.com/images/HeroCamp.JPG" />
+  <meta property="og:image" content="https://www.fruitionforestgarden.com/images/HeroCamp.png" />
   <meta property="og:image:alt" content="Aerial view of Fruition Forest Garden" />
   <meta property="og:type" content="website" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:site" content="@fruitionforestgarden" />
   <meta name="twitter:title" content="Fruition Forest Garden" />
   <meta name="twitter:description" content="A blog about our adventure building our homestead on a undeveloped 20 acres in Michigan's Upper Peninsula." />
-  <meta name="twitter:image" content="https://www.fruitionforestgarden.com/images/HeroCamp.JPG" />
+  <meta name="twitter:image" content="https://www.fruitionforestgarden.com/images/HeroCamp.png" />
 `;
 
 function buildOgTags(post) {
