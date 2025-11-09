@@ -24,7 +24,8 @@ function buildOgTags(post, req = null) {
   }
   
   // Use the first image from imageList (carousel) if available, fallback to images array
-  let image = `${baseUrl}/images/HeroCamp.png`;
+  // Use optimized OG version (HeroCamp-og.png) for social sharing - smaller file size, Facebook-compliant
+  let image = `${baseUrl}/images/HeroCamp-og.png`;
   let imageAlt = 'Aerial view of Fruition Forest Garden';
   
   if (post) {
