@@ -644,7 +644,6 @@ router.get('/analytics', isAdmin, async (req, res) => {
         const dbHealth = Analytics.checkDatabaseHealth();
         
         res.render('admin/analytics', {
-            layout: 'admin',
             title: 'Analytics Dashboard',
             user: req.user,
             totalStats,
