@@ -37,10 +37,10 @@ node -e "const crypto = require('crypto'); console.log('Secure password:', crypt
 **For Fruition Forest Garden:**
 ```bash
 # 1. Change username
-ssh deploy@172.236.119.220 "docker exec ffg-blog-prod node /app/scripts/change-username.js fruitionforestgarden@protonmail.com MDC"
+ssh deploy@172.236.119.220 "docker exec ffg-blog-prod node /app/fruitionforestgarden/scripts/change-username.js fruitionforestgarden@protonmail.com MDC"
 
 # 2. Change password (use the password you generated)
-ssh deploy@172.236.119.220 "docker exec ffg-blog-prod node /app/scripts/change-password.js MDC YOUR_NEW_PASSWORD_HERE"
+ssh deploy@172.236.119.220 "docker exec ffg-blog-prod node /app/fruitionforestgarden/scripts/change-password.js MDC YOUR_NEW_PASSWORD_HERE"
 
 # 3. Verify
 ssh deploy@172.236.119.220 "docker exec ffg-blog-prod sqlite3 /app/data/blog.db \"SELECT username, isAdmin FROM users WHERE username = 'MDC';\""
@@ -49,10 +49,10 @@ ssh deploy@172.236.119.220 "docker exec ffg-blog-prod sqlite3 /app/data/blog.db 
 **For The Tecnoagrarian:**
 ```bash
 # 1. Change username
-ssh deploy@172.236.119.220 "docker exec tta-blog-prod node /app/scripts/change-username.js tta_admin MDC"
+ssh deploy@172.236.119.220 "docker exec tta-blog-prod node /app/thetecnoagrarian/scripts/change-username.js tta_admin MDC"
 
 # 2. Change password (use the same password you used for FFG)
-ssh deploy@172.236.119.220 "docker exec tta-blog-prod node /app/scripts/change-password.js MDC YOUR_NEW_PASSWORD_HERE"
+ssh deploy@172.236.119.220 "docker exec tta-blog-prod node /app/thetecnoagrarian/scripts/change-password.js MDC YOUR_NEW_PASSWORD_HERE"
 
 # 3. Verify
 ssh deploy@172.236.119.220 "docker exec tta-blog-prod sqlite3 /app/data/blog.db \"SELECT username, isAdmin FROM users WHERE username = 'MDC';\""
