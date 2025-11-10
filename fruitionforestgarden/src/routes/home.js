@@ -1,5 +1,6 @@
 import express from 'express';
 import buildOgTags from '../middleware/ogTags.js';
+import { getHeroImagePath } from '../utils/heroImageProcessor.js';
 
 const router = express.Router();
 
@@ -46,14 +47,18 @@ router.get('/', async (req, res) => {
 
         const totalPages = Math.ceil(totalCount / limit) || 1;
 
+        // Get hero image path if it exists
+        const heroImagePath = await getHeroImagePath();
+
         // Add default OG tags for home page (pass req for dynamic base URL)
-        const ogTags = buildOgTags(null, req);
+        const ogTags = await buildOgTags(null, req);
 
         res.render('home', {
             title: 'Home',
             posts,
             currentPage: page,
             pages: Array.from({ length: totalPages }, (_, i) => i + 1),
+            heroImagePath,
             ogTags
         });
     } catch (error) {
@@ -66,8 +71,8 @@ router.get('/', async (req, res) => {
 });
 
 // About page
-router.get('/about', (req, res) => {
-    const ogTags = buildOgTags(null, req);
+router.get('/about', async (req, res) => {
+    const ogTags = await buildOgTags(null, req);
     res.render('about', {
         title: 'About',
         ogTags
@@ -182,7 +187,7 @@ router.get('/post/:slug', async (req, res) => {
         post.multipleImages = Array.isArray(post.imageList) && post.imageList.length > 1;
 
         res.locals.post = post; // Make post available to template
-        const ogTags = buildOgTags(post, req);
+        const ogTags = await buildOgTags(post, req);
         res.render('posts/show', {
             title: post.title,
             post,

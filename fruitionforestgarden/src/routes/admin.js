@@ -6,6 +6,7 @@ import multer from 'multer';
 import { isAuthenticated, isAdmin, processImage } from '@ffg/blog-core';
 import postController from '../controllers/postController.js';
 import Analytics from '../models/analytics.js';
+import { processHeroImage, getHeroImagePath } from '../utils/heroImageProcessor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -731,6 +732,62 @@ router.post('/users/:id/delete', isAdmin, async (req, res) => {
         req.flash('error', 'Failed to delete user: ' + error.message);
         res.redirect('/admin/users');
     }
+});
+
+// Hero Image Management Routes
+
+// GET route for hero image management page
+router.get('/hero-image', isAdmin, async (req, res) => {
+    try {
+        const heroImagePath = await getHeroImagePath();
+        res.render('admin/hero-image', {
+            title: 'Hero Image Management',
+            heroImagePath,
+            success: req.flash('success'),
+            error: req.flash('error'),
+            user: req.user
+        });
+    } catch (error) {
+        console.error('Error loading hero image page:', error);
+        req.flash('error', 'Failed to load hero image page');
+        res.redirect('/admin/dashboard');
+    }
+});
+
+// POST route for hero image upload
+router.post('/hero-image/upload', isAdmin, (req, res) => {
+    req.app.locals.upload.single('heroImage')(req, res, async function (err) {
+        if (err instanceof multer.MulterError) {
+            req.flash('error', `File upload error: ${err.message}. Max size is 50MB.`);
+            return res.redirect('/admin/hero-image');
+        } else if (err) {
+            req.flash('error', `File upload error: ${err.message}`);
+            return res.redirect('/admin/hero-image');
+        }
+
+        if (!req.file) {
+            req.flash('error', 'No file uploaded. Please select an image file.');
+            return res.redirect('/admin/hero-image');
+        }
+
+        try {
+            // Process the hero image
+            const result = await processHeroImage(req.file.path);
+            
+            // Format file sizes for display
+            const heroSizeMB = (result.heroSize / (1024 * 1024)).toFixed(2);
+            const ogSizeMB = (result.ogSize / (1024 * 1024)).toFixed(2);
+            
+            req.flash('success', 
+                `Hero image uploaded successfully! Hero: ${result.heroDimensions.width}x${result.heroDimensions.height} (${heroSizeMB}MB), OG: ${result.ogDimensions.width}x${result.ogDimensions.height} (${ogSizeMB}MB)`
+            );
+            res.redirect('/admin/hero-image');
+        } catch (error) {
+            console.error('Error processing hero image:', error);
+            req.flash('error', `Failed to process hero image: ${error.message}`);
+            res.redirect('/admin/hero-image');
+        }
+    });
 });
 
 export default router; 

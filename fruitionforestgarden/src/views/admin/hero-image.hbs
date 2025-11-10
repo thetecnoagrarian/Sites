@@ -1,0 +1,59 @@
+{{#> layouts/admin }}
+<div class="admin-container">
+    <h1>Hero Image Management</h1>
+
+    {{#if success}}
+        <div class="message success">{{success}}</div>
+    {{/if}}
+    {{#if error}}
+        <div class="message error">{{error}}</div>
+    {{/if}}
+
+    <section class="admin-section">
+        <h2>Current Hero Image</h2>
+        {{#if heroImagePath}}
+            <div class="hero-preview">
+                <img src="{{heroImagePath}}" alt="Current Hero Image" style="max-width: 100%; max-height: 400px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                <p style="margin-top: 1rem; color: #666;">Current hero image is displayed on the homepage.</p>
+            </div>
+        {{else}}
+            <p style="color: #999;">No hero image uploaded yet.</p>
+        {{/if}}
+    </section>
+
+    <section class="admin-section">
+        <h2>Upload New Hero Image</h2>
+        <form action="/admin/hero-image/upload" method="POST" enctype="multipart/form-data" class="hero-upload-form">
+            <input type="hidden" name="_csrf" value="{{csrfToken}}">
+            
+            <div class="form-group">
+                <label for="heroImage">Select Image File</label>
+                <input type="file" id="heroImage" name="heroImage" accept="image/jpeg,image/png,image/gif,image/webp" required>
+                <small style="display: block; margin-top: 0.5rem; color: #666;">
+                    Large images will be automatically optimized:
+                    <ul style="margin: 0.5rem 0; padding-left: 1.5rem;">
+                        <li>Hero image: Max 1920px width, WebP format, &lt; 2MB</li>
+                        <li>OG image: 1200x630px, WebP format, &lt; 1MB (for social sharing)</li>
+                    </ul>
+                    Max file size: 50MB
+                </small>
+            </div>
+
+            <div class="form-group">
+                <sl-button type="submit" variant="primary">
+                    <sl-icon slot="prefix" name="upload"></sl-icon>
+                    Upload and Process Hero Image
+                </sl-button>
+            </div>
+        </form>
+    </section>
+
+    <section class="admin-section">
+        <sl-button href="/admin/dashboard" variant="default">
+            <sl-icon slot="prefix" name="arrow-left"></sl-icon>
+            Back to Dashboard
+        </sl-button>
+    </section>
+</div>
+{{/layouts/admin}}
+

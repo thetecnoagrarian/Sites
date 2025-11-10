@@ -1,3 +1,10 @@
+import path from 'path';
+import { promises as fs } from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Get base URL from request or environment, fallback to production domain
 function getBaseUrl(req) {
   if (req) {
@@ -11,7 +18,34 @@ function getBaseUrl(req) {
   return process.env.BASE_URL || 'https://www.fruitionforestgarden.com';
 }
 
-function buildOgTags(post, req = null) {
+// Check if hero OG image exists (WebP format)
+async function getHeroOgImagePath() {
+  const imagesDir = path.join(process.cwd(), 'src/public/images');
+  const ogPath = path.join(imagesDir, 'HeroCamp-og.webp');
+  
+  try {
+    await fs.access(ogPath);
+    return '/images/HeroCamp-og.webp';
+  } catch {
+    // Fallback to hero image if OG version doesn't exist
+    const heroPath = path.join(imagesDir, 'HeroCamp.webp');
+    try {
+      await fs.access(heroPath);
+      return '/images/HeroCamp.webp';
+    } catch {
+      // Final fallback to old PNG if WebP doesn't exist
+      const oldOgPath = path.join(imagesDir, 'HeroCamp-og.png');
+      try {
+        await fs.access(oldOgPath);
+        return '/images/HeroCamp-og.png';
+      } catch {
+        return null;
+      }
+    }
+  }
+}
+
+async function buildOgTags(post, req = null) {
   const baseUrl = getBaseUrl(req);
   const title = post?.title || 'Fruition Forest Garden';
   const desc = post?.description || (post?.content ? post.content.substring(0, 160) + '...' : 'A blog about our adventure building our homestead on a undeveloped 20 acres in Michigan\'s Upper Peninsula.');
@@ -24,17 +58,29 @@ function buildOgTags(post, req = null) {
   }
   
   // Use the first image from imageList (carousel) if available, fallback to images array
-  // Use optimized OG version (HeroCamp-og.png) for social sharing - smaller file size, Facebook-compliant
-  let image = `${baseUrl}/images/HeroCamp-og.png`;
+  // For homepage, use processed OG image (HeroCamp-og.webp) if available
+  let image = null;
   let imageAlt = 'Aerial view of Fruition Forest Garden';
   
   if (post) {
+    // For posts, use post images
     if (Array.isArray(post.imageList) && post.imageList[0] && post.imageList[0].medium) {
       image = `${baseUrl}${post.imageList[0].medium}`;
       imageAlt = post.imageList[0].caption || post.title || 'Fruition Forest Garden';
     } else if (Array.isArray(post.images) && post.images[0] && post.images[0].medium) {
       image = `${baseUrl}${post.images[0].medium}`;
       imageAlt = post.title || 'Fruition Forest Garden';
+    }
+  }
+  
+  // For homepage or if no post image, use hero OG image
+  if (!image) {
+    const heroOgPath = await getHeroOgImagePath();
+    if (heroOgPath) {
+      image = `${baseUrl}${heroOgPath}`;
+    } else {
+      // Final fallback to old PNG
+      image = `${baseUrl}/images/HeroCamp-og.png`;
     }
   }
   
