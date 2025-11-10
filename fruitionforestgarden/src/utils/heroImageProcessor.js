@@ -1,6 +1,6 @@
-const sharp = require('sharp');
-const path = require('path');
-const fs = require('fs').promises;
+import sharp from 'sharp';
+import path from 'path';
+import { promises as fs } from 'fs';
 
 /**
  * Process hero image: creates both hero and OG versions
@@ -116,7 +116,7 @@ const getHeroImagePath = async (imagesDir = null) => {
   return exists ? '/images/HeroCamp.webp' : null;
 };
 
-module.exports = {
+export {
   processHeroImage,
   heroImageExists,
   getHeroImagePath
