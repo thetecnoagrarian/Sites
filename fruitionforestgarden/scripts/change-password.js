@@ -1,6 +1,8 @@
 const path = require('path');
 const Database = require('better-sqlite3');
-const db = new Database(path.join(__dirname, 'src', 'database', 'blog.db'));
+// Use DATABASE_PATH environment variable if set (production), otherwise use local path
+const dbPath = process.env.DATABASE_PATH || path.join(__dirname, 'src', 'database', 'blog.db');
+const db = new Database(dbPath);
 const bcrypt = require('bcryptjs');
 
 const username = process.argv[2];
