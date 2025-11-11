@@ -22,7 +22,7 @@ services:
       - MAX_FILE_SIZE=10485760
       - UPLOADS_PATH=/app/data/uploads
       - RATE_LIMIT_WINDOW_MS=900000
-      - RATE_LIMIT_MAX_REQUESTS=25
+      - RATE_LIMIT_MAX_REQUESTS=100
     ports:
       - "4000:4000"
     volumes:
@@ -58,7 +58,7 @@ services:
       - MAX_FILE_SIZE=10485760
       - UPLOADS_PATH=/app/data/uploads
       - RATE_LIMIT_WINDOW_MS=900000
-      - RATE_LIMIT_MAX_REQUESTS=25
+      - RATE_LIMIT_MAX_REQUESTS=100
     ports:
       - "4002:4002"
     volumes:
