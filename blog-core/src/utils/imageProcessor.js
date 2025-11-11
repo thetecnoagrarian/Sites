@@ -27,16 +27,17 @@ export const processImage = async (inputPath, filename, outputDir) => {
     
     // Process each size
     for (const [sizeName, { maxWidth, maxHeight }] of Object.entries(IMAGE_SIZES)) {
-      const outputFilename = `${baseFilename}-${sizeName}.jpg`;
+      const outputFilename = `${baseFilename}-${sizeName}.webp`;
       const outputPath = path.join(outputDir, outputFilename);
       
-      // Resize image maintaining aspect ratio
+      // Resize image maintaining aspect ratio and convert to WebP
+      // WebP provides 25-35% better compression than JPEG at similar quality
       await sharp(inputPath)
         .resize(maxWidth, maxHeight, {
           fit: 'inside',
           withoutEnlargement: true
         })
-        .jpeg({ quality: 85 })
+        .webp({ quality: 85, effort: 4 }) // quality 85, effort 4 (good balance of speed vs compression)
         .toFile(outputPath);
       
       // Store relative path for web access
