@@ -284,7 +284,8 @@ router.post('/posts/confirm-overwrite', isAdmin, async (req, res) => {
 router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
     req.app.locals.upload.array('image', 25)(req, res, function (err) {
       if (err instanceof multer.MulterError) {
-        req.flash('error', 'One or more files are too large. Max size is 20MB.');
+        const maxSizeMB = Math.round((parseInt(process.env.MAX_FILE_SIZE) || (50 * 1024 * 1024)) / (1024 * 1024));
+        req.flash('error', `One or more files are too large. Max size is ${maxSizeMB}MB.`);
         return res.redirect('/admin/posts/new');
       } else if (err) {
         req.flash('error', 'An error occurred during file upload.');
@@ -488,7 +489,8 @@ router.get('/posts/:id/edit', isAdmin, async (req, res) => {
 router.post('/dashboard/posts/:id/update', isAdmin, (req, res, next) => {
     req.app.locals.upload.array('image', 25)(req, res, function (err) {
         if (err instanceof multer.MulterError) {
-            req.flash('error', 'One or more files are too large. Max size is 20MB.');
+            const maxSizeMB = Math.round((parseInt(process.env.MAX_FILE_SIZE) || (50 * 1024 * 1024)) / (1024 * 1024));
+            req.flash('error', `One or more files are too large. Max size is ${maxSizeMB}MB.`);
             return res.redirect(`/admin/posts/${req.params.id}/edit`);
         } else if (err) {
             req.flash('error', 'File upload error: ' + err.message);

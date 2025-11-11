@@ -19,7 +19,7 @@ services:
       - SESSION_SECRET=${SESSION_SECRET}
       - DATABASE_PATH=/app/data/blog.db
       - LOG_LEVEL=warn
-      - MAX_FILE_SIZE=10485760
+      - MAX_FILE_SIZE=52428800
       - UPLOADS_PATH=/app/data/uploads
       - RATE_LIMIT_WINDOW_MS=900000
       - RATE_LIMIT_MAX_REQUESTS=100
@@ -55,7 +55,7 @@ services:
       - SESSION_SECRET=${SESSION_SECRET}
       - DATABASE_PATH=/app/data/blog.db
       - LOG_LEVEL=warn
-      - MAX_FILE_SIZE=10485760
+      - MAX_FILE_SIZE=52428800
       - UPLOADS_PATH=/app/data/uploads
       - RATE_LIMIT_WINDOW_MS=900000
       - RATE_LIMIT_MAX_REQUESTS=100

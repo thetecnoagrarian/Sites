@@ -48,11 +48,14 @@ export const createUploadMiddleware = (uploadsPath) => {
         }
     };
 
+    // Get file size limit from environment variable, default to 50MB for images
+    const maxFileSize = parseInt(process.env.MAX_FILE_SIZE) || (50 * 1024 * 1024);
+    
     return multer({
         storage,
         fileFilter,
         limits: {
-            fileSize: 10 * 1024 * 1024 // 10MB limit
+            fileSize: maxFileSize
         }
     });
 };
