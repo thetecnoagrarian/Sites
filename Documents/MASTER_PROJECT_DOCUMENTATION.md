@@ -37,9 +37,10 @@
 ### What This Is
 A monorepo containing two blog sites deployed to Linode server using Docker Compose:
 
-- **Fruition Forest Garden**: `https://ffg-new.fruitionforestgarden.com` (port 4000) - Test subdomain
-- **The Tecnoagrarian**: `https://thetecnoagrarian.com` (port 4002) - Production domain ✅
-- **The Tecnoagrarian (WWW)**: `https://www.thetecnoagrarian.com` (port 4002) - Production domain ✅
+- **The Tecnoagrarian**: `https://thetecnoagrarian.com` (port 4002) - **PRODUCTION LIVE** ✅
+- **The Tecnoagrarian (WWW)**: `https://www.thetecnoagrarian.com` (port 4002) - **PRODUCTION LIVE** ✅
+- **Fruition Forest Garden**: `https://fruitionforestgarden.com` (port 4000) - **PREPARING FOR LAUNCH** 🚀
+- **Fruition Forest Garden (Test)**: `https://ffg-new.fruitionforestgarden.com` (port 4000) - Test subdomain
 
 ### Technology Stack
 - **Backend**: Node.js with Express
@@ -81,13 +82,17 @@ A monorepo containing two blog sites deployed to Linode server using Docker Comp
 - ✅ Consistent font styling (Arial 16px)
 - ✅ Admin dashboard shadow optimization
 
-### 🧹 **RECENT CLEANUP**
-- **Docker Cleanup (November 9, 2025)**: Reclaimed 12.5GB of disk space
-  - Removed unused Docker images: 2.81GB
-  - Cleared build cache: 9.72GB
-  - Cleaned old backups: additional space freed
-- **Disk Usage**: Reduced from 100% to 61% usage
-- **OG Tags Fix**: Updated HeroCamp.JPG to HeroCamp.png for proper MIME type handling
+### 🧹 **RECENT OPTIMIZATIONS (November 11, 2025)**
+- **Docker Multi-Stage Build**: Reduced image size from 3GB to ~300MB (90% reduction)
+- **Docker Buildx Installed**: Better cache management, faster builds, reduced disk usage
+- **WebP Image Format**: New uploads automatically use WebP (25-35% smaller than JPEG)
+- **File Upload Limit**: Increased from 10MB to 50MB for large image uploads
+- **Rate Limit**: Increased from 25 to 100 requests per 15 minutes for admin workflow
+- **Hero Image Management**: Admin interface for managing hero images with WebP conversion
+- **Disk Space Management**: Comprehensive cleanup procedures documented
+  - Docker cleanup: Reclaimed 12.5GB+ disk space
+  - Build cache optimization: Reduced from 8-9GB to 2-4GB expected
+  - Disk usage: Reduced from 100% to ~61% usage
 
 ---
 
@@ -152,10 +157,12 @@ A monorepo containing two blog sites deployed to Linode server using Docker Comp
 ### Image Processing
 - **Library**: Sharp ✅
 - **Sizes**: thumbnail (400x400), medium (800x800), large (1920x1920) ✅
-- **Formats**: JPEG with 85% quality ✅
+- **Formats**: WebP with 85% quality (new uploads), JPEG/PNG (existing images) ✅
 - **Path**: `/app/data/uploads/` ✅
 - **Interface**: Up/down arrow buttons (replaces drag-and-drop) ✅
-- **File Extensions**: Standardized to lowercase `.jpg` ✅
+- **File Extensions**: WebP for new images (`.webp`), existing images may be `.jpg` or `.png` ✅
+- **File Size Limit**: 50MB per image ✅
+- **Benefits**: WebP provides 25-35% smaller file sizes than JPEG at similar quality ✅
 
 ### Docker Configuration
 - **Compose File**: `docker-compose.prod.yml` ✅
@@ -163,7 +170,8 @@ A monorepo containing two blog sites deployed to Linode server using Docker Comp
   - `DATABASE_PATH=/app/data/blog.db` ✅
   - `UPLOADS_PATH=/app/data/uploads` ✅
   - `SESSION_SECRET` (from .env file) ✅
-  - `RATE_LIMIT_MAX_REQUESTS=25` ✅ (Production setting)
+  - `RATE_LIMIT_MAX_REQUESTS=100` ✅ (Production setting - increased for admin work)
+  - `MAX_FILE_SIZE=52428800` ✅ (50MB - increased for large image uploads)
 - **Volume Permissions**: ✅ FIXED - Both `sites_ffg_data` and `sites_tta_data` volumes have correct ownership
 
 ### Nginx Configuration
@@ -629,6 +637,16 @@ ssh deploy@172.236.119.220 "/opt/Sites/scripts/backup-host.sh"
 
 ## 📝 Changelog
 
+### Version 2.5.0 - November 11, 2025
+- ✅ **WebP Image Format**: New uploads automatically converted to WebP (25-35% smaller than JPEG)
+- ✅ **Multi-Stage Docker Build**: Optimized Dockerfile reduces image size from 3GB to ~300MB (90% reduction)
+- ✅ **Docker Buildx Installed**: Better cache management, faster builds, reduced disk usage
+- ✅ **File Upload Limit Increased**: From 10MB to 50MB for large image uploads
+- ✅ **Rate Limit Increased**: From 25 to 100 requests per 15 minutes for better admin workflow
+- ✅ **Hero Image Management**: Admin interface for uploading and managing hero images with automatic WebP conversion
+- ✅ **Improved .dockerignore**: Excludes backups, tests, docs from build context
+- ✅ **Disk Space Optimization**: Comprehensive cleanup and optimization procedures documented
+
 ### Version 2.4.0 - November 9, 2025
 - ✅ **Docker Cleanup**: Reclaimed 12.5GB disk space (removed unused images and build cache)
 - ✅ **OG Tags Complete**: Facebook sharing working for homepage and post pages on both sites
@@ -698,6 +716,9 @@ This master document consolidates all previous documentation files:
 **Active Documentation Files:**
 - `MASTER_PROJECT_DOCUMENTATION.md` - This file (single source of truth)
 - `ENVIRONMENT_TEMPLATE.md` - Template for production `.env` configuration
+- `BUILDX_INSTALLATION_GUIDE.md` - Docker buildx installation and advantages
+- `DOCKER_OPTIMIZATION_PLAN.md` - Docker build optimization strategies
+- `USERNAME_PASSWORD_UPDATE_GUIDE.md` - Admin credential management guide
 
 **Deleted/Consolidated Files** (November 7, 2025):
 - ✅ `BROWSER_TESTING_OPTIONS.md` - Consolidated into master doc
@@ -709,16 +730,39 @@ This master document consolidates all previous documentation files:
 - ✅ `PASSWORD_UPDATE_GUIDE.md` - Procedures consolidated into master doc
 - ✅ `POST_CREATION_FIX.md` - Bug fix complete, info consolidated
 
-### Next Steps
-1. **Complete Pre-Launch Checklist** items 3-6 (High Priority)
-2. **Implement Security Hardening** (helmet, CSP, security headers)
-3. **Set up Automated Backups** and recovery procedures
-4. **Create Production Environment** files and secrets management
-5. **Add CI/CD Pipeline** for automated testing and deployment
+### Site Status Summary
+
+**The Tecnoagrarian** ✅ **PRODUCTION LIVE**
+- Domain: `thetecnoagrarian.com` and `www.thetecnoagrarian.com`
+- Status: Fully operational and live
+- All features working: Posts, images, admin, analytics
+- SSL: Valid Let's Encrypt certificate
+- Performance: All targets met (< 2s homepage, < 3s post pages)
+
+**Fruition Forest Garden** 🚀 **PREPARING FOR LAUNCH**
+- Production Domain: `fruitionforestgarden.com` (configured, ready for launch)
+- Test Domain: `ffg-new.fruitionforestgarden.com` (active for testing)
+- Status: All features implemented and tested
+- Recent Optimizations:
+  - ✅ WebP image format for new uploads (25-35% smaller)
+  - ✅ Multi-stage Docker builds (90% image size reduction)
+  - ✅ Docker buildx installed (better cache management)
+  - ✅ 50MB file upload limit
+  - ✅ Hero image management interface
+  - ✅ Rate limit optimized (100 req/15min)
+- Ready for: Final content review and launch
+
+### Next Steps for FFG Launch
+1. ✅ **Technical Readiness**: Complete (all optimizations done)
+2. ⏳ **Content Review**: Verify all posts and images display correctly
+3. ⏳ **Final Testing**: Test production domain before switching DNS
+4. ⏳ **Launch**: Point production domain to live server
 
 ---
 
-**Last Updated**: November 9, 2025  
-**Status**: **PRODUCTION READY** - All core functionality operational, production domains live  
-**Priority**: **LOW** - Core features complete, automated testing in place  
-**Next Milestone**: OG tags validation, backup restoration testing, performance optimization
+**Last Updated**: November 11, 2025  
+**Status**: 
+- **The Tecnoagrarian**: ✅ **PRODUCTION LIVE** - Fully operational
+- **Fruition Forest Garden**: 🚀 **READY FOR LAUNCH** - All optimizations complete, awaiting final review  
+**Priority**: **MEDIUM** - FFG launch preparation, TTA maintenance  
+**Next Milestone**: Fruition Forest Garden production launch
