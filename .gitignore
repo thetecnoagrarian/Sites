@@ -112,3 +112,8 @@ playwright/.cache/
 tests/screenshots/
 test-results.json
 
+# Sensitive information (never commit)
+Documents/SECRETS.md
+*.secrets.md
+secrets.md
+

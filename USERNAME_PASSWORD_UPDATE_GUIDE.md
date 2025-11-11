@@ -36,32 +36,51 @@ node -e "const crypto = require('crypto'); console.log('Secure password:', crypt
 
 **For Fruition Forest Garden:**
 ```bash
+# Get server details from Documents/SECRETS.md first
+# Replace [SSH_USER]@[SERVER_IP] with actual values
+
 # 1. Change username
-ssh deploy@172.236.119.220 "docker exec ffg-blog-prod node /app/fruitionforestgarden/scripts/change-username.js fruitionforestgarden@protonmail.com MDC"
+ssh [SSH_USER]@[SERVER_IP] "docker exec ffg-blog-prod node /app/fruitionforestgarden/scripts/change-username.js fruitionforestgarden@protonmail.com MDC"
 
 # 2. Change password (use the password you generated)
-ssh deploy@172.236.119.220 "docker exec ffg-blog-prod node /app/fruitionforestgarden/scripts/change-password.js MDC YOUR_NEW_PASSWORD_HERE"
+# IMPORTANT: Use single quotes around the password to prevent bash from interpreting special characters (!, $, etc.)
+ssh [SSH_USER]@[SERVER_IP] 'docker exec ffg-blog-prod node /app/fruitionforestgarden/scripts/change-password.js MDC '"'YOUR_NEW_PASSWORD_HERE'"
 
 # 3. Verify
-ssh deploy@172.236.119.220 "docker exec ffg-blog-prod sqlite3 /app/data/blog.db \"SELECT username, isAdmin FROM users WHERE username = 'MDC';\""
+ssh [SSH_USER]@[SERVER_IP] "docker exec ffg-blog-prod sqlite3 /app/data/blog.db \"SELECT username, isAdmin FROM users WHERE username = 'MDC';\""
 ```
 
 **For The Tecnoagrarian:**
 ```bash
+# Get server details from Documents/SECRETS.md first
+# Replace [SSH_USER]@[SERVER_IP] with actual values
+
 # 1. Change username
-ssh deploy@172.236.119.220 "docker exec tta-blog-prod node /app/thetecnoagrarian/scripts/change-username.js tta_admin MDC"
+ssh [SSH_USER]@[SERVER_IP] "docker exec tta-blog-prod node /app/thetecnoagrarian/scripts/change-username.js tta_admin MDC"
 
 # 2. Change password (use the same password you used for FFG)
-ssh deploy@172.236.119.220 "docker exec tta-blog-prod node /app/thetecnoagrarian/scripts/change-password.js MDC YOUR_NEW_PASSWORD_HERE"
+# IMPORTANT: Use single quotes around the password to prevent bash from interpreting special characters (!, $, etc.)
+ssh [SSH_USER]@[SERVER_IP] 'docker exec tta-blog-prod node /app/thetecnoagrarian/scripts/change-password.js MDC '"'YOUR_NEW_PASSWORD_HERE'"
 
 # 3. Verify
-ssh deploy@172.236.119.220 "docker exec tta-blog-prod sqlite3 /app/data/blog.db \"SELECT username, isAdmin FROM users WHERE username = 'MDC';\""
+ssh [SSH_USER]@[SERVER_IP] "docker exec tta-blog-prod sqlite3 /app/data/blog.db \"SELECT username, isAdmin FROM users WHERE username = 'MDC';\""
+```
+
+**Alternative Method (if the above doesn't work):**
+If you have issues with special characters, you can also set the password as an environment variable first:
+```bash
+# Set password variable (use single quotes to prevent interpretation)
+PASSWORD='YOUR_NEW_PASSWORD_HERE'
+
+# Then use it in the command (replace [SSH_USER]@[SERVER_IP] with values from Documents/SECRETS.md)
+ssh [SSH_USER]@[SERVER_IP] "docker exec ffg-blog-prod node /app/fruitionforestgarden/scripts/change-password.js MDC '$PASSWORD'"
 ```
 
 ### Step 4: Restart Containers
 This invalidates existing sessions, forcing you to log in with the new credentials:
 ```bash
-ssh deploy@172.236.119.220 "cd /opt/Sites && docker-compose -f docker-compose.prod.yml restart fruitionforestgarden thetecnoagrarian"
+# Replace [SSH_USER]@[SERVER_IP] with values from Documents/SECRETS.md
+ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.prod.yml restart fruitionforestgarden thetecnoagrarian"
 ```
 
 ### Step 5: Test Login
@@ -90,10 +109,19 @@ Full 1Password integration would require:
 **If username change fails:**
 - Check that the old username is correct
 - Verify the user exists: `docker exec [container] sqlite3 /app/data/blog.db "SELECT * FROM users;"`
+- Make sure you're using the correct server IP from `Documents/SECRETS.md`
 
 **If password change fails:**
 - Make sure you're using the NEW username (MDC) after changing it
 - Check password length (minimum 16 characters recommended)
+- **Special characters in password**: If your password contains `!`, `$`, `\``, or other special characters, bash may try to interpret them. Use single quotes around the password:
+  ```bash
+  # Wrong (bash interprets ! as history expansion):
+  ssh deploy@172.236.119.220 "docker exec ffg-blog-prod node ... MDC MyPass!123"
+  
+  # Correct (single quotes prevent interpretation):
+  ssh deploy@172.236.119.220 'docker exec ffg-blog-prod node ... MDC '"'MyPass!123'"
+  ```
 
 **If login fails after changes:**
 - Make sure containers were restarted

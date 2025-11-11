@@ -22,7 +22,8 @@ RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=25
 
 # Trusted IPs (comma-separated for rate limit bypass)
-TRUSTED_IPS=129.222.46.17
+# See Documents/SECRETS.md for your actual trusted IP
+TRUSTED_IPS=your-trusted-ip-here
 
 # Optional: Database Backup Settings
 BACKUP_RETENTION_DAYS=14

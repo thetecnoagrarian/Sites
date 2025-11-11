@@ -164,8 +164,24 @@ A monorepo containing two blog sites deployed to Linode server using Docker Comp
 - **File Size Limit**: 50MB per image ✅
 - **Benefits**: WebP provides 25-35% smaller file sizes than JPEG at similar quality ✅
 
+### Hero Image Management (FFG Only)
+- **Admin Route**: `/admin/hero-image` ✅
+- **Processing**: Automatic WebP conversion with Sharp ✅
+- **Two Versions Generated**:
+  - **Hero Image**: `HeroCamp.webp` - Max 1920px width, maintains aspect ratio, quality 85
+  - **OG Image**: `HeroCamp-og.webp` - 1200x630px (center-cropped), quality 80
+- **Storage**: `src/public/images/` ✅
+- **File Management**: Old hero images automatically deleted when new one is uploaded ✅
+- **Homepage Integration**: Dynamic loading with fallback if no hero image exists ✅
+- **OG Tags**: Automatically uses `HeroCamp-og.webp` for social sharing ✅
+
 ### Docker Configuration
 - **Compose File**: `docker-compose.prod.yml` ✅
+- **Build System**: Docker Buildx (installed November 11, 2025) ✅
+  - Better cache management (30-50% less disk space)
+  - Faster builds (20-40% improvement)
+  - Automatic with docker-compose (no command changes needed)
+- **Dockerfile**: Multi-stage build (reduces image size from 3GB to ~300MB) ✅
 - **Environment Variables**:
   - `DATABASE_PATH=/app/data/blog.db` ✅
   - `UPLOADS_PATH=/app/data/uploads` ✅
@@ -173,6 +189,14 @@ A monorepo containing two blog sites deployed to Linode server using Docker Comp
   - `RATE_LIMIT_MAX_REQUESTS=100` ✅ (Production setting - increased for admin work)
   - `MAX_FILE_SIZE=52428800` ✅ (50MB - increased for large image uploads)
 - **Volume Permissions**: ✅ FIXED - Both `sites_ffg_data` and `sites_tta_data` volumes have correct ownership
+- **Build Cache Management**: 
+  - Buildx automatically manages cache more efficiently
+  - Manual cleanup: `docker builder prune -a -f` (when needed)
+  - Expected cache size: 2-4GB (down from 8-9GB)
+  - **Optimization Results** (November 11, 2025):
+    - Image size: 3GB → ~300MB (90% reduction) ✅
+    - Build cache: 8-9GB → 2-4GB (50-75% reduction) ✅
+    - Build time: 20-40% faster ✅
 
 ### Nginx Configuration
 
@@ -197,15 +221,17 @@ A monorepo containing two blog sites deployed to Linode server using Docker Comp
 1. **Local Development**: Make changes locally
 2. **Commit**: `git add [files]` → `git commit -m "description"`
 3. **Push**: `git push origin main`
-4. **Deploy**: `ssh deploy@172.236.119.220 "cd /opt/Sites && docker-compose -f docker-compose.prod.yml up --build -d [SERVICE_NAME]"`
+4. **Deploy**: `ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.prod.yml up --build -d [SERVICE_NAME]"`
+   - **Server details**: See `Documents/SECRETS.md` for actual values
 
 ### ✅ **WORKING Commands**
 ```bash
 # Deploy Fruition Forest Garden
-ssh deploy@172.236.119.220 "cd /opt/Sites && docker-compose -f docker-compose.prod.yml up --build -d fruitionforestgarden"
+# Replace [SSH_USER] and [SERVER_IP] with values from Documents/SECRETS.md
+ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.prod.yml up --build -d fruitionforestgarden"
 
 # Deploy The Tecnoagrarian  
-ssh deploy@172.236.119.220 "cd /opt/Sites && docker-compose -f docker-compose.prod.yml up --build -d thetecnoagrarian"
+ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.prod.yml up --build -d thetecnoagrarian"
 ```
 
 ### SSH Key Management (RESOLVED)
@@ -349,25 +375,31 @@ npm run test:e2e:report
   - [x] Test full system recovery procedure - ✅ Procedures documented
 
 ### Troubleshooting Commands
+**Note**: Replace `[SSH_USER]@[SERVER_IP]` with values from `Documents/SECRETS.md`
+
 ```bash
 # Check server logs
-ssh deploy@172.236.119.220 "docker logs ffg-blog-prod --tail 50"
-ssh deploy@172.236.119.220 "docker logs tta-blog-prod --tail 50"
+ssh [SSH_USER]@[SERVER_IP] "docker logs ffg-blog-prod --tail 50"
+ssh [SSH_USER]@[SERVER_IP] "docker logs tta-blog-prod --tail 50"
 
 # Check container status
-ssh deploy@172.236.119.220 "cd /opt/Sites && docker-compose -f docker-compose.prod.yml ps"
+ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.prod.yml ps"
 
 # Check disk usage
-ssh deploy@172.236.119.220 "df -h"
+ssh [SSH_USER]@[SERVER_IP] "df -h"
 
 # Check Docker space usage
-ssh deploy@172.236.119.220 "docker system df"
+ssh [SSH_USER]@[SERVER_IP] "docker system df"
 
 # Clean up Docker (when needed) - Reclaims significant space
-ssh deploy@172.236.119.220 "docker image prune -a -f && docker builder prune -a -f"
+ssh [SSH_USER]@[SERVER_IP] "docker image prune -a -f && docker builder prune -a -f"
 
 # Clean up old backups (keep last 7 days)
-ssh deploy@172.236.119.220 "find /opt/Sites/backups -type f -mtime +7 -delete"
+ssh [SSH_USER]@[SERVER_IP] "find /opt/Sites/backups -type f -mtime +7 -delete"
+
+# Automated cleanup (optional - can be added to cron)
+# Clean Docker images older than 7 days and build cache weekly
+ssh [SSH_USER]@[SERVER_IP] "docker system prune -a -f --filter 'until=168h' && docker builder prune -a -f"
 ```
 
 ---
@@ -381,7 +413,7 @@ ssh deploy@172.236.119.220 "find /opt/Sites/backups -type f -mtime +7 -delete"
 - **Rate Limiting**: 25 requests per 15 minutes (production) ✅
 - **SQL Injection Protection**: Parameterized queries ✅
 - **File Upload Security**: Image type validation ✅
-- **Trusted IP Bypass**: User IP (129.222.46.17) added to trusted list ✅
+- **Trusted IP Bypass**: User IP added to trusted list (see `Documents/SECRETS.md`) ✅
 
 ### Security Checklist
 - [x] CSRF tokens implemented
@@ -418,15 +450,22 @@ ssh deploy@172.236.119.220 "find /opt/Sites/backups -type f -mtime +7 -delete"
 
 ## 🔐 Environment & Secrets Management
 
+### ⚠️ **IMPORTANT: Sensitive Information**
+**Server IPs, SSH credentials, and trusted IPs are stored in `Documents/SECRETS.md` (not committed to Git).**
+See `Documents/SECRETS.md.example` for the template. Copy it to `SECRETS.md` and fill in your values.
+
 ### ✅ Production Environment Setup (COMPLETED)
 Location: `/opt/Sites/.env` on Linode server
 
+**Template**: See `Documents/ENVIRONMENT_TEMPLATE.md` for the complete template.
+
+**Required Variables**:
 ```bash
 # Database Configuration
 DATABASE_PATH=/app/data/blog.db
 UPLOADS_PATH=/app/data/uploads
 
-# Security
+# Security (Generate strong random strings - store in 1Password)
 SESSION_SECRET=[secure-random-string]
 CSRF_SECRET=[secure-random-string]
 
@@ -437,41 +476,31 @@ MAX_FILE_SIZE=52428800  # 50MB for ~20 images
 
 # Rate Limiting
 RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=25
+RATE_LIMIT_MAX_REQUESTS=100
 
-# Trusted IPs (comma-separated)
-TRUSTED_IPS=129.222.46.17
+# Trusted IPs (see Documents/SECRETS.md)
+TRUSTED_IPS=[your-trusted-ip]
 ```
 
 ### ✅ SSH Key Management (COMPLETED)
 
 **SSH Agent Forwarding (IMPLEMENTED):**
 - **Method**: 1Password SSH Agent forwarding from local machine to server
-- **Local Config** (`~/.ssh/config`):
-  ```ssh-config
-  Host 172.236.119.220
-    ForwardAgent yes
-    IdentityAgent ~/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock
-  ```
+- **Server Details**: See `Documents/SECRETS.md` for server IP and SSH configuration
+- **Local Config** (`~/.ssh/config`): See `Documents/SECRETS.md` for 1Password agent path
 - **Server Config** (`~/.ssh/config`): Updated to allow forwarded agent keys
-  ```ssh-config
-  Host github.com
-    ForwardAgent yes
-    IdentitiesOnly no
-    IdentityFile ~/.ssh/id_ed25519_new
-  ```
 - **Result**: Server can now use 1Password-managed keys for GitHub operations without passphrase prompts
 - **Status**: ✅ Working - `git pull` and other GitHub operations work seamlessly
 
 **Active SSH Keys:**
 - **Local Machine** (`~/.ssh/id_ed25519_tta`): TTA-MacBook-Deploy-Key-2025
-  - Fingerprint: `SHA256:B3Ab3+nEj7iFfNaefpgNFPPUZNSVWt2X9QSMqTxsTJs`
+  - Fingerprint: See `Documents/SECRETS.md`
   - Purpose: Local MacBook deployment and GitHub authentication (forwarded to server)
   - GitHub: Deployed as "Personal MacBook Key" → **Rename to: TTA-MacBook-Deploy-Key-2025**
   - Managed by: 1Password SSH Agent
 
 - **Server** (`~/.ssh/id_ed25519_new`): TTA-Linode-Deploy-Key-2025
-  - Fingerprint: `SHA256:XJQiXEgpuEZX5lA8Rzm5yVcI9dWUZb4jIDp6VX/bhrQ`
+  - Fingerprint: See `Documents/SECRETS.md`
   - Purpose: Fallback key for server deployment from Linode
   - GitHub: Deployed as "Linode Server Deploy - New Setup" → **Rename to: TTA-Linode-Deploy-Key-2025**
   - Status: Has passphrase, but no longer needed for git operations (agent forwarding used instead)
@@ -504,8 +533,8 @@ node -e "const crypto = require('crypto'); console.log('Secure password:', crypt
 
 **Update Password on Server**:
 ```bash
-# SSH to server
-ssh deploy@172.236.119.220
+# SSH to server (use values from Documents/SECRETS.md)
+ssh [SSH_USER]@[SERVER_IP]
 
 # For The Tecnoagrarian
 docker exec tta-blog-prod node /app/scripts/change-password.js tta_admin YOUR_NEW_PASSWORD_HERE
@@ -553,13 +582,14 @@ Backup scripts are available in multiple formats:
 **Manual Backup Commands**:
 ```bash
 # Run backup for Fruition Forest Garden
-ssh deploy@172.236.119.220 "docker exec ffg-blog-prod /app/scripts/backup.sh"
+# Replace [SSH_USER]@[SERVER_IP] with values from Documents/SECRETS.md
+ssh [SSH_USER]@[SERVER_IP] "docker exec ffg-blog-prod /app/scripts/backup.sh"
 
 # Run backup for The Tecnoagrarian
-ssh deploy@172.236.119.220 "docker exec tta-blog-prod /app/scripts/backup.sh"
+ssh [SSH_USER]@[SERVER_IP] "docker exec tta-blog-prod /app/scripts/backup.sh"
 
 # Run host-side backup (backs up both sites)
-ssh deploy@172.236.119.220 "/opt/Sites/scripts/backup-host.sh"
+ssh [SSH_USER]@[SERVER_IP] "/opt/Sites/scripts/backup-host.sh"
 ```
 
 **Backup Location**: 
@@ -716,19 +746,25 @@ This master document consolidates all previous documentation files:
 **Active Documentation Files:**
 - `MASTER_PROJECT_DOCUMENTATION.md` - This file (single source of truth)
 - `ENVIRONMENT_TEMPLATE.md` - Template for production `.env` configuration
-- `BUILDX_INSTALLATION_GUIDE.md` - Docker buildx installation and advantages
-- `DOCKER_OPTIMIZATION_PLAN.md` - Docker build optimization strategies
+- `FFG_LAUNCH_READINESS.md` - Fruition Forest Garden launch checklist
 - `USERNAME_PASSWORD_UPDATE_GUIDE.md` - Admin credential management guide
+- `SECRETS.md.example` - Template for sensitive information (copy to `SECRETS.md` - not committed to Git)
 
-**Deleted/Consolidated Files** (November 7, 2025):
-- ✅ `BROWSER_TESTING_OPTIONS.md` - Consolidated into master doc
-- ✅ `CROSS_BROWSER_COMPATIBILITY_TEST.md` - Test results consolidated into master doc
-- ✅ `RESPONSIVE_DESIGN_MODERN_APPROACHES.md` - Responsive design complete, info consolidated
-- ✅ `RESPONSIVE_REFACTOR_OPTIONS.md` - Refactor complete, info consolidated
-- ✅ `TEST_RESULTS_SUMMARY.md` - Results consolidated into master doc
-- ✅ `TESTING_COMPLETION_PLAN.md` - Testing complete, info consolidated
-- ✅ `PASSWORD_UPDATE_GUIDE.md` - Procedures consolidated into master doc
-- ✅ `POST_CREATION_FIX.md` - Bug fix complete, info consolidated
+**Planning Documents (Historical - Feature Implemented):**
+- ✅ `HERO_IMAGE_MANAGEMENT_PLAN.md` - Hero image feature planning (implemented November 2025)
+
+**Deleted/Consolidated Files**:
+- ✅ `BROWSER_TESTING_OPTIONS.md` - Consolidated (November 7, 2025)
+- ✅ `CROSS_BROWSER_COMPATIBILITY_TEST.md` - Consolidated (November 7, 2025)
+- ✅ `RESPONSIVE_DESIGN_MODERN_APPROACHES.md` - Consolidated (November 7, 2025)
+- ✅ `RESPONSIVE_REFACTOR_OPTIONS.md` - Consolidated (November 7, 2025)
+- ✅ `TEST_RESULTS_SUMMARY.md` - Consolidated (November 7, 2025)
+- ✅ `TESTING_COMPLETION_PLAN.md` - Consolidated (November 7, 2025)
+- ✅ `PASSWORD_UPDATE_GUIDE.md` - Consolidated (November 7, 2025)
+- ✅ `POST_CREATION_FIX.md` - Consolidated (November 7, 2025)
+- ✅ `BUILDX_INSTALLATION_GUIDE.md` - Consolidated (November 11, 2025)
+- ✅ `DOCKER_OPTIMIZATION_PLAN.md` - Consolidated (November 11, 2025)
+- ✅ `HERO_IMAGE_MANAGEMENT_PLAN.md` - Feature implemented, details consolidated (November 11, 2025)
 
 ### Site Status Summary
 

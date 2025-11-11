@@ -18,9 +18,10 @@ NC='\033[0m' # No Color
 UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
 # Test URLs
-FFG_HOME="https://ffg-new.fruitionforestgarden.com"
+FFG_HOME="https://fruitionforestgarden.com"
 TTA_HOME="https://thetecnoagrarian.com"
-FFG_POST="https://ffg-new.fruitionforestgarden.com/post/bear-tracks-and-nose-print-at-our-campsite"
+# Update these post URLs with actual post slugs from your sites
+FFG_POST="https://fruitionforestgarden.com/post/bear-tracks-and-nose-print-at-our-campsite"
 TTA_POST="https://thetecnoagrarian.com/post/new-post-title"
 
 # Test function
