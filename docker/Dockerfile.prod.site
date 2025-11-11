@@ -1,42 +1,74 @@
-# Production Dockerfile for blog sites
-FROM node:20-alpine
+# Multi-stage production Dockerfile for blog sites
+# Stage 1: Build dependencies and prepare application
+FROM node:20-alpine AS builder
 
 # Build arguments
 ARG SITE_DIR_NAME
 ARG SITE_PORT
 
-# Set working directory
-WORKDIR /app
-
-# Install system dependencies including Sharp requirements
+# Install build dependencies (will be removed in final stage)
 RUN apk add --no-cache \
-    sqlite \
     python3 \
     make \
     g++ \
-    bash \
-    curl \
-    vips-dev \
-    libc6-compat \
     && rm -rf /var/cache/apk/*
 
-# Update npm to latest version to fix deprecation warnings
+# Update npm to latest version
 RUN npm install -g npm@latest
 
-# Copy the entire monorepo structure
-COPY . .
+# Set working directory
+WORKDIR /app
 
-# Create a root package.json for workspace management
+# Copy package files first (better Docker layer caching)
+COPY package.json package-lock.json* ./
+COPY blog-core/package.json ./blog-core/
+COPY ${SITE_DIR_NAME}/package.json ./${SITE_DIR_NAME}/
+
+# Create workspace package.json
 RUN echo '{"name": "blog-monorepo", "workspaces": ["blog-core", "'${SITE_DIR_NAME}'"]}' > package.json
 
-# Install all dependencies using workspace
-RUN npm install --omit=dev && npm cache clean --force
+# Install dependencies (production only)
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Rebuild Sharp for Alpine Linux compatibility
 RUN npm rebuild sharp --platform=linuxmusl --arch=x64
 
-# Set working directory to the specific site
-WORKDIR /app/${SITE_DIR_NAME}
+# Copy source code (only what's needed for production)
+COPY blog-core/src ./blog-core/src
+COPY blog-core/src/index.js ./blog-core/src/index.js 2>/dev/null || true
+COPY ${SITE_DIR_NAME}/src ./${SITE_DIR_NAME}/src
+COPY ${SITE_DIR_NAME}/package.json ./${SITE_DIR_NAME}/
+
+# Stage 2: Production image (minimal size)
+FROM node:20-alpine
+
+# Build arguments (needed for runtime)
+ARG SITE_DIR_NAME
+ARG SITE_PORT
+
+# Install only runtime dependencies (no build tools)
+RUN apk add --no-cache \
+    sqlite \
+    bash \
+    curl \
+    vips \
+    libc6-compat \
+    && rm -rf /var/cache/apk/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy installed dependencies from builder stage
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/blog-core/node_modules ./blog-core/node_modules 2>/dev/null || true
+COPY --from=builder /app/${SITE_DIR_NAME}/node_modules ./${SITE_DIR_NAME}/node_modules 2>/dev/null || true
+
+# Copy application code from builder stage
+COPY --from=builder /app/blog-core ./blog-core
+COPY --from=builder /app/${SITE_DIR_NAME} ./${SITE_DIR_NAME}
+
+# Copy root package.json for workspace resolution
+COPY --from=builder /app/package.json ./package.json
 
 # Create necessary directories
 RUN mkdir -p /app/data/database /app/data/uploads /app/logs
@@ -44,10 +76,13 @@ RUN mkdir -p /app/data/database /app/data/uploads /app/logs
 # Set proper permissions
 RUN addgroup -g 1001 -S blog && \
     adduser -S blog -u 1001 -G blog && \
-    chown -R blog:blog /app/data /app/logs /app/${SITE_DIR_NAME}
+    chown -R blog:blog /app/data /app/logs /app/${SITE_DIR_NAME} /app/blog-core
 
 # Switch to non-root user
 USER blog
+
+# Set working directory to the specific site
+WORKDIR /app/${SITE_DIR_NAME}
 
 # Expose port
 EXPOSE ${SITE_PORT}
