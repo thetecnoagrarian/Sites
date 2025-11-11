@@ -19,25 +19,23 @@ RUN npm install -g npm@latest
 # Set working directory
 WORKDIR /app
 
-# Copy package files first (better Docker layer caching)
+# Copy root package files first (better Docker layer caching)
 COPY package.json package-lock.json* ./
+
+# Copy package files for workspaces
 COPY blog-core/package.json ./blog-core/
 COPY ${SITE_DIR_NAME}/package.json ./${SITE_DIR_NAME}/
 
-# Create workspace package.json
-RUN echo '{"name": "blog-monorepo", "workspaces": ["blog-core", "'${SITE_DIR_NAME}'"]}' > package.json
-
-# Install dependencies (production only)
+# Install dependencies using workspace (production only)
 RUN npm ci --omit=dev && npm cache clean --force
 
-# Rebuild Sharp for Alpine Linux compatibility
+# Rebuild Sharp for Alpine Linux compatibility (must be done after npm install)
 RUN npm rebuild sharp --platform=linuxmusl --arch=x64
 
 # Copy source code (only what's needed for production)
 COPY blog-core/src ./blog-core/src
 COPY blog-core/src/index.js ./blog-core/src/index.js 2>/dev/null || true
 COPY ${SITE_DIR_NAME}/src ./${SITE_DIR_NAME}/src
-COPY ${SITE_DIR_NAME}/package.json ./${SITE_DIR_NAME}/
 
 # Stage 2: Production image (minimal size)
 FROM node:20-alpine
@@ -58,17 +56,16 @@ RUN apk add --no-cache \
 # Set working directory
 WORKDIR /app
 
-# Copy installed dependencies from builder stage
+# Copy root package.json for workspace resolution
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/package-lock.json* ./ 2>/dev/null || true
+
+# Copy installed node_modules from builder (workspace hoists dependencies to root)
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/blog-core/node_modules ./blog-core/node_modules 2>/dev/null || true
-COPY --from=builder /app/${SITE_DIR_NAME}/node_modules ./${SITE_DIR_NAME}/node_modules 2>/dev/null || true
 
 # Copy application code from builder stage
 COPY --from=builder /app/blog-core ./blog-core
 COPY --from=builder /app/${SITE_DIR_NAME} ./${SITE_DIR_NAME}
-
-# Copy root package.json for workspace resolution
-COPY --from=builder /app/package.json ./package.json
 
 # Create necessary directories
 RUN mkdir -p /app/data/database /app/data/uploads /app/logs
