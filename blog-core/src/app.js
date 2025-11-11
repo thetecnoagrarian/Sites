@@ -256,6 +256,11 @@ export function createBlogApp(config) {
 
     // Bot protection middleware
     app.use((req, res, next) => {
+        // Allow health check endpoint to bypass bot protection (needed for Docker health checks)
+        if (req.path === '/health') {
+            return next();
+        }
+        
         const userAgent = req.headers['user-agent'] || '';
         const clientIP = req.headers['x-forwarded-for'] || req.ip;
         

@@ -3,7 +3,9 @@ import { test, expect } from '@playwright/test';
 test.describe('Homepage', () => {
   test('loads successfully', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveTitle(/The Tecnoagrarian/);
+    // Accept either site name in title
+    const title = await page.title();
+    expect(title).toMatch(/The Tecnoagrarian|Fruition Forest Garden/);
   });
 
   test('displays header with logo', async ({ page }) => {
