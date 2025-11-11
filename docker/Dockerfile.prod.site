@@ -34,7 +34,7 @@ RUN npm rebuild sharp --platform=linuxmusl --arch=x64
 
 # Copy source code (only what's needed for production)
 COPY blog-core/src ./blog-core/src
-COPY blog-core/src/index.js ./blog-core/src/index.js 2>/dev/null || true
+COPY blog-core/src/index.js ./blog-core/src/index.js
 COPY ${SITE_DIR_NAME}/src ./${SITE_DIR_NAME}/src
 
 # Stage 2: Production image (minimal size)
