@@ -10,7 +10,8 @@ test.describe('Homepage', () => {
 
   test('displays header with logo', async ({ page }) => {
     await page.goto('/');
-    const logo = page.locator('.logo-image');
+    // TTA uses .logo-image, FFG uses .site-logo img
+    const logo = page.locator('.logo-image, .site-logo img');
     await expect(logo).toBeVisible();
   });
 
@@ -22,7 +23,8 @@ test.describe('Homepage', () => {
 
   test('displays search area', async ({ page }) => {
     await page.goto('/');
-    const searchArea = page.locator('.search-area');
+    // TTA uses .search-area, FFG uses .search-box in sidebar
+    const searchArea = page.locator('.search-area, .search-box');
     await expect(searchArea).toBeVisible();
   });
 
