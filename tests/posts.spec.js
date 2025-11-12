@@ -109,8 +109,22 @@ test.describe('Post Pages', () => {
         await lightboxImages.first().scrollIntoViewIfNeeded();
         await page.waitForTimeout(200);
         
-        // Click first lightbox image
-        await lightboxImages.first().click();
+        // Check if image is inside a carousel (Shoelace carousel intercepts clicks)
+        const carousel = page.locator('sl-carousel');
+        const isInCarousel = await carousel.count() > 0 && await lightboxImages.first().evaluate((img) => {
+          return img.closest('sl-carousel') !== null;
+        });
+        
+        if (isInCarousel) {
+          // If in carousel, use JavaScript click to bypass pointer interception
+          await lightboxImages.first().evaluate((img) => {
+            img.click();
+          });
+        } else {
+          // Normal click if not in carousel
+          await lightboxImages.first().click();
+        }
+        
         await page.waitForTimeout(500); // Give more time for lightbox to open
         
         // Check if lightbox opened (with timeout)
