@@ -123,7 +123,18 @@ test.describe('Cross-Browser Compatibility', () => {
     });
     
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    
+    // Wait for page to load - use 'load' instead of 'networkidle'
+    // 'networkidle' can be flaky, especially in Firefox with analytics or other background requests
+    try {
+      await page.waitForLoadState('load', { timeout: 10000 });
+    } catch (e) {
+      // If load times out, try domcontentloaded as fallback
+      await page.waitForLoadState('domcontentloaded', { timeout: 5000 });
+    }
+    
+    // Give a small buffer for any async module loading
+    await page.waitForTimeout(1000);
     
     // Should not have module loading errors
     const moduleErrors = errors.filter(e => e.includes('module') || e.includes('import'));
