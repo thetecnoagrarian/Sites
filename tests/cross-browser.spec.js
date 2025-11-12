@@ -22,13 +22,27 @@ test.describe('Cross-Browser Compatibility', () => {
     if (count > 0) {
       await expect(searchInput.first()).toBeVisible();
       
-      // Try to interact with it
-      await searchInput.first().click();
-      await page.keyboard.type('test');
+      // Scroll into view if needed (for sidebar on FFG)
+      await searchInput.first().scrollIntoViewIfNeeded();
+      await page.waitForTimeout(200);
       
-      // Should accept input (may need to wait for shadow DOM)
-      await page.waitForTimeout(100);
-      const value = await searchInput.first().inputValue();
+      // Try to interact with it - click and type
+      await searchInput.first().click();
+      await page.waitForTimeout(200);
+      await page.keyboard.type('test');
+      await page.waitForTimeout(300); // Give shadow DOM time to update
+      
+      // Try to get value - Shoelace uses shadow DOM, so we need to use evaluate
+      const value = await searchInput.first().evaluate((el) => {
+        // Access the internal input element in shadow DOM
+        const shadowRoot = el.shadowRoot;
+        if (shadowRoot) {
+          const input = shadowRoot.querySelector('input');
+          return input ? input.value : '';
+        }
+        return el.value || '';
+      });
+      
       expect(value).toContain('test');
     } else {
       // If no search input, skip test

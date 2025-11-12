@@ -25,14 +25,24 @@ test.describe('Post Pages', () => {
     
     if (count > 0) {
       const firstPostLink = postLinks.first();
+      
+      // Scroll into view to ensure link is clickable
+      await firstPostLink.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(200);
+      
       const href = await firstPostLink.getAttribute('href');
       
       if (href) {
-        await firstPostLink.click();
-        await page.waitForLoadState('networkidle');
+        // Use Promise.all to wait for both navigation and URL change
+        await Promise.all([
+          page.waitForURL(/\/post\//, { timeout: 5000 }),
+          firstPostLink.click()
+        ]);
         
-        // Should be on a post page
+        // Verify we're on a post page
         await expect(page).toHaveURL(/\/post\//);
+      } else {
+        test.skip();
       }
     } else {
       test.skip();
