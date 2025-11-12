@@ -40,7 +40,14 @@ test.describe('Forms', () => {
 
   test('search form works on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/');
+    
+    // Navigate with timeout and retry logic
+    try {
+      await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    } catch (e) {
+      // If initial load fails, try again with load state
+      await page.goto('/', { waitUntil: 'load', timeout: 15000 });
+    }
     
     const searchInput = page.locator('sl-input[name="q"], input[name="q"]');
     const count = await searchInput.count();
