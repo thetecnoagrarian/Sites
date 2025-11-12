@@ -316,9 +316,12 @@ export function createBlogApp(config) {
             const isTrusted = trustedIPs.some(trustedIP => {
                 // Exact match
                 if (clientIP === trustedIP) return true;
-                // Subnet match (e.g., 129.222.46.*)
+                // Subnet match (e.g., 129.222.46.* or 129.222.*.*)
                 if (trustedIP.includes('*')) {
-                    const pattern = trustedIP.replace(/\*/g, '.*');
+                    // Escape dots and convert * to .*
+                    const pattern = trustedIP
+                        .replace(/\./g, '\\.')  // Escape dots first
+                        .replace(/\*/g, '.*');   // Then convert * to .*
                     const regex = new RegExp(`^${pattern}$`);
                     return regex.test(clientIP);
                 }
@@ -350,6 +353,30 @@ export function createBlogApp(config) {
             uptime: process.uptime(),
             environment: process.env.NODE_ENV || 'development',
             siteName
+        });
+    });
+
+    // Debug endpoint to check IP detection (remove after testing)
+    app.get('/debug-ip', (req, res) => {
+        const xForwardedFor = req.headers['x-forwarded-for'];
+        const reqIP = req.ip;
+        const trustedIPsEnv = process.env.TRUSTED_IPS || '';
+        let clientIP = xForwardedFor || reqIP;
+        if (clientIP && clientIP.includes(',')) {
+            clientIP = clientIP.split(',')[0].trim();
+        }
+        res.json({
+            'x-forwarded-for': xForwardedFor,
+            'req.ip': reqIP,
+            'detected-client-ip': clientIP,
+            'trusted-ips': trustedIPsEnv,
+            'is-trusted': trustedIPsEnv.split(',').map(ip => ip.trim()).some(ip => {
+                if (ip.includes('*')) {
+                    const pattern = ip.replace(/\*/g, '.*');
+                    return new RegExp(`^${pattern}$`).test(clientIP);
+                }
+                return clientIP === ip;
+            })
         });
     });
 
