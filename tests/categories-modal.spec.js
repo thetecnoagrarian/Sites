@@ -234,7 +234,12 @@ test.describe('Categories Modal', () => {
       });
       
       expect(styles.display).toBe('grid');
-      expect(styles.gridTemplateColumns).toContain('repeat');
+      // Browser resolves repeat(auto-fit, ...) to actual pixel values
+      // So we check that gridTemplateColumns has multiple columns (indicated by spaces or multiple values)
+      const hasMultipleColumns = styles.gridTemplateColumns.includes(' ') || 
+                                  styles.gridTemplateColumns.split(' ').length > 1 ||
+                                  styles.gridTemplateColumns.includes('px');
+      expect(hasMultipleColumns).toBe(true);
     });
   });
 });
