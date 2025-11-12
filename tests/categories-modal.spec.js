@@ -53,8 +53,11 @@ test.describe('Categories Modal', () => {
       await expect(backdrop).toHaveClass(/active/);
       
       // Check modal is at bottom of screen
+      // Allow small tolerance for sub-pixel rendering differences
       const menuBox = await categoriesMenu.boundingBox();
-      expect(menuBox.y + menuBox.height).toBeCloseTo(page.viewportSize().height, 0);
+      const viewportHeight = page.viewportSize().height;
+      const modalBottom = menuBox.y + menuBox.height;
+      expect(modalBottom).toBeCloseTo(viewportHeight, 1); // Allow 1px tolerance
       
       // Take screenshot
       await page.screenshot({ path: 'tests/screenshots/categories-modal-open-mobile.png' });
