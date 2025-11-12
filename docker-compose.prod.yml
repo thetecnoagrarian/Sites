@@ -23,6 +23,7 @@ services:
       - UPLOADS_PATH=/app/data/uploads
       - RATE_LIMIT_WINDOW_MS=900000
       - RATE_LIMIT_MAX_REQUESTS=100
+      - TRUSTED_IPS=${TRUSTED_IPS}
     ports:
       - "4000:4000"
     volumes:
@@ -59,6 +60,7 @@ services:
       - UPLOADS_PATH=/app/data/uploads
       - RATE_LIMIT_WINDOW_MS=900000
       - RATE_LIMIT_MAX_REQUESTS=100
+      - TRUSTED_IPS=${TRUSTED_IPS}
     ports:
       - "4002:4002"
     volumes:

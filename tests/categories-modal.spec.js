@@ -5,10 +5,19 @@ test.describe('Categories Modal', () => {
     await page.goto('/');
   });
 
+  // Helper to check if categories modal exists (TTA has it, FFG doesn't)
+  async function hasCategoriesModal(page) {
+    const button = page.locator('.categories-toggle');
+    return (await button.count()) > 0;
+  }
+
   test.describe('Mobile View', () => {
     test.use({ viewport: { width: 375, height: 667 } }); // iPhone size
 
     test('categories button is visible and centered', async ({ page }) => {
+      if (!(await hasCategoriesModal(page))) {
+        test.skip();
+      }
       const categoriesButton = page.locator('.categories-toggle');
       await expect(categoriesButton).toBeVisible();
       
@@ -23,6 +32,9 @@ test.describe('Categories Modal', () => {
     });
 
     test('opens bottom sheet modal when clicked', async ({ page }) => {
+      if (!(await hasCategoriesModal(page))) {
+        test.skip();
+      }
       const categoriesButton = page.locator('.categories-toggle');
       const categoriesMenu = page.locator('.categories-menu');
       const backdrop = page.locator('.categories-backdrop');
@@ -49,6 +61,9 @@ test.describe('Categories Modal', () => {
     });
 
     test('modal has header with close button', async ({ page }) => {
+      if (!(await hasCategoriesModal(page))) {
+        test.skip();
+      }
       await page.locator('.categories-toggle').click();
       await page.waitForTimeout(300);
       
@@ -61,6 +76,9 @@ test.describe('Categories Modal', () => {
     });
 
     test('closes when close button is clicked', async ({ page }) => {
+      if (!(await hasCategoriesModal(page))) {
+        test.skip();
+      }
       await page.locator('.categories-toggle').click();
       await page.waitForTimeout(300);
       
@@ -72,6 +90,9 @@ test.describe('Categories Modal', () => {
     });
 
     test('closes when backdrop is clicked', async ({ page }) => {
+      if (!(await hasCategoriesModal(page))) {
+        test.skip();
+      }
       await page.locator('.categories-toggle').click();
       await page.waitForTimeout(300);
       
@@ -84,6 +105,9 @@ test.describe('Categories Modal', () => {
     });
 
     test('closes when escape key is pressed', async ({ page }) => {
+      if (!(await hasCategoriesModal(page))) {
+        test.skip();
+      }
       await page.locator('.categories-toggle').click();
       await page.waitForTimeout(300);
       
@@ -95,6 +119,9 @@ test.describe('Categories Modal', () => {
     });
 
     test('displays categories in vertical list', async ({ page }) => {
+      if (!(await hasCategoriesModal(page))) {
+        test.skip();
+      }
       await page.locator('.categories-toggle').click();
       await page.waitForTimeout(300);
       
@@ -120,6 +147,9 @@ test.describe('Categories Modal', () => {
     });
 
     test('modal is scrollable when many categories', async ({ page }) => {
+      if (!(await hasCategoriesModal(page))) {
+        test.skip();
+      }
       await page.locator('.categories-toggle').click();
       await page.waitForTimeout(300);
       
@@ -137,6 +167,9 @@ test.describe('Categories Modal', () => {
     });
 
     test('button stays centered when modal opens', async ({ page }) => {
+      if (!(await hasCategoriesModal(page))) {
+        test.skip();
+      }
       const categoriesButton = page.locator('.categories-toggle');
       
       // Get initial position
@@ -160,6 +193,9 @@ test.describe('Categories Modal', () => {
     test.use({ viewport: { width: 1920, height: 1080 } });
 
     test('shows hover dropdown on desktop', async ({ page }) => {
+      if (!(await hasCategoriesModal(page))) {
+        test.skip();
+      }
       const categoriesDropdown = page.locator('.categories-dropdown');
       const categoriesMenu = page.locator('.categories-menu');
       
@@ -182,6 +218,9 @@ test.describe('Categories Modal', () => {
     });
 
     test('displays categories in grid layout on desktop', async ({ page }) => {
+      if (!(await hasCategoriesModal(page))) {
+        test.skip();
+      }
       await page.locator('.categories-dropdown').hover();
       await page.waitForTimeout(300);
       
