@@ -113,7 +113,15 @@ const heroImageExists = async (imagesDir = null) => {
  * @returns {Promise<string|null>} Path to hero image or null if doesn't exist
  */
 const getHeroImagePath = async (imagesDir = null) => {
-  const dir = imagesDir || path.join(process.cwd(), 'src/public/images');
+  // Use __dirname to get the actual file location, then resolve relative to it
+  // This works better in Docker containers where process.cwd() might not be reliable
+  const fileUrl = import.meta.url;
+  const currentFile = fileURLToPath(fileUrl);
+  const currentDir = path.dirname(currentFile);
+  
+  // Resolve images directory: go up from utils/ to src/, then to public/images
+  const defaultDir = path.resolve(currentDir, '../public/images');
+  const dir = imagesDir || defaultDir;
   
   // First check for uploaded hero image (HeroCamp.webp)
   const uploadedHeroPath = path.join(dir, 'HeroCamp.webp');
@@ -126,7 +134,8 @@ const getHeroImagePath = async (imagesDir = null) => {
     try {
       await fs.access(defaultHeroPath);
       return '/images/HeroCamp.png';
-    } catch {
+    } catch (err) {
+      console.error('Hero image not found at:', defaultHeroPath, err.message);
       return null;
     }
   }
