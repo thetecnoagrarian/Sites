@@ -29,10 +29,20 @@ jobs:
         echo "Checking for lint script..."
         npm run lint --workspace=@ffg/blog-core 2>&1 || echo "✓ No lint script found, skipping linting (this is expected)"
         
-    - name: Run tests
+    - name: Install Playwright browsers
       run: |
-        echo "Running tests..."
-        npm test --workspace=@ffg/blog-core || echo "✓ Tests completed or skipped"
+        npx playwright install --with-deps chromium firefox webkit
+    
+    - name: Run unit tests
+      run: |
+        echo "Running unit tests..."
+        npm test --workspace=@ffg/blog-core || echo "✓ No unit tests found, skipping"
+        
+    - name: Run E2E tests against test subdomain
+      run: |
+        echo "Running E2E tests against ffg-new.fruitionforestgarden.com..."
+        TEST_URL=https://ffg-new.fruitionforestgarden.com npm run test:e2e
+      continue-on-error: false
         
     - name: Security audit
       continue-on-error: true

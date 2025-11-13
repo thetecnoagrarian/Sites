@@ -218,11 +218,50 @@ A monorepo containing two blog sites deployed to Linode server using Docker Comp
 ## 🚀 Deployment Guide
 
 ### ✅ **VERIFIED WORKING Deployment Process**
+
+**IMPORTANT: Always check CI/CD results before deploying!**
+
 1. **Local Development**: Make changes locally
 2. **Commit**: `git add [files]` → `git commit -m "description"`
 3. **Push**: `git push origin main`
-4. **Deploy**: `ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.prod.yml up --build -d [SERVICE_NAME]"`
+4. **Wait for CI/CD**: 
+   - Go to GitHub Actions tab: `https://github.com/thetecnoagrarian/Sites/actions`
+   - Wait for the pipeline to complete (usually 2-3 minutes)
+   - **Verify all checks pass** (green checkmarks):
+     - ✅ Lint-and-test job passes
+     - ✅ Build-and-deploy job passes
+   - **DO NOT deploy if any checks fail** - fix issues first
+5. **Deploy** (only after CI/CD passes):
+   ```bash
+   # Deploy Fruition Forest Garden
+   ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.prod.yml up --build -d fruitionforestgarden"
+   
+   # Deploy The Tecnoagrarian
+   ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.prod.yml up --build -d thetecnoagrarian"
+   ```
    - **Server details**: See `Documents/SECRETS.md` for actual values
+
+### 🤖 **CI/CD Pipeline (Automated Testing)**
+
+The CI/CD pipeline automatically runs on every push to `main`:
+
+**What it does:**
+1. ✅ **Lints code** - Checks for syntax and style issues
+2. ✅ **Runs unit tests** - Verifies core functionality
+3. ✅ **Runs E2E tests** - Tests against `ffg-new.fruitionforestgarden.com` (220 tests across 5 browsers)
+4. ✅ **Security audit** - Checks for vulnerable dependencies
+5. ✅ **Builds Docker images** - Verifies Docker builds work correctly
+
+**How to use it:**
+- **Before deploying**: Always check GitHub Actions to ensure all tests pass
+- **If tests fail**: Fix the issues before deploying
+- **If tests pass**: Safe to deploy to production
+
+**Benefits:**
+- ✅ No need to run manual tests before every push
+- ✅ Catches bugs automatically before they reach production
+- ✅ Verifies Docker builds work correctly
+- ✅ Tests run in a clean environment (catches environment-specific issues)
 
 ### ✅ **WORKING Commands**
 ```bash
@@ -246,11 +285,14 @@ ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.pr
 
 ## 🔧 Development Workflow
 
-### Git Workflow
+### Git Workflow (With CI/CD)
 1. **Local Changes**: Make changes in local development environment
 2. **Commit**: `git add [files]` → `git commit -m "descriptive message"`
 3. **Push**: `git push origin main`
-4. **Deploy**: SSH to server and rebuild containers
+4. **Wait for CI/CD**: Check GitHub Actions - all tests must pass
+5. **Deploy** (only if CI/CD passes): SSH to server and rebuild containers
+
+**⚠️ Never deploy if CI/CD tests fail!**
 
 ### Common Commands
 ```bash
