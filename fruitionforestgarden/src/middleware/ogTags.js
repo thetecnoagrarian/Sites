@@ -21,25 +21,33 @@ function getBaseUrl(req) {
 // Check if hero OG image exists (WebP format)
 async function getHeroOgImagePath() {
   const imagesDir = path.join(process.cwd(), 'src/public/images');
-  const ogPath = path.join(imagesDir, 'HeroCamp-og.webp');
   
+  // Priority 1: Check for uploaded OG image (HeroCamp-og.webp)
+  const ogPath = path.join(imagesDir, 'HeroCamp-og.webp');
   try {
     await fs.access(ogPath);
     return '/images/HeroCamp-og.webp';
   } catch {
-    // Fallback to hero image if OG version doesn't exist
+    // Priority 2: Fallback to uploaded hero image (HeroCamp.webp)
     const heroPath = path.join(imagesDir, 'HeroCamp.webp');
     try {
       await fs.access(heroPath);
       return '/images/HeroCamp.webp';
     } catch {
-      // Final fallback to old PNG if WebP doesn't exist
-      const oldOgPath = path.join(imagesDir, 'HeroCamp-og.png');
+      // Priority 3: Fallback to about page hero image (HeroCamp.png)
+      const defaultHeroPath = path.join(imagesDir, 'HeroCamp.png');
       try {
-        await fs.access(oldOgPath);
-        return '/images/HeroCamp-og.png';
+        await fs.access(defaultHeroPath);
+        return '/images/HeroCamp.png';
       } catch {
-        return null;
+        // Priority 4: Final fallback to old OG PNG if it exists
+        const oldOgPath = path.join(imagesDir, 'HeroCamp-og.png');
+        try {
+          await fs.access(oldOgPath);
+          return '/images/HeroCamp-og.png';
+        } catch {
+          return null;
+        }
       }
     }
   }
@@ -79,8 +87,8 @@ async function buildOgTags(post, req = null) {
     if (heroOgPath) {
       image = `${baseUrl}${heroOgPath}`;
     } else {
-      // Final fallback to old PNG
-      image = `${baseUrl}/images/HeroCamp-og.png`;
+      // Final fallback to about page hero image
+      image = `${baseUrl}/images/HeroCamp.png`;
     }
   }
   

@@ -108,12 +108,28 @@ const heroImageExists = async (imagesDir = null) => {
 
 /**
  * Get hero image path if it exists
+ * Falls back to about page hero image (HeroCamp.png) if no uploaded hero image exists
  * @param {string} imagesDir - Directory to check (default: src/public/images)
  * @returns {Promise<string|null>} Path to hero image or null if doesn't exist
  */
 const getHeroImagePath = async (imagesDir = null) => {
-  const exists = await heroImageExists(imagesDir);
-  return exists ? '/images/HeroCamp.webp' : null;
+  const dir = imagesDir || path.join(process.cwd(), 'src/public/images');
+  
+  // First check for uploaded hero image (HeroCamp.webp)
+  const uploadedHeroPath = path.join(dir, 'HeroCamp.webp');
+  try {
+    await fs.access(uploadedHeroPath);
+    return '/images/HeroCamp.webp';
+  } catch {
+    // Fallback to about page hero image (HeroCamp.png)
+    const defaultHeroPath = path.join(dir, 'HeroCamp.png');
+    try {
+      await fs.access(defaultHeroPath);
+      return '/images/HeroCamp.png';
+    } catch {
+      return null;
+    }
+  }
 };
 
 export {
