@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import path from 'path';
 import { promises as fs } from 'fs';
+import { fileURLToPath } from 'url';
 
 /**
  * Process hero image: creates both hero and OG versions
