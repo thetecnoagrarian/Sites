@@ -264,6 +264,37 @@ export function createBlogApp(config) {
         const userAgent = req.headers['user-agent'] || '';
         const clientIP = req.headers['x-forwarded-for'] || req.ip;
         
+        // Check if client IP is trusted (trusted IPs bypass bot protection for development)
+        const trustedIPsEnv = process.env.TRUSTED_IPS || '';
+        let isTrustedIP = false;
+        if (trustedIPsEnv) {
+            let checkIP = clientIP;
+            // X-Forwarded-For can be a comma-separated list, take the first one
+            if (checkIP && checkIP.includes(',')) {
+                checkIP = checkIP.split(',')[0].trim();
+            }
+            
+            const trustedIPs = trustedIPsEnv.split(',').map(ip => ip.trim()).filter(ip => ip.length > 0);
+            isTrustedIP = trustedIPs.some(trustedIP => {
+                // Exact match
+                if (checkIP === trustedIP) return true;
+                // Subnet match (e.g., 129.222.*.*)
+                if (trustedIP.includes('*')) {
+                    const pattern = trustedIP
+                        .replace(/\./g, '\\.')  // Escape dots first
+                        .replace(/\*/g, '.*');   // Then convert * to .*
+                    const regex = new RegExp(`^${pattern}$`);
+                    return regex.test(checkIP);
+                }
+                return false;
+            });
+        }
+        
+        // Trusted IPs bypass bot protection (for development)
+        if (isTrustedIP) {
+            return next();
+        }
+        
         // Block common bot patterns
         const botPatterns = [
             /bot/i, /crawler/i, /spider/i, /scraper/i,
