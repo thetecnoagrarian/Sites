@@ -676,6 +676,10 @@ ssh [SSH_USER]@[SERVER_IP] "/opt/Sites/scripts/backup-host.sh"
 
 ### Planned Features (Priority Tagged)
 #### **Short Term (Next 3 months)**
+- **Database-Backed Session Store**: Switch from MemoryStore to SQLite-backed sessions using existing `sessions` table
+  - Prevents session loss on container restarts
+  - Required for multi-container deployments
+  - Infrastructure already exists in database schema, just needs to be connected
 - **Analytics Dashboard**: User tracking and post analytics
 - **SEO Optimization**: Meta tags, sitemaps, structured data
 - **Performance Optimization**: Caching, CDN integration
@@ -695,6 +699,10 @@ ssh [SSH_USER]@[SERVER_IP] "/opt/Sites/scripts/backup-host.sh"
 - **Database Migration**: PostgreSQL for better performance
 
 ### Technical Improvements
+- **Database-Backed Session Store**: Replace MemoryStore with SQLite session store (using `connect-sqlite3`)
+  - Eliminates session loss on container restarts
+  - Enables multi-container deployments
+  - Database schema already includes `sessions` table
 - **Caching Layer**: Redis for session and data caching
 - **Load Balancing**: Multiple server instances
 - **Monitoring**: Application performance monitoring
