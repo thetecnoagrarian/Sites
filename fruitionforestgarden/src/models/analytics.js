@@ -29,6 +29,28 @@ class Analytics {
                 visit_count INTEGER DEFAULT 1
             )
         `);
+        
+        // Create all-time stats table
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS all_time_stats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                stat_name TEXT UNIQUE NOT NULL,
+                stat_value INTEGER NOT NULL,
+                last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        // Create all-time top pages table
+        db.exec(`
+            CREATE TABLE IF NOT EXISTS all_time_top_pages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                page_path TEXT NOT NULL,
+                total_views INTEGER NOT NULL,
+                unique_ips INTEGER NOT NULL,
+                last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(page_path)
+            )
+        `);
     }
 
     static recordPageView(pagePath, userAgent, ipAddress, referrer) {
@@ -112,6 +134,41 @@ class Analytics {
         } catch (error) {
             console.error('Error getting page view stats:', error);
             return [];
+        }
+    }
+
+    static getAllTimeStats() {
+        try {
+            const db = this.getDb();
+            
+            // Get stored aggregate stats
+            const storedStats = db.prepare(`
+                SELECT stat_name, stat_value 
+                FROM all_time_stats
+            `).all();
+            
+            const stats = {};
+            storedStats.forEach(row => {
+                stats[row.stat_name] = row.stat_value;
+            });
+            
+            // Get top pages (all time)
+            const topPages = db.prepare(`
+                SELECT page_path, total_views, unique_ips
+                FROM all_time_top_pages
+                ORDER BY total_views DESC
+                LIMIT 25
+            `).all();
+            
+            return {
+                totalPageViews: stats.total_page_views || 0,
+                totalUniqueVisitors: stats.total_unique_visitors || 0,
+                topPages: topPages
+            };
+        } catch (error) {
+            console.error('Error getting all-time stats:', error);
+            // Fallback to calculating from current data
+            return this.getTotalStats();
         }
     }
 

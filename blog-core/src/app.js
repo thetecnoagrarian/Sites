@@ -111,10 +111,10 @@ export function createBlogApp(config) {
     // Session configuration - using memory store with better configuration
     app.use(session({
         secret: process.env.SESSION_SECRET,
-        resave: false,
-        saveUninitialized: false,
+        resave: true, // Resave session even if not modified (helps with CSRF token persistence)
+        saveUninitialized: true, // Save uninitialized sessions (needed for CSRF token)
         cookie: {
-            secure: false, // Temporarily disable secure cookies to debug session issues
+            secure: false, // Set to true in production with HTTPS
             httpOnly: true,
             sameSite: 'lax', // Change from 'strict' to 'lax' for better compatibility
             maxAge: 24 * 60 * 60 * 1000 // 24 hours
@@ -129,7 +129,13 @@ export function createBlogApp(config) {
     app.use((req, res, next) => {
         // Generate or verify CSRF token
         const secret = req.session.csrfSecret || csrfProtection.secretSync();
-        req.session.csrfSecret = secret;
+        if (!req.session.csrfSecret) {
+            req.session.csrfSecret = secret;
+            // Ensure session is saved when we set the CSRF secret
+            req.session.save((err) => {
+                if (err) console.error('Session save error:', err);
+            });
+        }
         
         // Always add CSRF token generation method
         req.csrfToken = () => csrfProtection.create(secret);
@@ -147,7 +153,25 @@ export function createBlogApp(config) {
         // Validate CSRF token for POST, PUT, DELETE
         if (req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE') {
             const token = req.body._csrf || req.headers['x-csrf-token'];
-            if (!token || !csrfProtection.verify(secret, token)) {
+            const sessionSecret = req.session.csrfSecret;
+            
+            if (!token) {
+                console.error('CSRF token missing in request');
+                return res.status(403).json({ error: 'Invalid CSRF token' });
+            }
+            
+            if (!sessionSecret) {
+                console.error('CSRF secret missing in session');
+                return res.status(403).json({ error: 'Invalid CSRF token' });
+            }
+            
+            if (!csrfProtection.verify(sessionSecret, token)) {
+                console.error('CSRF token verification failed', { 
+                    hasToken: !!token, 
+                    hasSecret: !!sessionSecret,
+                    tokenLength: token?.length,
+                    secretLength: sessionSecret?.length
+                });
                 return res.status(403).json({ error: 'Invalid CSRF token' });
             }
         }

@@ -1,0 +1,95 @@
+# Local production-like Docker Compose
+# Matches production but uses bind mounts for local development
+# Use this to test production-like environment locally
+
+services:
+  fruitionforestgarden:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.prod.site
+      args:
+        SITE_DIR_NAME: fruitionforestgarden
+        SITE_PORT: 4000
+    container_name: ffg-blog-local-prod
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - APP_ROLE=production
+      - SESSION_SECRET=${SESSION_SECRET:-local-dev-secret-change-me}
+      - DATABASE_PATH=/app/data/database/blog.db
+      - LOG_LEVEL=info  # More verbose for local debugging
+      - MAX_FILE_SIZE=52428800
+      - UPLOADS_PATH=/app/data/uploads
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=1000  # Higher for local testing
+      - TRUSTED_IPS=${TRUSTED_IPS:-}
+    ports:
+      - "4000:4000"
+    volumes:
+      # Use bind mounts for local development (live code editing)
+      - ./blog-core:/app/blog-core
+      - ./fruitionforestgarden:/app/fruitionforestgarden
+      - ./fruitionforestgarden/src/database:/app/data/database
+      - ./fruitionforestgarden/src/public/uploads:/app/data/uploads
+      - ffg_logs:/app/logs
+    networks:
+      - blog_prod_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  thetecnoagrarian:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.prod.site
+      args:
+        SITE_DIR_NAME: thetecnoagrarian
+        SITE_PORT: 4002
+    container_name: tta-blog-local-prod
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      - NODE_ENV=production
+      - PORT=4002
+      - APP_ROLE=production
+      - SESSION_SECRET=${SESSION_SECRET:-local-dev-secret-change-me}
+      - DATABASE_PATH=/app/data/database/blog.db
+      - LOG_LEVEL=info  # More verbose for local debugging
+      - MAX_FILE_SIZE=52428800
+      - UPLOADS_PATH=/app/data/uploads
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=1000  # Higher for local testing
+      - TRUSTED_IPS=${TRUSTED_IPS:-}
+    ports:
+      - "4002:4002"
+    volumes:
+      # Use bind mounts for local development (live code editing)
+      - ./blog-core:/app/blog-core
+      - ./thetecnoagrarian:/app/thetecnoagrarian
+      - ./thetecnoagrarian/src/database:/app/data/database
+      - ./thetecnoagrarian/src/public/uploads:/app/data/uploads
+      - tta_logs:/app/logs
+    networks:
+      - blog_prod_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  ffg_logs:
+    driver: local
+  tta_logs:
+    driver: local
+
+networks:
+  blog_prod_network:
+    driver: bridge
+

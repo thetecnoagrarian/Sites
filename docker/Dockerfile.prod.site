@@ -71,14 +71,15 @@ COPY --from=builder /app/${SITE_DIR_NAME} ./${SITE_DIR_NAME}
 # Create necessary directories
 RUN mkdir -p /app/data/database /app/data/uploads /app/logs /app/backups /app/scripts
 
-# Copy backup script
+# Copy scripts
 COPY scripts/backup.sh /app/scripts/backup.sh
+COPY scripts/cleanup-analytics-container.js /app/scripts/cleanup-analytics-container.js
 
 # Set proper permissions
 RUN addgroup -g 1001 -S blog && \
     adduser -S blog -u 1001 -G blog && \
     chown -R blog:blog /app/data /app/logs /app/backups /app/scripts /app/${SITE_DIR_NAME} /app/blog-core && \
-    chmod +x /app/scripts/backup.sh
+    chmod +x /app/scripts/backup.sh /app/scripts/cleanup-analytics-container.js
 
 # Switch to non-root user
 USER blog
