@@ -6,7 +6,7 @@
 DATE=$(date +"%Y-%m-%d_%H-%M")
 BACKUP_DIR="/app/backups"
 DATA_DIR="/app/data"
-RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-14}
+RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-28}
 
 # Colors for output
 RED='\033[0;31m'

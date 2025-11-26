@@ -1,6 +1,6 @@
 #!/bin/bash
 # Setup automated backups for both blog sites
-# This script sets up cron jobs to run backups daily
+# This script sets up cron jobs to run backups weekly (Sundays at 2 AM)
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -20,9 +20,8 @@ chmod +x "$BACKUP_SCRIPT"
 echo -e "${YELLOW}Creating backup directories...${NC}"
 ssh deploy@172.236.119.220 "mkdir -p /opt/Sites/backups/tta /opt/Sites/backups/ffg"
 
-# Create cron job entries (runs daily at 2 AM)
-CRON_ENTRY_TTA="0 2 * * * docker exec tta-blog-prod /app/scripts/backup.sh >> /opt/Sites/backups/tta/backup.log 2>&1"
-CRON_ENTRY_FFG="0 2 * * * docker exec ffg-blog-prod /app/scripts/backup.sh >> /opt/Sites/backups/ffg/backup.log 2>&1"
+# Create cron job entry (runs weekly on Sundays at 2 AM, keeps backups for 4 weeks)
+CRON_ENTRY="0 2 * * 0 /opt/Sites/scripts/backup-host.sh >> /opt/Sites/backups/cron.log 2>&1"
 
 echo -e "${GREEN}To set up automated backups, run these commands on the server:${NC}"
 echo ""
@@ -36,8 +35,9 @@ echo "   ssh deploy@172.236.119.220 'docker exec tta-blog-prod chmod +x /app/scr
 echo "   ssh deploy@172.236.119.220 'docker exec ffg-blog-prod chmod +x /app/scripts/backup.sh'"
 echo ""
 echo "3. Add to crontab (run 'crontab -e' on server):"
-echo "   $CRON_ENTRY_TTA"
-echo "   $CRON_ENTRY_FFG"
+echo "   $CRON_ENTRY"
+echo ""
+echo "   Note: Backups run weekly (Sundays at 2 AM) and are kept for 4 weeks"
 echo ""
 echo -e "${YELLOW}Note: Backups will be stored in /opt/Sites/backups/ on the server${NC}"
 

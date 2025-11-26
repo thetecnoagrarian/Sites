@@ -5,7 +5,7 @@
 # Configuration
 DATE=$(date +"%Y-%m-%d_%H-%M")
 HOST_BACKUP_DIR="/opt/Sites/backups"
-RETENTION_DAYS=14
+RETENTION_DAYS=28
 
 # Colors for output
 GREEN='\033[0;32m'
