@@ -43,10 +43,9 @@ CREATE TABLE IF NOT EXISTS post_categories (
     PRIMARY KEY (post_id, category_id)
 );
 
--- Sessions table for express-session
+-- Sessions table for express-session (better-sqlite3-session-store format)
 CREATE TABLE IF NOT EXISTS sessions (
-    sid TEXT PRIMARY KEY,
-    sess TEXT NOT NULL,
+    sess TEXT PRIMARY KEY,
     expire INTEGER NOT NULL
 );
 
