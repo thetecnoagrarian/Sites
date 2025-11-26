@@ -45,8 +45,9 @@ CREATE TABLE IF NOT EXISTS post_categories (
 
 -- Sessions table for express-session (better-sqlite3-session-store format)
 CREATE TABLE IF NOT EXISTS sessions (
-    sess TEXT PRIMARY KEY,
-    expire INTEGER NOT NULL
+    sid TEXT NOT NULL PRIMARY KEY,
+    sess JSON NOT NULL,
+    expire TEXT NOT NULL
 );
 
 -- Create triggers to update updated_at timestamp
