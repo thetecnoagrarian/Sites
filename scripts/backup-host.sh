@@ -48,8 +48,15 @@ fi
 
 # Clean up old host backups
 log "Cleaning up backups older than $RETENTION_DAYS days on host..."
+# Clean up individual backup files
 find "$HOST_BACKUP_DIR" -type f -mtime +$RETENTION_DAYS -delete
+# Clean up nested backup directories (container_backups_*)
 find "$HOST_BACKUP_DIR" -type d -name "container_backups_*" -mtime +$RETENTION_DAYS -exec rm -rf {} + 2>/dev/null || true
+# Clean up individual backup files inside site directories
+find "$HOST_BACKUP_DIR/ffg" -type f \( -name "blog_*.db" -o -name "uploads_*.tar.gz" \) -mtime +$RETENTION_DAYS -delete
+find "$HOST_BACKUP_DIR/tta" -type f \( -name "blog_*.db" -o -name "uploads_*.tar.gz" \) -mtime +$RETENTION_DAYS -delete
+# Clean up empty directories
+find "$HOST_BACKUP_DIR" -type d -empty -delete 2>/dev/null || true
 
 log "Backup process completed!"
 log "Backup location: $HOST_BACKUP_DIR"

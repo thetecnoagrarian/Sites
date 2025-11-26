@@ -1,5 +1,6 @@
 import express from 'express';
 import session from 'express-session';
+import SQLiteStoreFactory from 'better-sqlite3-session-store';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import path from 'path';
@@ -57,6 +58,16 @@ export function createBlogApp(config) {
     const db = initializeDatabase(databasePath);
     setDatabase(db);
 
+    // Initialize SQLite session store
+    const SQLiteStore = SQLiteStoreFactory(session);
+    const sessionStore = new SQLiteStore({
+        client: db,
+        expired: {
+            clear: true,
+            intervalMs: 900000 // Clean up expired sessions every 15 minutes
+        }
+    });
+
     // Security middleware
     app.use(helmet({
         contentSecurityPolicy: {
@@ -108,13 +119,14 @@ export function createBlogApp(config) {
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));
 
-    // Session configuration - using memory store with better configuration
+    // Session configuration - using SQLite-backed session store
     app.use(session({
+        store: sessionStore,
         secret: process.env.SESSION_SECRET,
-        resave: true, // Resave session even if not modified (helps with CSRF token persistence)
+        resave: false, // SQLite store handles this automatically
         saveUninitialized: true, // Save uninitialized sessions (needed for CSRF token)
         cookie: {
-            secure: false, // Set to true in production with HTTPS
+            secure: process.env.NODE_ENV === 'production', // Use secure cookies in production (HTTPS)
             httpOnly: true,
             sameSite: 'lax', // Change from 'strict' to 'lax' for better compatibility
             maxAge: 24 * 60 * 60 * 1000 // 24 hours
