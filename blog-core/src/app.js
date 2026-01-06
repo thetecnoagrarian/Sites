@@ -11,6 +11,7 @@ import Database from 'better-sqlite3';
 import rateLimit from 'express-rate-limit';
 import compression from 'compression';
 import multer from 'multer';
+import { mkdirSync } from 'fs';
 
 import { setDatabase } from './models/db.js';
 import { initializeDatabase } from './database/init.js';
@@ -47,6 +48,22 @@ export function createBlogApp(config) {
 
     if (!uploadsPath) {
         throw new Error('uploadsPath is required');
+    }
+
+    // Ensure uploads directory exists
+    try {
+        mkdirSync(uploadsPath, { recursive: true });
+    } catch (error) {
+        // If directory creation fails, provide a helpful error message
+        if (error.code === 'ENOENT' || error.code === 'EACCES') {
+            throw new Error(
+                `Cannot create uploads directory at "${uploadsPath}". ` +
+                `Parent directory may not exist or you may not have permissions. ` +
+                `For local development, ensure UPLOADS_PATH points to a writable location. ` +
+                `Original error: ${error.message}`
+            );
+        }
+        throw error;
     }
 
     const app = express();

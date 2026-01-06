@@ -296,7 +296,10 @@ ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.pr
 
 ### Common Commands
 ```bash
-# Start all sites locally
+# Pure local development (no Docker)
+npm run dev:all  # Starts both sites on ports 3000 and 3002
+
+# Docker-based local development
 ./start-all-sites.sh
 
 # Stop all sites
@@ -308,6 +311,8 @@ ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.pr
 # Deploy to server
 ssh deploy@172.236.119.220 "cd /opt/Sites && docker-compose -f docker-compose.prod.yml up --build -d [SERVICE_NAME]"
 ```
+
+> **Note**: For local development setup and directory auto-creation fixes, see [DIRECTORY_AUTO_CREATION_FIX.md](./DIRECTORY_AUTO_CREATION_FIX.md)
 
 ---
 
@@ -717,6 +722,13 @@ ssh [SSH_USER]@[SERVER_IP] "/opt/Sites/scripts/backup-host.sh"
 
 ## 📝 Changelog
 
+### Version 2.6.0 - January 6, 2026
+- ✅ **Directory Auto-Creation**: Database and uploads directories now created automatically if missing
+- ✅ **Local Development Fix**: Fixed local dev crashes when directories don't exist
+- ✅ **TTA Default Paths**: Updated TTA to use local paths by default (matching FFG)
+- ✅ **Better Error Handling**: Improved error messages for directory creation failures
+- ✅ **Documentation**: Added [DIRECTORY_AUTO_CREATION_FIX.md](./DIRECTORY_AUTO_CREATION_FIX.md) guide
+
 ### Version 2.5.0 - November 11, 2025
 - ✅ **WebP Image Format**: New uploads automatically converted to WebP (25-35% smaller than JPEG)
 - ✅ **Multi-Stage Docker Build**: Optimized Dockerfile reduces image size from 3GB to ~300MB (90% reduction)
@@ -795,6 +807,7 @@ This master document consolidates all previous documentation files:
 
 **Active Documentation Files:**
 - `MASTER_PROJECT_DOCUMENTATION.md` - This file (single source of truth)
+- `DIRECTORY_AUTO_CREATION_FIX.md` - Local development directory auto-creation guide
 - `ENVIRONMENT_TEMPLATE.md` - Template for production `.env` configuration
 - `FFG_LAUNCH_READINESS.md` - Fruition Forest Garden launch checklist
 - `USERNAME_PASSWORD_UPDATE_GUIDE.md` - Admin credential management guide
@@ -846,7 +859,7 @@ This master document consolidates all previous documentation files:
 
 ---
 
-**Last Updated**: November 11, 2025  
+**Last Updated**: January 6, 2026  
 **Status**: 
 - **The Tecnoagrarian**: ✅ **PRODUCTION LIVE** - Fully operational
 - **Fruition Forest Garden**: 🚀 **READY FOR LAUNCH** - All optimizations complete, awaiting final review  
