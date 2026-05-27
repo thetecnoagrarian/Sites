@@ -1,0 +1,60 @@
+# Exclude backups from Docker build context
+backups/
+**/backups/
+**/*.tar.gz
+**/*.db
+**/*.log
+**/*.sqlite
+**/*.sqlite3
+
+# Exclude node_modules (will be installed in container)
+**/node_modules/
+node_modules/
+
+# Exclude git
+.git/
+.gitignore
+.gitattributes
+
+# Exclude documentation
+docs/
+Documents/
+*.md
+!README.md
+
+# Exclude test files
+tests/
+test-results/
+*.test.js
+*.spec.js
+playwright.config.js
+
+# Exclude development files
+.env
+.env.local
+.env.*.local
+# Shell scripts are part of this repo's operations and may be copied by Docker.
+# Do not blanket-ignore them.
+
+# Exclude large files
+*.db
+*.sqlite
+test-results-summary.json
+fruitionforestgarden-live-backup-*.db
+
+# Exclude uploads (handled via volumes)
+**/uploads/
+**/public/uploads/
+
+# Exclude Docker files (don't need in image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Exclude IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
