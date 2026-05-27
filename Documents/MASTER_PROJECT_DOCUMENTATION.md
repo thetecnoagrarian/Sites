@@ -562,6 +562,8 @@ TRUSTED_IPS=[your-trusted-ip]
 - **thetecnoagrarian account**: Delete and re-add 2 keys with new names
 - **fruitionforestgarden account**: Delete "local github_ed25519" key
 
+**New repo / authentication issues:** See [GITHUB_AUTHENTICATION_SETUP.md](./GITHUB_AUTHENTICATION_SETUP.md) for fixing GitHub auth with thetecnoagrarian account (add key to account or as deploy key, set SSH remote, test).
+
 ### Authentication Workflow
 - **Admin Passwords**: Managed through application database
 - **SSH Keys**: 1Password for secure storage
@@ -807,6 +809,7 @@ This master document consolidates all previous documentation files:
 
 **Active Documentation Files:**
 - `MASTER_PROJECT_DOCUMENTATION.md` - This file (single source of truth)
+- `GITHUB_AUTHENTICATION_SETUP.md` - GitHub/SSH auth for thetecnoagrarian account and new repos
 - `DIRECTORY_AUTO_CREATION_FIX.md` - Local development directory auto-creation guide
 - `ENVIRONMENT_TEMPLATE.md` - Template for production `.env` configuration
 - `FFG_LAUNCH_READINESS.md` - Fruition Forest Garden launch checklist
