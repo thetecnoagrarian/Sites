@@ -1,0 +1,517 @@
+# Deployment Runbook
+
+This runbook documents deployment concepts, operator checkpoints, and safe handling rules for the Fruition Forest Garden and The Tecnoagrarian monorepo.
+
+It does not contain secrets. Real server users, server IPs, trusted IP allowlists, private keys, certificate contents, passwords, tokens, and live credential material must stay out of this file. Use placeholders such as `[SERVER_IP]`, `[SSH_USER]`, `[DOMAIN]`, `[SERVICE_NAME]`, `[CONTAINER_NAME]`, `[SESSION_SECRET]`, `[TRUSTED_IPS]`, `[DATABASE_PATH]`, and `[UPLOADS_PATH]`.
+
+No deployment, Docker, SSH, SCP, rsync, backup restore, prune, reset, delete, or destructive command should be run unless the user explicitly approves that specific action.
+
+## 1. Purpose and Safety Boundary
+
+This runbook is for:
+
+- Understanding the deployment model.
+- Choosing the right deployment-related files.
+- Preparing safe preflight checks.
+- Separating local development, local production-like testing, and production deployment.
+- Documenting high-risk actions before anyone runs them.
+
+This runbook is not:
+
+- A source of secrets.
+- A replacement for explicit operator approval.
+- Proof that any production action is safe to run.
+- A live deployment procedure with real access details.
+
+Deployment affects live sites. Treat production commands as approval-required even when they appear in historical docs or scripts.
+
+## 2. Deployment Model Overview
+
+Confirmed: the repository is a two-site Node.js/Express blog monorepo using a shared `blog-core` package.
+
+Confirmed production model from safe files:
+
+- Two site services:
+  - Fruition Forest Garden.
+  - The Tecnoagrarian.
+- Shared production image pattern through `docker/Dockerfile.prod.site`.
+- Root production Compose file at `docker-compose.prod.yml`.
+- Site services use Docker named volumes for runtime data and logs.
+- Environment variables are supplied through Compose and an env file path.
+- nginx is configured as a reverse proxy and static-file front end.
+- Backups are intended to cover runtime database and uploads data.
+
+Inferred workflow:
+
+1. Code changes are made locally.
+2. Local checks or local production-like checks are performed.
+3. CI runs on push or pull request.
+4. A human reviews status and approves deployment.
+5. Production services are rebuilt/restarted through Docker Compose on the target host.
+
+Needs Review: the exact canonical production deployment path and final service names must be confirmed before use.
+
+## 3. Canonical Deployment Files
+
+### `docker-compose.prod.yml`
+
+Purpose:
+
+- Defines production-style services for both sites.
+- Builds each service from `docker/Dockerfile.prod.site`.
+- Passes site-specific build args.
+- Uses `.env` as an env file path.
+- Sets production environment variables.
+- Defines named data and log volumes.
+- Defines service health checks.
+
+Needs Review:
+
+- Confirm whether this is the only canonical production Compose file.
+- Confirm exact production service names before use.
+
+### `docker-compose.local-prod.yml`
+
+Purpose:
+
+- Defines local production-like services.
+- Uses the shared production Dockerfile.
+- Uses `.env.local` by path only.
+- Uses bind mounts for local code/data.
+- Uses production-like ports/settings with local-friendly logging/rate limits.
+
+Useful for:
+
+- Testing production-like image/build behavior locally.
+- Finding Dockerfile or runtime-path issues before production.
+
+Needs Review:
+
+- Confirm this is the preferred local production-like workflow.
+
+### `docker-compose.yml`
+
+Purpose:
+
+- Defines local development-oriented services.
+- Uses site-specific development Dockerfiles.
+- Uses bind mounts for shared and site code.
+- Maps local development ports.
+
+Needs Review:
+
+- `docker-compose.yml` uses `UPLOAD_PATH`, while source and production Compose use `UPLOADS_PATH`.
+- Confirm whether root local Compose or site-level Compose files are canonical for local development.
+
+### `docker/Dockerfile.prod.site`
+
+Purpose:
+
+- Shared parameterized multi-stage production Dockerfile.
+- Uses build args `SITE_DIR_NAME` and `SITE_PORT`.
+- Installs production workspace dependencies.
+- Rebuilds Sharp for Alpine compatibility.
+- Copies `blog-core/src` and selected site `src`.
+- Creates runtime directories for data, uploads, logs, backups, and scripts.
+- Runs the selected site app as a non-root user.
+
+Runtime note:
+
+- Docker uses Node 20.
+- Package engines allow Node `>=18.0.0`.
+- Needs Review: confirm whether Node 20 is the intended production baseline.
+
+### `nginx/blog.conf`
+
+Purpose:
+
+- Defines upstreams for both site services.
+- Redirects HTTP to HTTPS.
+- Proxies app requests to site services.
+- Aliases static CSS, JS, images, and uploads.
+- References certificate paths.
+
+Safety:
+
+- Do not inspect certificate files or private keys.
+- Use `[DOMAIN]` and `[CERT_PATH]` placeholders in docs.
+
+Needs Review:
+
+- Confirm whether this checked-in nginx file matches current production nginx configuration.
+
+### `.dockerignore`
+
+Purpose:
+
+- Excludes runtime and development-only files from Docker build context.
+
+Confirmed exclusions include:
+
+- Backups.
+- Database files.
+- Logs.
+- SQLite files.
+- `node_modules`.
+- Git metadata.
+- most documentation.
+- tests and generated test output.
+- env files.
+- uploads.
+- Docker/Compose files.
+- IDE files.
+
+Needs Review:
+
+- Confirm whether site-level `.dockerignore` files differ from root `.dockerignore`.
+
+### `.github/workflows/ci-cd.yml`
+
+Purpose:
+
+- Defines CI checks for push and pull request to `main`.
+- Installs dependencies.
+- Attempts lint/unit/E2E/audit steps.
+- Verifies production Compose YAML syntax.
+- Contains a placeholder manual-deploy step rather than active production deployment.
+
+CI caution:
+
+- Some test/audit steps tolerate failure or missing scripts.
+- Do not treat CI passing as deployment approval.
+
+### Relevant Scripts
+
+- `scripts/backup.sh` - container-side database/uploads backup and retention cleanup.
+- `scripts/backup-host.sh` - host-side backup orchestration for both containers and host backup copies.
+- `scripts/setup-backups.sh` - backup setup helper that involves SSH/SCP/cron concepts. Approval required before execution.
+- `scripts/sync-local-prod.sh` - local production-like Docker sync helper. Approval required before execution because it stops/builds/starts containers.
+- `scripts/cleanup-disk-space.sh` - server disk cleanup helper. High risk; approval required before execution.
+- `scripts/cleanup-analytics-container.js` - analytics retention cleanup script that modifies database rows. High risk; approval required before execution.
+- `start-all-sites.sh` - local Docker start helper. Approval required before execution.
+- `stop-all-sites.sh` - local Docker stop helper. Approval required before execution.
+- `restart-all-sites.sh` - local Docker restart helper. Approval required before execution.
+
+## 4. Local Development Workflow
+
+Confirmed local development concepts:
+
+- Root `package.json` has npm scripts for starting or developing each site and both sites together.
+- `docker-compose.yml` defines two development-oriented services.
+- Local development Compose uses bind mounts for `blog-core/` and the site package directories.
+- Runtime data is mounted into local folders and/or local Docker volumes depending on the service configuration.
+
+Local development service shape:
+
+- Fruition Forest Garden local service maps to a local port.
+- The Tecnoagrarian local service maps to a local port.
+- Each service mounts shared code and site code.
+- Each service has local data/upload/log behavior.
+
+Example only / do not run without approval:
+
+```bash
+# Local service start, stop, restart, and Docker Compose commands are approval-required.
+docker compose -f docker-compose.yml up --build -d [SERVICE_NAME]
+docker compose -f docker-compose.yml down
+```
+
+Needs Review:
+
+- `UPLOAD_PATH` vs `UPLOADS_PATH`.
+- Fruition Forest Garden local port differences across scripts, source defaults, and Compose.
+- Whether root local Compose or site-level Compose files should be the default operator path.
+
+## 5. Local Production-Like Workflow
+
+Confirmed from `docker-compose.local-prod.yml`:
+
+- Uses `docker/Dockerfile.prod.site`.
+- Uses build args for each site.
+- Uses `.env.local` by path only.
+- Uses production-like ports.
+- Uses bind mounts for local code and runtime data.
+- Uses local-friendly log level and higher local rate-limit settings.
+- Defines health checks.
+
+How it differs from ordinary local development:
+
+- It uses the shared production Dockerfile rather than site development Dockerfiles.
+- It more closely matches production ports and runtime layout.
+- It still uses local bind mounts and local env file path.
+
+How it differs from real production:
+
+- It uses `.env.local`, not `.env`.
+- It uses bind mounts rather than production named data volumes for code/data.
+- It is local-only and should not be treated as proof production is safe.
+
+Useful for:
+
+- Testing Docker build behavior.
+- Testing production-like environment variables.
+- Finding path, volume, and image-processing issues before deployment.
+
+Example only / do not run without approval:
+
+```bash
+docker compose -f docker-compose.local-prod.yml up --build -d
+docker compose -f docker-compose.local-prod.yml logs -f [SERVICE_NAME]
+docker compose -f docker-compose.local-prod.yml down
+```
+
+## 6. Production Workflow
+
+Confirmed from `docker-compose.prod.yml`:
+
+- Two services are defined.
+- Each service builds from `docker/Dockerfile.prod.site`.
+- Each service passes:
+  - `SITE_DIR_NAME`
+  - `SITE_PORT`
+- Each service uses `.env` by path only.
+- Each service sets production-mode environment variables.
+- Each service mounts a named data volume and named logs volume.
+- Each service has a health check.
+- Each service is attached to a production Docker network.
+
+Confirmed runtime paths inside containers:
+
+- Database path is represented by `[DATABASE_PATH]`.
+- Uploads path is represented by `[UPLOADS_PATH]`.
+- Logs live under a container log path mounted to a Docker volume.
+- Backups are generated under a container backup path when backup scripts run.
+
+nginx relationship:
+
+- nginx proxies HTTP application traffic to site upstreams.
+- nginx may serve static CSS, JS, images, and uploads through aliases.
+- TLS certificate paths exist in nginx config, but certificate files/private keys must not be inspected.
+
+Approval-required production deployment example:
+
+```bash
+# Approval required. Placeholder-only example.
+ssh [SSH_USER]@[SERVER_IP] "cd [DEPLOY_PATH] && docker compose -f docker-compose.prod.yml up --build -d [SERVICE_NAME]"
+```
+
+Do not run this command unless the user explicitly approves the exact deployment action.
+
+Needs Review:
+
+- Confirm `[DEPLOY_PATH]`.
+- Confirm `[SERVICE_NAME]`.
+- Confirm whether `docker compose` or `docker-compose` is canonical on the target host.
+- Confirm whether nginx config in this repo is deployed as-is or used as a reference.
+
+## 7. Backup and Restore Concepts
+
+Confirmed backup concepts:
+
+- Runtime databases and uploads are the main backup targets.
+- Source code is expected to live in Git and is not part of backup output.
+- Container-side backup script backs up database and uploads into a backup directory.
+- Host-side backup script runs container backups, copies backup output to a host backup location, and applies retention cleanup.
+- Backup setup docs/scripts mention cron-based scheduling.
+
+Runtime state that must not be committed:
+
+- SQLite database files.
+- Upload folders.
+- Logs.
+- Backup directories.
+- Generated archive files.
+
+High-risk restore boundary:
+
+- Database restore is high-risk.
+- Upload restore is high-risk.
+- Volume manipulation is high-risk.
+- Container restart after restore is high-risk.
+- Backup deletion/retention cleanup is high-risk.
+
+Do not execute restore, prune, delete, or cleanup commands without explicit approval.
+
+Approval-required backup example:
+
+```bash
+# Approval required. Placeholder-only example.
+ssh [SSH_USER]@[SERVER_IP] "docker exec [CONTAINER_NAME] /app/scripts/backup.sh"
+```
+
+Approval-required restore concept:
+
+```text
+Restore requires selecting a backup, stopping or isolating affected services if needed,
+copying database/upload data into the runtime volume, fixing ownership/permissions if needed,
+restarting affected services, and verifying application behavior.
+```
+
+Do not convert this concept into a live restore procedure until the user explicitly approves a restore-planning task.
+
+## 8. Deployment Preflight Checklist
+
+Before any deployment, confirm:
+
+- [ ] `git status` reviewed.
+- [ ] Diffs reviewed, including documentation and config changes.
+- [ ] Sensitive files are not staged or included.
+- [ ] Current branch confirmed.
+- [ ] Target site/service confirmed.
+- [ ] Exact Compose file confirmed.
+- [ ] Exact Dockerfile confirmed.
+- [ ] Required env files exist by path, without opening them.
+- [ ] `[SESSION_SECRET]`, `[TRUSTED_IPS]`, `[DATABASE_PATH]`, and `[UPLOADS_PATH]` are expected to be supplied by env/config.
+- [ ] Backup status confirmed without opening backup contents.
+- [ ] Rollback concept agreed.
+- [ ] CI status reviewed, with attention to tolerant failures.
+- [ ] User explicitly approved the deployment command before it is run.
+
+## 9. Safe Command Categories
+
+### Safe Inspection Commands
+
+These are usually safe when scoped to non-sensitive files:
+
+- Read approved documentation.
+- Read package manifests.
+- Read Compose/Docker/nginx config.
+- Read CI config.
+- List file paths.
+- Search for variable names.
+- Inspect `.dockerignore`.
+
+Still avoid `.env*`, `Documents/SECRETS.md`, databases, uploads, backups, keys, certificates, and credential exports.
+
+### Caution Commands
+
+Require judgment and may need approval depending on context:
+
+- `git status`
+- `git diff --stat`
+- targeted `git diff` of non-sensitive files
+- local lint/test commands
+- local process inspection
+- generated-output cleanup planning without deletion
+
+### Approval-Required Commands
+
+Do not run without explicit user approval:
+
+- Docker Compose build/start/stop/restart commands.
+- SSH/SCP/rsync commands.
+- Production deploy commands.
+- Backup commands.
+- Cron setup commands.
+- Analytics cleanup commands.
+- Docker image/cache cleanup commands.
+- Any command that changes runtime state.
+
+Placeholder-only examples:
+
+```bash
+# Approval required.
+ssh [SSH_USER]@[SERVER_IP] "cd [DEPLOY_PATH] && docker compose -f docker-compose.prod.yml ps"
+
+# Approval required.
+docker compose -f docker-compose.local-prod.yml up --build -d
+```
+
+### Never Run Without Explicit Approval
+
+- `git reset`
+- `git add`
+- `git commit`
+- `rm` / deletion commands
+- Docker prune commands
+- Docker volume deletion/manipulation
+- database restore or migration commands
+- backup restore commands
+- production restart commands
+- commands that reveal secret values
+
+## 10. Rollback Concepts
+
+Rollback should be planned before deployment.
+
+Inferred rollback components:
+
+- Revert application code to a known-good Git revision.
+- Rebuild/restart the affected service only after approval.
+- Restore database only if the deployment changed or corrupted runtime data.
+- Restore uploads only if upload data changed or was damaged.
+- Verify service health and core workflows after rollback.
+
+Do not invent an exact rollback procedure from this file alone.
+
+Explicit-approval rollback actions:
+
+- Database restore.
+- Upload restore.
+- Docker volume manipulation.
+- Image rollback.
+- Production service restart.
+- nginx reload/restart.
+- Server cleanup.
+
+## 11. CI/CD Notes
+
+Confirmed from `.github/workflows/ci-cd.yml`:
+
+- CI runs on push and pull request to `main`.
+- CI uses Node 20.
+- CI installs dependencies.
+- CI attempts linting for `@ffg/blog-core`, tolerating a missing lint script.
+- CI installs Chromium for Playwright.
+- CI attempts unit tests for `@ffg/blog-core`, tolerating no unit tests.
+- CI runs Chromium E2E tests against a configured test URL and continues on error.
+- CI runs `npm audit` for `@ffg/blog-core` and continues on error.
+- CI verifies `docker-compose.prod.yml` as YAML.
+- The visible deploy step is a manual-trigger placeholder and does not perform production deployment.
+
+Do not overstate CI guarantees. Passing CI does not equal deployment approval, especially because some test/audit steps tolerate failure.
+
+## 12. Known Deployment Risks and Open Questions
+
+- Which Compose file is canonical for local development, local production-like testing, and production deployment?
+- Do site-level Docker/Compose files remain current, or are root-level Compose files authoritative?
+- Should `UPLOAD_PATH` in `docker-compose.yml` be changed to `UPLOADS_PATH`?
+- Should site examples using `DATABASE_URL` be aligned with `DATABASE_PATH`?
+- Docker uses Node 20, while package engines allow Node `>=18.0.0`; confirm intended runtime baseline.
+- Dependency audit remediation should likely wait until documentation migration is complete unless a high-risk vulnerability is confirmed and approved for action.
+- CI tolerates some test/audit failures; decide whether that is intentional.
+- Trusted-IP/default-origin behavior should be environment-driven and placeholder-documented.
+- Backup and restore need a separate verified restore procedure before use.
+- Exact production deploy path must be confirmed before use.
+- Exact service/container names must be confirmed before use.
+- Confirm whether `.dockerignore` exclusions match current deployment expectations.
+- Confirm whether nginx config in this repo is source of truth or historical/reference config.
+
+## 13. Codex Rules for Future Deployment Work
+
+Codex may:
+
+- Inspect safe config and docs.
+- Inspect approved scripts for purpose and risk.
+- Propose runbook improvements.
+- Propose placeholder-only command templates.
+- Document open questions.
+- Compare Compose/Docker/nginx/CI intent.
+
+Codex may not, without explicit approval:
+
+- Run deployment commands.
+- Run SSH, SCP, rsync, or network commands.
+- Run Docker build/start/stop/restart/prune commands.
+- Run backup restore commands.
+- Run database restore/migration commands.
+- Run cleanup or deletion commands.
+- Run `git add`, `git commit`, or `git reset`.
+- Ask the user to paste secrets into chat.
+- Open `.env*`, `Documents/SECRETS.md`, databases, uploads, backups, keys, certificates, or credential exports.
+
+Codex must:
+
+- Use placeholders.
+- Keep secrets out of docs, chat, diffs, logs, and screenshots.
+- Stop and ask if a task appears to require a real secret.
