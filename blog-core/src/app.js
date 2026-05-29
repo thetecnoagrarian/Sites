@@ -307,54 +307,26 @@ export function createBlogApp(config) {
     // Attach user to request if logged in
     app.use(attachUser);
 
-    // Bot protection middleware
+    // Public crawler policy
+    app.get('/robots.txt', (req, res) => {
+        res.type('text/plain');
+        res.send([
+            'User-agent: *',
+            'Allow: /',
+            ''
+        ].join('\n'));
+    });
+
+    // Request filtering middleware
     app.use((req, res, next) => {
-        // Allow health check endpoint to bypass bot protection (needed for Docker health checks)
+        // Allow health check endpoint to bypass request filtering (needed for Docker health checks)
         if (req.path === '/health') {
             return next();
         }
         
         const userAgent = req.headers['user-agent'] || '';
         const clientIP = req.headers['x-forwarded-for'] || req.ip;
-        
-        // Check if client IP is trusted (trusted IPs bypass bot protection for development)
-        const trustedIPsEnv = process.env.TRUSTED_IPS || '';
-        let isTrustedIP = false;
-        if (trustedIPsEnv) {
-            let checkIP = clientIP;
-            // X-Forwarded-For can be a comma-separated list, take the first one
-            if (checkIP && checkIP.includes(',')) {
-                checkIP = checkIP.split(',')[0].trim();
-            }
-            
-            const trustedIPs = trustedIPsEnv.split(',').map(ip => ip.trim()).filter(ip => ip.length > 0);
-            isTrustedIP = trustedIPs.some(trustedIP => {
-                // Exact match
-                if (checkIP === trustedIP) return true;
-                // Subnet match (e.g., 129.222.*.*)
-                if (trustedIP.includes('*')) {
-                    const pattern = trustedIP
-                        .replace(/\./g, '\\.')  // Escape dots first
-                        .replace(/\*/g, '.*');   // Then convert * to .*
-                    const regex = new RegExp(`^${pattern}$`);
-                    return regex.test(checkIP);
-                }
-                return false;
-            });
-        }
-        
-        // Trusted IPs bypass bot protection (for development)
-        if (isTrustedIP) {
-            return next();
-        }
-        
-        // Block common bot patterns
-        const botPatterns = [
-            /bot/i, /crawler/i, /spider/i, /scraper/i,
-            /curl/i, /wget/i, /python/i, /java/i,
-            /nikto/i, /sqlmap/i, /nmap/i, /masscan/i,
-            /zgrab/i, /gobuster/i, /dirb/i, /dirbuster/i
-        ];
+        const pathLower = req.path.toLowerCase();
         
         // Block requests for sensitive files
         const sensitivePaths = [
@@ -364,17 +336,23 @@ export function createBlogApp(config) {
             '/adminer', '/.git', '/.svn', '/.htaccess',
             '/backup', '/backups', '/.backup'
         ];
-        
-        // Check for bot user agents
-        if (botPatterns.some(pattern => pattern.test(userAgent))) {
-            logger.warn(`Bot detected: ${userAgent} from ${clientIP}`);
-            return res.status(403).json({ error: 'Access denied' });
-        }
-        
+
         // Check for sensitive file requests
-        if (sensitivePaths.some(path => req.path.includes(path))) {
+        if (sensitivePaths.some(path => pathLower.includes(path))) {
             logger.warn(`Sensitive file access attempt: ${req.path} from ${clientIP}`);
             return res.status(404).json({ error: 'Not found' });
+        }
+
+        // Log crawler/tool user agents without blocking public crawlable content.
+        const botPatterns = [
+            /bot/i, /crawler/i, /spider/i, /scraper/i,
+            /curl/i, /wget/i, /python/i, /java/i,
+            /nikto/i, /sqlmap/i, /nmap/i, /masscan/i,
+            /zgrab/i, /gobuster/i, /dirb/i, /dirbuster/i
+        ];
+
+        if (botPatterns.some(pattern => pattern.test(userAgent))) {
+            logger.info(`Crawler/tool user agent allowed: ${userAgent} from ${clientIP} on ${req.path}`);
         }
         
         next();
