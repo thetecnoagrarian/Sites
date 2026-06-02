@@ -3,6 +3,8 @@ import buildOgTags from '../middleware/ogTags.js';
 
 const router = express.Router();
 
+const getCanonicalUrl = (res, pathname) => `${res.locals.siteBaseUrl}${pathname}`;
+
 // Health check endpoint for Docker/Kubernetes
 router.get('/health', (req, res) => {
     res.status(200).json({
@@ -54,7 +56,8 @@ router.get('/', async (req, res) => {
             posts,
             currentPage: page,
             pages: Array.from({ length: totalPages }, (_, i) => i + 1),
-            ogTags
+            ogTags,
+            canonicalUrl: getCanonicalUrl(res, '/')
         });
     } catch (error) {
         console.error('Error loading home page:', error);
@@ -70,7 +73,8 @@ router.get('/about', (req, res) => {
     const ogTags = buildOgTags(null);
     res.render('about', {
         title: 'About',
-        ogTags
+        ogTags,
+        canonicalUrl: getCanonicalUrl(res, '/about')
     });
 });
 
@@ -94,7 +98,8 @@ router.get('/category/:slug', async (req, res) => {
         res.render('category', {
             title: category.name,
             category,
-            posts
+            posts,
+            canonicalUrl: getCanonicalUrl(res, `/category/${category.slug}`)
         });
     } catch (error) {
         console.error('Error loading category:', error);
@@ -116,7 +121,8 @@ router.get('/search', async (req, res) => {
         if (!query) {
             return res.render('search', {
                 title: 'Search',
-                posts: []
+                posts: [],
+                canonicalUrl: getCanonicalUrl(res, '/search')
             });
         }
 
@@ -124,7 +130,8 @@ router.get('/search', async (req, res) => {
         res.render('search', {
             title: 'Search Results',
             query,
-            posts
+            posts,
+            canonicalUrl: getCanonicalUrl(res, '/search')
         });
     } catch (error) {
         console.error('Error searching:', error);
@@ -186,7 +193,8 @@ router.get('/post/:slug', async (req, res) => {
         res.render('posts/show', {
             title: post.title,
             post,
-            ogTags
+            ogTags,
+            canonicalUrl: getCanonicalUrl(res, `/post/${post.slug}`)
         });
     } catch (error) {
         console.error('Error loading post:', error);

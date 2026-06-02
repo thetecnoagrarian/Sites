@@ -17,6 +17,9 @@
 
 
     <title>{{title}} - The Tecnoagrarian</title>
+    {{#if canonicalUrl}}
+    <link rel="canonical" href="{{canonicalUrl}}">
+    {{/if}}
     {{{ogTags}}}
     <!-- Open Graph Meta Tags for Social Sharing -->
     <!-- Removed static OG tags: these are now injected dynamically per page -->

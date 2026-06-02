@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{title}} - Fruition Forest Garden</title>
+    {{#if canonicalUrl}}
+    <link rel="canonical" href="{{canonicalUrl}}">
+    {{/if}}
     {{{ogTags}}}
     <!-- Open Graph Meta Tags for Social Sharing -->
     <!-- Removed static OG tags: these are now injected dynamically per page -->

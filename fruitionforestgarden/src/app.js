@@ -14,7 +14,8 @@ const config = {
     databasePath: process.env.DATABASE_PATH || path.join(__dirname, 'database/blog.db'),
     uploadsPath: process.env.UPLOADS_PATH || path.join(__dirname, 'public/uploads'),
     viewsPath: path.join(__dirname, 'views'),
-    publicPath: path.join(__dirname, 'public')
+    publicPath: path.join(__dirname, 'public'),
+    baseUrl: process.env.BASE_URL || 'https://www.fruitionforestgarden.com'
 };
 
 async function startApp() {
