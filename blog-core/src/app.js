@@ -17,7 +17,43 @@ import { setDatabase } from './models/db.js';
 import { initializeDatabase } from './database/init.js';
 import { attachUser } from './middleware/auth.js';
 import { createUploadMiddleware } from './middleware/upload.js';
+import Post from './models/post.js';
+import Category from './models/category.js';
 import logger from './utils/logger.js';
+
+const normalizeBaseUrl = (baseUrl) => {
+    if (!baseUrl || typeof baseUrl !== 'string') return '';
+    return baseUrl.replace(/\/+$/, '');
+};
+
+const escapeXml = (value) => String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+const buildSitemapXml = (urls) => {
+    const entries = urls.map(({ loc, lastmod }) => {
+        const lastmodNode = lastmod ? `\n    <lastmod>${escapeXml(lastmod)}</lastmod>` : '';
+        return `  <url>\n    <loc>${escapeXml(loc)}</loc>${lastmodNode}\n  </url>`;
+    }).join('\n');
+
+    return [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        entries,
+        '</urlset>',
+        ''
+    ].join('\n');
+};
+
+const formatSitemapDate = (value) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toISOString();
+};
 
 /**
  * Create a blog application with the given configuration
@@ -28,6 +64,7 @@ import logger from './utils/logger.js';
  * @param {string} config.uploadsPath - Path to uploads directory
  * @param {string} config.viewsPath - Path to views directory (optional)
  * @param {string} config.publicPath - Path to public directory (optional)
+ * @param {string} config.baseUrl - Public canonical base URL for the site (optional)
  * @param {Object} config.handlebarsHelpers - Additional Handlebars helpers (optional)
  * @returns {express.Application} - Configured Express app
  */
@@ -39,8 +76,10 @@ export function createBlogApp(config) {
         uploadsPath,
         viewsPath,
         publicPath,
+        baseUrl,
         handlebarsHelpers = {}
     } = config;
+    const canonicalBaseUrl = normalizeBaseUrl(baseUrl);
 
     if (!databasePath) {
         throw new Error('databasePath is required');
@@ -307,14 +346,60 @@ export function createBlogApp(config) {
     // Attach user to request if logged in
     app.use(attachUser);
 
+    app.use((req, res, next) => {
+        res.locals.siteBaseUrl = canonicalBaseUrl;
+        next();
+    });
+
     // Public crawler policy
     app.get('/robots.txt', (req, res) => {
-        res.type('text/plain');
-        res.send([
+        const lines = [
             'User-agent: *',
-            'Allow: /',
-            ''
-        ].join('\n'));
+            'Allow: /'
+        ];
+
+        if (canonicalBaseUrl) {
+            lines.push(`Sitemap: ${canonicalBaseUrl}/sitemap.xml`);
+        }
+
+        res.type('text/plain');
+        res.send([...lines, ''].join('\n'));
+    });
+
+    app.get('/sitemap.xml', (req, res) => {
+        if (!canonicalBaseUrl) {
+            return res.status(404).type('application/xml').send(buildSitemapXml([]));
+        }
+
+        const urls = [
+            { loc: `${canonicalBaseUrl}/` },
+            { loc: `${canonicalBaseUrl}/about` }
+        ];
+
+        try {
+            const categories = Category.findAll() || [];
+            categories
+                .filter(category => category && category.slug)
+                .forEach(category => {
+                    urls.push({ loc: `${canonicalBaseUrl}/category/${encodeURIComponent(category.slug)}` });
+                });
+
+            const posts = Post.findAll(10000, 0) || [];
+            posts
+                .filter(post => post && post.slug)
+                .forEach(post => {
+                    urls.push({
+                        loc: `${canonicalBaseUrl}/post/${encodeURIComponent(post.slug)}`,
+                        lastmod: formatSitemapDate(post.updated_at || post.created_at)
+                    });
+                });
+
+            res.type('application/xml; charset=utf-8');
+            res.send(buildSitemapXml(urls));
+        } catch (error) {
+            logger.error({ err: error }, 'Sitemap generation failed');
+            res.status(500).type('application/xml').send(buildSitemapXml([]));
+        }
     });
 
     // Request filtering middleware
