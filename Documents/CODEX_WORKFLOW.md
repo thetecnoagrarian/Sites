@@ -349,6 +349,10 @@ Commit rules:
 - Review `git diff --stat`.
 - Review targeted diffs.
 - Confirm sensitive files are not included.
+- For deployment-sensitive commits, prefer one-line `git add` commands. A multiline `git add` command with blank lines after backslashes can stage only the first file, producing a partial commit.
+- Before committing, inspect staged changes with `git diff --cached --stat` and `git diff --cached --name-only`.
+- Confirm all expected files are staged before committing and pushing deployment-sensitive work.
+- Remember that production deploys from GitHub. If GitHub receives an incomplete commit, the server correctly deploys that incomplete state.
 
 Never commit:
 
