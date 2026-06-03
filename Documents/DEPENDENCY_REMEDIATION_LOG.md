@@ -162,3 +162,47 @@ Manual checks to prioritize:
 This pass should remain one small commit so rollback is simple if runtime behavior breaks.
 
 Do not combine this dependency remediation with Handlebars/rendering fixes, SSH key cleanup, CSP cleanup, deployment changes, or content changes.
+
+## Local Production-like Docker Verification
+
+Commit tested:
+
+- `2677689 Update Express multer and sanitize-html dependencies`
+
+Docker command style used:
+
+- Attempted `docker-compose` first.
+- Attempted `docker compose` after `docker-compose` was unavailable.
+
+Result:
+
+- Config validation did not run.
+- Fruition Forest Garden did not build.
+- Fruition Forest Garden did not start.
+- Fruition Forest Garden health status was not available.
+- The Tecnoagrarian did not build.
+- The Tecnoagrarian did not start.
+- The Tecnoagrarian health status was not available.
+
+Failure details:
+
+- `docker-compose -f docker-compose.local-prod.yml config` failed because `docker-compose` was not found on PATH.
+- `docker compose -f docker-compose.local-prod.yml config` failed because `docker` was not found on PATH.
+
+Relevant log summary:
+
+- No container logs were available because Docker was not available locally in this shell environment.
+
+Local HTTP check summary:
+
+- Local HTTP checks were not run because no containers were started.
+
+Unexpected file changes:
+
+- No application source, package, Docker, deployment, or runtime files were changed during this verification attempt.
+- This documentation section was added to record the blocked local Docker verification.
+
+Deployment recommendation:
+
+- Production deployment is blocked pending local Docker availability or an alternate approved verification path.
+- Do not deploy based on this verification attempt. Re-run local production-like Docker verification once Docker Compose is available.
