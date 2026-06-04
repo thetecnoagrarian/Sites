@@ -206,3 +206,141 @@ Deployment recommendation:
 
 - Production deployment is blocked pending local Docker availability or an alternate approved verification path.
 - Do not deploy based on this verification attempt. Re-run local production-like Docker verification once Docker Compose is available.
+
+## Local Production-like Docker Verification Retry
+
+Commit tested:
+
+- `01c99fb Document blocked local Docker verification`
+- Dependency remediation commit in history: `2677689 Update Express multer and sanitize-html dependencies`
+
+Docker command style used:
+
+- `/usr/local/bin/docker-compose`
+
+Docker Desktop/CLI availability:
+
+- `/usr/local/bin/docker --version` succeeded.
+- `/usr/local/bin/docker-compose --version` succeeded.
+- `/usr/local/bin/docker ps` initially failed from the sandboxed shell due Docker socket access, then succeeded with approved Docker escalation.
+
+Config validation:
+
+- `/usr/local/bin/docker-compose -f docker-compose.local-prod.yml config` passed.
+- Full config output was intentionally not copied into this document because it can include local environment values.
+
+Fruition Forest Garden:
+
+- Build did not pass.
+- Start was not attempted.
+- Health status was not available.
+
+The Tecnoagrarian:
+
+- Build was not attempted because the Fruition Forest Garden build failed first.
+- Start was not attempted.
+- Health status was not available.
+
+Failure details:
+
+- `/usr/local/bin/docker-compose -f docker-compose.local-prod.yml build fruitionforestgarden` failed while loading metadata for the `node:20-alpine` base image.
+- Docker reported that the configured credential helper `docker-credential-desktop` was not found on PATH in this execution context.
+- The failure happened before the application dependency remediation could be tested in a container.
+
+Relevant log summary:
+
+- No application startup logs were available because no site container was built or started.
+- The failure was a Docker credential-helper / base-image metadata access issue, not an observed Express, Multer, or sanitize-html runtime failure.
+
+Local HTTP check summary:
+
+- Local HTTP checks were not run because no site containers were started.
+
+Unexpected file changes:
+
+- No application source, package, Docker, deployment, or runtime files were changed during this retry.
+- This documentation section was added to record the blocked retry.
+
+Deployment recommendation:
+
+- Production deployment remains blocked pending a successful local production-like Docker build/start verification or another explicitly approved verification path.
+- Do not deploy based on this retry.
+
+## Local Production-like Docker Verification Retry 2
+
+Commit tested:
+
+- `01c99fb Document blocked local Docker verification`
+- Dependency remediation commit in history: `2677689 Update Express multer and sanitize-html dependencies`
+
+PATH adjustment used:
+
+- Docker commands were run with `/usr/local/bin` and Docker Desktop's resource binary directory prepended to `PATH` so `docker-credential-desktop` was visible.
+
+Docker command style used:
+
+- `/usr/local/bin/docker-compose`
+
+Docker Desktop/CLI availability:
+
+- `/usr/local/bin/docker --version` succeeded.
+- `/usr/local/bin/docker-compose --version` succeeded.
+- `docker-credential-desktop` was visible on the adjusted `PATH`.
+- Docker socket access required approved escalation from the Codex sandbox.
+
+Config validation:
+
+- `/usr/local/bin/docker-compose -f docker-compose.local-prod.yml config --quiet` passed.
+- Full config output was intentionally not copied into this document because it can include local environment values.
+
+Fruition Forest Garden:
+
+- Build passed.
+- Start passed.
+- Compose status showed the container running and healthy.
+- Logs showed production-mode startup and successful `/health` checks.
+
+The Tecnoagrarian:
+
+- Build passed.
+- Start passed.
+- Compose status showed the container running and healthy.
+- Logs showed production-mode startup and successful `/health` checks.
+
+Relevant build/log summary:
+
+- Both builds completed from `docker/Dockerfile.prod.site`.
+- The previous `docker-credential-desktop` failure did not recur.
+- `npm ci --omit=dev` completed inside both builds and still reported the known remaining dependency audit findings from the deferred remediation families.
+- npm emitted allow-scripts warnings for native/runtime packages already known to be Docker-sensitive, and the Sharp rebuild step completed successfully.
+- No application startup errors were visible in the inspected container logs.
+- No secret or full environment/config output was copied into this log.
+
+Local HTTP check summary:
+
+- Initial sandboxed `curl` checks could not connect to the published localhost ports.
+- The same localhost checks succeeded with approved unsandboxed execution.
+- Fruition Forest Garden returned `200 OK` for:
+  - `http://localhost:4000/`
+  - `http://localhost:4000/robots.txt`
+  - `http://localhost:4000/sitemap.xml`
+- The Tecnoagrarian returned `200 OK` for:
+  - `http://localhost:4002/`
+  - `http://localhost:4002/robots.txt`
+  - `http://localhost:4002/sitemap.xml`
+
+Unexpected file changes:
+
+- No application source, package, Docker, deployment, or runtime files were intentionally changed during this retry.
+- This documentation section was added to record the successful local production-like verification.
+
+Deployment recommendation:
+
+- The dependency remediation commit passed local production-like Docker build/start/health verification for both sites.
+- Production deployment is no longer blocked by local Docker verification.
+- Production deployment still requires the normal deployment operator checklist, explicit user approval, and no automatic deployment should occur from this verification alone.
+
+Container state:
+
+- `ffg-blog-local-prod` was left running and healthy.
+- `tta-blog-local-prod` was left running and healthy.
