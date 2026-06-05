@@ -191,7 +191,7 @@ router.get('/posts/new', isAdmin, async (req, res) => {
         const { Category } = await import('@ffg/blog-core');
         const categories = Category.findAll();
         const csrfToken = req.csrfToken();
-        console.log('New post route - CSRF token:', csrfToken);
+        console.log('New post route loaded', { hasCsrfToken: !!csrfToken });
         res.render('admin/new-post', {
             title: 'New Post',
             categories,
@@ -250,7 +250,10 @@ router.post('/posts/confirm-overwrite', isAdmin, async (req, res) => {
             // Set overwrite flag and create the post
             pendingPostData.overwriteExisting = true;
             const { Post } = await import('@ffg/blog-core');
-            console.log('Overwrite confirmed, calling Post.create with:', pendingPostData);
+            console.log('Overwrite confirmed for pending post', {
+                hasPendingPostData: !!pendingPostData,
+                hasExistingPostId: !!req.session.existingPostId
+            });
             const result = Post.create(pendingPostData);
             console.log('Post.create result:', result);
             
@@ -300,10 +303,12 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
       next();
     });
 }, async (req, res) => {
-    console.log('POST /dashboard/posts/create - Starting post creation...');
-    console.log('req.body:', req.body);
-    console.log('req.files:', req.files);
-    console.log('req.body._csrf:', req.body._csrf);
+    console.log('POST /dashboard/posts/create - Starting post creation', {
+        hasTitle: !!req.body.title,
+        hasBody: !!req.body.body,
+        fileCount: req.files?.length || 0,
+        hasCsrfToken: !!req.body._csrf
+    });
     
     try {
         // Validate required fields
@@ -324,7 +329,7 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
         } else if (req.body.captions) {
             formCaptions = Array.isArray(req.body.captions) ? req.body.captions : [req.body.captions];
         }
-        console.log('Form captions received:', formCaptions);
+        console.log('Form captions received', { captionCount: formCaptions.length });
         
         // Process images first, and only continue if all images process successfully
         let imageProcessingFailed = false;
@@ -338,7 +343,11 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
                     // Get caption for this image (use index to match image with caption)
                     const caption = formCaptions[i] || '';
                     captions.push(caption);
-                    console.log(`Processed image ${i}:`, processedImage, 'with caption:', caption);
+                    console.log('Processed uploaded image', {
+                        index: i,
+                        variantCount: Object.keys(processedImage || {}).length,
+                        hasCaption: !!caption
+                    });
                 } catch (imageError) {
                     console.error('Error processing image:', imageError);
                     
@@ -368,8 +377,10 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
             return res.redirect('/admin/posts/new');
         }
 
-        console.log('Final images array:', images);
-        console.log('Final captions array:', captions);
+        console.log('Post media prepared', {
+            imageCount: images.length,
+            captionCount: captions.length
+        });
 
         // Create post data object
         console.log('Raw created_at from form:', req.body.created_at);
@@ -398,7 +409,14 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
             overwriteExisting: req.body.overwriteExisting === 'true'
         };
 
-        console.log('Post data to create:', postData);
+        console.log('Post data prepared for create', {
+            hasTitle: !!postData.title,
+            hasBody: !!postData.body,
+            imageCount: images.length,
+            captionCount: captions.length,
+            hasAuthor: !!postData.author_id,
+            overwriteExisting: postData.overwriteExisting
+        });
 
         // Create the post
         const { Post } = await import('@ffg/blog-core');
@@ -427,7 +445,7 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
             
             // Handle categories if any
             if (req.body.categories && Array.isArray(req.body.categories)) {
-                console.log('Adding categories to post:', req.body.categories);
+                console.log('Adding categories to post', { categoryCount: req.body.categories.length });
                 for (const categoryId of req.body.categories) {
                     try {
                         Post.addCategory(result.lastInsertRowid, categoryId);
@@ -469,8 +487,10 @@ router.get('/posts/:id/edit', isAdmin, async (req, res) => {
         for (const category of categories) {
             category.selected = postCategories.some(pc => String(pc.id) === String(category.id));
         }
-        console.log('Edit post route - Global CSRF token:', res.locals.csrfToken);
-        console.log('Edit post route - Session ID:', req.sessionID);
+        console.log('Edit post route loaded', {
+            hasPost: !!post,
+            hasCsrfToken: !!res.locals.csrfToken
+        });
         res.render('admin/new-post', {
             title: 'Edit Post',
             post,
@@ -504,9 +524,11 @@ router.post('/dashboard/posts/:id/update', isAdmin, (req, res, next) => {
 
 async function updatePostHandler(req, res) {
     try {
-        console.log('Update route - CSRF token from form:', req.body._csrf);
-        console.log('Update route - Session ID:', req.sessionID);
-        console.log('Update route - Global CSRF token:', res.locals.csrfToken);
+        console.log('Update route started', {
+            hasCsrfToken: !!req.body._csrf,
+            hasGlobalCsrfToken: !!res.locals.csrfToken,
+            fileCount: req.files?.length || 0
+        });
         const { Post } = await import('@ffg/blog-core');
         const post = Post.findById(req.params.id);
         if (!post) {
@@ -546,10 +568,12 @@ async function updatePostHandler(req, res) {
             captions = Array.isArray(req.body.captions) ? req.body.captions : [req.body.captions];
         }
         
-        console.log('Update route - Raw captions from form:', req.body['captions[]']);
-        console.log('Update route - Processed captions array:', captions);
-        console.log('Update route - Post images:', post.images);
-        console.log('Update route - Post captions:', post.captions);
+        console.log('Update route media summary', {
+            rawCaptionCount: Array.isArray(req.body['captions[]']) ? req.body['captions[]'].length : (req.body['captions[]'] ? 1 : 0),
+            captionCount: captions.length,
+            existingImageCount: Array.isArray(post.images) ? post.images.length : 0,
+            existingCaptionCount: Array.isArray(post.captions) ? post.captions.length : 0
+        });
         
         // If no new images were uploaded, use existing images with updated captions
         if (!req.files || req.files.length === 0) {
@@ -580,15 +604,12 @@ async function updatePostHandler(req, res) {
             console.log('Update route - Processed created_at:', created_at);
         }
         
-        console.log('Update route - About to call Post.update with:', {
-            id: req.params.id,
-            title: req.body.title,
-            body: req.body.body,
-            description: req.body.description || '',
-            excerpt: req.body.excerpt || '',
-            images: imageUrls,
-            captions: captions,
-            created_at: created_at
+        console.log('Update route - About to call Post.update', {
+            hasTitle: !!req.body.title,
+            hasBody: !!req.body.body,
+            imageCount: imageUrls.length,
+            captionCount: captions.length,
+            hasCreatedAt: !!created_at
         });
         
         await Post.update(req.params.id, {

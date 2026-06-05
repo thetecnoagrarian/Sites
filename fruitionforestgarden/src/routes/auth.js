@@ -19,7 +19,7 @@ router.post('/login', async (req, res) => {
     try {
         const { User } = await import('@ffg/blog-core');
         const user = User.findByUsername(username);
-        console.log('User object from database:', user); // Debugging line
+        console.log('Login user lookup complete', { userFound: !!user });
         if (!user) {
             req.flash('error', 'Invalid username or password');
             return res.redirect('/login');

@@ -188,7 +188,7 @@ router.get('/posts/new', isAdmin, async (req, res) => {
     try {
         const categories = Category.findAll();
         const csrfToken = req.csrfToken();
-        console.log('New post route - CSRF token:', csrfToken);
+        console.log('New post route loaded', { hasCsrfToken: !!csrfToken });
         res.render('admin/new-post', {
             title: 'New Post',
             categories,
@@ -221,10 +221,12 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
       next();
     });
 }, async (req, res) => {
-    console.log('POST /dashboard/posts/create - Starting post creation...');
-    console.log('req.body:', req.body);
-    console.log('req.files:', req.files);
-    console.log('req.body._csrf:', req.body._csrf);
+    console.log('POST /dashboard/posts/create - Starting post creation', {
+        hasTitle: !!req.body.title,
+        hasBody: !!req.body.body,
+        fileCount: req.files?.length || 0,
+        hasCsrfToken: !!req.body._csrf
+    });
     
     try {
         // Validate required fields
@@ -245,7 +247,7 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
         } else if (req.body.captions) {
             formCaptions = Array.isArray(req.body.captions) ? req.body.captions : [req.body.captions];
         }
-        console.log('Form captions received:', formCaptions);
+        console.log('Form captions received', { captionCount: formCaptions.length });
         
         if (req.files && req.files.length > 0) {
             console.log('Processing uploaded files...');
@@ -257,7 +259,11 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
                     // Get caption for this image (use index to match image with caption)
                     const caption = formCaptions[i] || '';
                     captions.push(caption);
-                    console.log(`Processed image ${i}:`, processedImage, 'with caption:', caption);
+                    console.log('Processed uploaded image', {
+                        index: i,
+                        variantCount: Object.keys(processedImage || {}).length,
+                        hasCaption: !!caption
+                    });
                 } catch (imageError) {
                     console.error('Error processing image:', imageError);
                     req.flash('error', `Error processing image: ${imageError.message}`);
@@ -266,8 +272,10 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
             }
         }
 
-        console.log('Final images array:', images);
-        console.log('Final captions array:', captions);
+        console.log('Post media prepared', {
+            imageCount: images.length,
+            captionCount: captions.length
+        });
 
         // Create post data object
         console.log('Raw created_at from form:', req.body.created_at);
@@ -295,7 +303,13 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
             author_id: req.user.id
         };
 
-        console.log('Post data to create:', postData);
+        console.log('Post data prepared for create', {
+            hasTitle: !!postData.title,
+            hasBody: !!postData.body,
+            imageCount: images.length,
+            captionCount: captions.length,
+            hasAuthor: !!postData.author_id
+        });
 
         // Create the post
         const result = Post.create(postData);
@@ -306,7 +320,7 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
             
             // Handle categories if any
             if (req.body.categories && Array.isArray(req.body.categories)) {
-                console.log('Adding categories to post:', req.body.categories);
+                console.log('Adding categories to post', { categoryCount: req.body.categories.length });
                 for (const categoryId of req.body.categories) {
                     try {
                         Post.addCategory(result.lastInsertRowid, categoryId);
@@ -349,7 +363,10 @@ router.get('/posts/:id/edit', isAdmin, async (req, res) => {
             category.selected = postCategories.some(pc => String(pc.id) === String(category.id));
         }
         const csrfToken = req.csrfToken();
-        console.log('Edit post route - CSRF token:', csrfToken);
+        console.log('Edit post route loaded', {
+            hasPost: !!post,
+            hasCsrfToken: !!csrfToken
+        });
         res.render('admin/new-post', {
             title: 'Edit Post',
             post,
@@ -421,10 +438,12 @@ async function updatePostHandler(req, res) {
             captions = Array.isArray(req.body.captions) ? req.body.captions : [req.body.captions];
         }
         
-        console.log('Update route - Raw captions from form:', req.body['captions[]']);
-        console.log('Update route - Processed captions array:', captions);
-        console.log('Update route - Post images:', post.images);
-        console.log('Update route - Post captions:', post.captions);
+        console.log('Update route media summary', {
+            rawCaptionCount: Array.isArray(req.body['captions[]']) ? req.body['captions[]'].length : (req.body['captions[]'] ? 1 : 0),
+            captionCount: captions.length,
+            existingImageCount: Array.isArray(post.images) ? post.images.length : 0,
+            existingCaptionCount: Array.isArray(post.captions) ? post.captions.length : 0
+        });
         
         // If no new images were uploaded, use existing images with updated captions
         if (!req.files || req.files.length === 0) {

@@ -2,7 +2,11 @@ const User = require('../models/user');
 
 // Middleware to check if user is authenticated
 const isAuthenticated = (req, res, next) => {
-    console.log('isAuthenticated middleware:', req.session);
+    console.log('isAuthenticated middleware', {
+        method: req.method,
+        path: req.originalUrl || req.url,
+        hasUserId: !!req.session?.userId
+    });
     if (!req.session.userId) {
         req.flash('error', 'Please log in first');
         return res.redirect('/login');
@@ -37,8 +41,11 @@ const attachUser = async (req, res, next) => {
 
 // Middleware to check if user is authenticated and is an admin
 const isAdmin = (req, res, next) => {
-    console.log('isAdmin middleware called');
-    console.log('Session:', req.session);
+    console.log('isAdmin middleware called', {
+        method: req.method,
+        path: req.originalUrl || req.url,
+        hasUserId: !!req.session?.userId
+    });
     if (!req.session.userId) {
         console.log('isAdmin: No userId in session');
         req.flash('error', 'Please log in first');
@@ -46,7 +53,10 @@ const isAdmin = (req, res, next) => {
     }
     try {
         const user = User.findById(req.session.userId);
-        console.log('isAdmin: User found:', user);
+        console.log('isAdmin: User lookup complete', {
+            userFound: !!user,
+            hasRole: !!user?.role
+        });
         if (!user || user.role !== 'admin') {
             console.log('isAdmin: User not admin or not found');
             req.flash('error', 'Unauthorized access');

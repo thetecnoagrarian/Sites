@@ -5,10 +5,12 @@ import sanitizeHtml from 'sanitize-html';
 
 export const createPost = async (req, res) => {
   try {
-    console.log('Controller: createPost called');
-    console.log('Request body:', req.body);
-    console.log('Request files:', req.files);
-    console.log('Session:', req.session);
+    console.log('Controller: createPost called', {
+      hasTitle: !!req.body.title,
+      hasBody: !!req.body.body,
+      fileCount: req.files?.length || 0,
+      hasUserId: !!req.session?.userId
+    });
     
     // Validate required fields
     if (!req.body.title || !req.body.body) {
@@ -28,7 +30,7 @@ export const createPost = async (req, res) => {
           console.error('Error processing image:', imgErr);
         }
       }
-      console.log('Processed images array:', imagesArray);
+      console.log('Processed images', { imageCount: imagesArray.length });
     }
 
     // Create the post
@@ -63,7 +65,7 @@ export const createPost = async (req, res) => {
     let post;
     try {
       post = Post.findById(result.lastInsertRowid);
-    console.log('Created post:', post);
+      console.log('Created post lookup complete', { postFound: !!post });
     } catch (findErr) {
       console.error('Error during Post.findById:', findErr);
       req.flash('error', 'Post created but could not be retrieved (findById error)');
@@ -85,8 +87,7 @@ export const createPost = async (req, res) => {
       for (const categoryId of categoryIds) {
         Post.addCategory(post.id, categoryId);
       }
-      console.log('Assigned categories to post:', post.id, categoryIds);
-      console.log('Categories now linked:', Post.getCategories(post.id));
+      console.log('Assigned categories to post', { categoryCount: categoryIds.length });
     }
 
     res.redirect(`/admin/posts/${post.id}/edit`);
@@ -100,8 +101,11 @@ export const createPost = async (req, res) => {
 
 export const updatePost = async (req, res) => {
   try {
-    console.log('updatePost body:', req.body);
-    console.log('updatePost file:', req.file);
+    console.log('updatePost called', {
+      hasTitle: !!req.body.title,
+      hasBody: !!req.body.body,
+      fileCount: req.files?.length || (req.file ? 1 : 0)
+    });
     const post = await Post.findById(req.params.id);
     
     if (!post) {
@@ -174,8 +178,7 @@ export const updatePost = async (req, res) => {
       for (const categoryId of categoryIds) {
         Post.addCategory(post.id, categoryId);
       }
-      console.log('Updated categories for post:', post.id, categoryIds);
-      console.log('Categories now linked:', Post.getCategories(post.id));
+      console.log('Updated categories for post', { categoryCount: categoryIds.length });
     }
 
     req.flash('success', 'Post updated successfully');

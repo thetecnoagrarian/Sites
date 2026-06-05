@@ -20,8 +20,11 @@ router.use((req, res, next) => {
 
 // Middleware to check if user is authenticated and is an admin
 const isAdmin = (req, res, next) => {
-    console.log('isAdmin middleware called');
-    console.log('Session:', req.session);
+    console.log('isAdmin middleware called', {
+        method: req.method,
+        path: req.originalUrl || req.url,
+        hasUserId: !!req.session?.userId
+    });
     if (!req.session.userId) {
         console.log('isAdmin: No userId in session');
         req.flash('error', 'Please log in first');
@@ -29,7 +32,10 @@ const isAdmin = (req, res, next) => {
     }
     try {
         const user = User.findById(req.session.userId);
-        console.log('isAdmin: User found:', user);
+        console.log('isAdmin: User lookup complete', {
+            userFound: !!user,
+            hasRole: !!user?.role
+        });
         if (!user || user.role !== 'admin') {
             console.log('isAdmin: User not admin or not found');
             req.flash('error', 'Unauthorized access');
@@ -220,8 +226,12 @@ router.post('/dashboard/posts/create', isAdmin, (req, res, next) => {
       next();
     });
 }, csurf(), async (req, res) => {
-    console.log('POST /dashboard/posts/create req.body:', req.body);
-    console.log('POST /dashboard/posts/create req.body._csrf:', req.body._csrf);
+    console.log('POST /dashboard/posts/create', {
+        hasTitle: !!req.body.title,
+        hasBody: !!req.body.body,
+        fileCount: req.files?.length || 0,
+        hasCsrfToken: !!req.body._csrf
+    });
     try {
         // Use the logic from postController.createPost, but redirect to /admin/dashboard on success
         const { title, body, description, excerpt, categories, created_at } = req.body;

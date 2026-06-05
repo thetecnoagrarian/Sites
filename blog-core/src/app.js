@@ -236,9 +236,7 @@ export function createBlogApp(config) {
             if (!csrfProtection.verify(sessionSecret, token)) {
                 console.error('CSRF token verification failed', { 
                     hasToken: !!token, 
-                    hasSecret: !!sessionSecret,
-                    tokenLength: token?.length,
-                    secretLength: sessionSecret?.length
+                    hasSecret: !!sessionSecret
                 });
                 return res.status(403).json({ error: 'Invalid CSRF token' });
             }

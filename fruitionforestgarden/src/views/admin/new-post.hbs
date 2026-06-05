@@ -4,12 +4,8 @@
         <h1>{{#if post}}Edit Post{{else}}New Post{{/if}}</h1>
     </div>
 
-    <form action="{{#if post}}/admin/dashboard/posts/{{post.id}}/update{{else}}/admin/dashboard/posts/create{{/if}}" method="POST" enctype="multipart/form-data" class="post-form" onsubmit="console.log('Form submitted!', this); return true;">
+    <form action="{{#if post}}/admin/dashboard/posts/{{post.id}}/update{{else}}/admin/dashboard/posts/create{{/if}}" method="POST" enctype="multipart/form-data" class="post-form">
         <input type="hidden" name="_csrf" value="{{csrfToken}}">
-        <script>
-            console.log('CSRF Token in form:', '{{csrfToken}}');
-            console.log('Form action:', '{{#if post}}/admin/dashboard/posts/{{post.id}}/update{{else}}/admin/dashboard/posts/create{{/if}}');
-        </script>
         {{#if error}}
         <div class="alert alert-danger">{{error}}</div>
         {{/if}}
