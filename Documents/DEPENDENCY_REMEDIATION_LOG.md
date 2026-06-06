@@ -344,3 +344,54 @@ Container state:
 
 - `ffg-blog-local-prod` was left running and healthy.
 - `tta-blog-local-prod` was left running and healthy.
+
+## Post-Migration Production Verification
+
+Date/context:
+
+- Verification performed after the dependency remediation and a Linode emergency host migration/restart.
+- This section records user-provided production verification results only; no production commands were run by Codex for this update.
+
+Public endpoint results:
+
+- `https://www.fruitionforestgarden.com/` returned `200 OK`.
+- `https://www.fruitionforestgarden.com/robots.txt` returned `200 OK`.
+- `https://www.fruitionforestgarden.com/sitemap.xml` returned `200 OK`.
+- `https://www.thetecnoagrarian.com/` returned `200 OK`.
+- `https://www.thetecnoagrarian.com/robots.txt` returned `200 OK`.
+- `https://www.thetecnoagrarian.com/sitemap.xml` returned `200 OK`.
+
+Container/Docker reboot-survival result:
+
+- Linode uptime showed the server had rebooted after migration.
+- Production Compose status showed both `ffg-blog-prod` and `tta-blog-prod` up and healthy.
+- Docker service enablement and active-state checks showed Docker enabled and active.
+- Docker container status showed both production site containers running and healthy.
+- This confirms Docker and the production containers survived the Linode host restart/migration cycle.
+
+DNS caveat:
+
+- During verification, local router/Starlink DNS caused a false site-outage signal.
+- Public DNS and cellular resolution worked correctly.
+- Setting the Mac to public DNS resolvers restored normal local verification.
+- Treat this as a local/router DNS verification caveat, not an application failure.
+
+Bot/scanner log note:
+
+- Container logs showed normal production startup and page views.
+- Bot/scanner traffic was visible, including random paths and admin/plugin probes.
+- This traffic should be treated as normal internet background noise unless it escalates into sustained abuse or application errors.
+
+Session logging cleanup follow-up:
+
+- Logs also showed session-object logging that included per-session CSRF secret material.
+- No session values or secret material are copied into this document.
+- Follow-up security cleanup was completed separately in commit `748fc7f` (`Redact sensitive auth and session logging`).
+- This log records that the cleanup was committed and pushed; it does not claim the logging-redaction cleanup has been deployed to production.
+
+Conclusion:
+
+- Production is currently healthy after the Linode migration/restart.
+- Public crawlability endpoints for both sites are returning `200 OK`.
+- Docker and production containers survived the host migration/restart.
+- Session logging cleanup has been handled in a separate code commit, with production deployment status tracked separately from this dependency-remediation log.
