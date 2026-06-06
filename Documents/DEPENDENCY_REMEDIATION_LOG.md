@@ -395,3 +395,70 @@ Conclusion:
 - Public crawlability endpoints for both sites are returning `200 OK`.
 - Docker and production containers survived the host migration/restart.
 - Session logging cleanup has been handled in a separate code commit, with production deployment status tracked separately from this dependency-remediation log.
+
+## Logging-Redaction Production Deployment
+
+Date/context:
+
+- This section records user-provided production deployment and verification results for the logging-redaction cleanup.
+- The logging-redaction cleanup was committed as `748fc7f` (`Redact sensitive auth and session logging`).
+- Later documentation commits were also present on `origin/main`: `c8e1fc2` (`Document copyable Codex prompt handoff rule`) and `82d7a73` (`Document post-migration production verification`).
+- Production deployment was run from the server checkout at `/opt/Sites`.
+- No session IDs, cookies, CSRF values, secret values, scanner source IPs, or private credential material are copied into this document.
+
+Fruition Forest Garden deployment result:
+
+- The server `git pull` fast-forwarded from `9461272` to `82d7a73`.
+- The Fruition Forest Garden production image was rebuilt.
+- `ffg-blog-prod` was recreated and started.
+- Immediate public checks briefly returned `502 Bad Gateway` while the recreated container was still starting behind nginx.
+- Later Compose status showed `ffg-blog-prod` up and healthy.
+- Later public checks returned `200 OK`.
+- The brief `502 Bad Gateway` result is treated as a transient container-startup window during recreation, not a persistent deployment failure.
+
+The Tecnoagrarian deployment result:
+
+- The first deployment attempt was interrupted when the SSH connection closed before The Tecnoagrarian deployed.
+- A later The Tecnoagrarian-only deployment succeeded.
+- The Tecnoagrarian production image was rebuilt.
+- `tta-blog-prod` was recreated and started.
+- Public checks returned `200 OK` for:
+  - `https://www.thetecnoagrarian.com/`
+  - `https://www.thetecnoagrarian.com/robots.txt`
+  - `https://www.thetecnoagrarian.com/sitemap.xml`
+
+Final public endpoint verification:
+
+- Fruition Forest Garden returned `200 OK` for:
+  - `https://www.fruitionforestgarden.com/`
+  - `https://www.fruitionforestgarden.com/robots.txt`
+  - `https://www.fruitionforestgarden.com/sitemap.xml`
+- The Tecnoagrarian returned `200 OK` for:
+  - `https://www.thetecnoagrarian.com/`
+  - `https://www.thetecnoagrarian.com/robots.txt`
+  - `https://www.thetecnoagrarian.com/sitemap.xml`
+
+Container health verification:
+
+- Final Compose status showed `ffg-blog-prod` up and healthy.
+- Final Compose status showed `tta-blog-prod` up and healthy.
+
+Log verification:
+
+- Fresh logs showed normal production startup for both services.
+- Fresh logs did not show the old full session-object logging pattern.
+- Fresh logs did not show per-session CSRF secret dumps.
+
+Bot/scanner noise note:
+
+- Bot/scanner traffic continued to appear after deployment.
+- Probes included Outlook-related paths, `.env`, `.git`, and cloud credential JSON-style paths.
+- This is expected hostile internet background noise and is not evidence that the logging-redaction deployment failed.
+- Continue treating scanner traffic as security-relevant noise to monitor, without copying source IPs or sensitive request details into documentation.
+
+Conclusion:
+
+- The logging-redaction cleanup from commit `748fc7f` is now deployed to both production sites.
+- Both production containers are running and healthy after recreation.
+- Public homepage, `robots.txt`, and `sitemap.xml` checks returned `200 OK` for both sites after the deployment completed.
+- Fresh production logs confirm that the unsafe session-object and per-session CSRF secret logging pattern is no longer present in the inspected startup/request window.
