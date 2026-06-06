@@ -163,6 +163,16 @@ Strong Codex prompts should include:
 - Define stop conditions.
 - Define post-task summary requirements.
 
+### Copyable Handoff Format
+
+When ChatGPT writes a prompt for the human to paste into Codex, the prompt should be delivered as one complete copyable text block.
+
+Do not split one Codex prompt across multiple code boxes or prose sections. Any commands, constraints, allowed files, forbidden files, output requirements, final reporting requirements, audit requirements, and stop conditions that Codex needs must be inside the same copyable prompt block.
+
+Explanatory notes for the human may appear before or after the prompt, but they must not contain required instructions that Codex needs to execute the task. If the prompt contains shell commands, keep them inside the same prompt block rather than creating separate command boxes that could be mistaken for user-run commands.
+
+The human should be able to copy the block once and paste it into Codex without losing context.
+
 ### Reusable Prompt Skeleton
 
 ```text
