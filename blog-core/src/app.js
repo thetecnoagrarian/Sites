@@ -350,6 +350,10 @@ export function createBlogApp(config) {
     });
 
     // Public crawler policy
+    app.get('/index.html', (req, res) => {
+        res.redirect(301, '/');
+    });
+
     app.get('/robots.txt', (req, res) => {
         const lines = [
             'User-agent: *',
