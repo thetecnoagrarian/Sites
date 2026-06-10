@@ -462,3 +462,66 @@ Conclusion:
 - Both production containers are running and healthy after recreation.
 - Public homepage, `robots.txt`, and `sitemap.xml` checks returned `200 OK` for both sites after the deployment completed.
 - Fresh production logs confirm that the unsafe session-object and per-session CSRF secret logging pattern is no longer present in the inspected startup/request window.
+
+## CSP Form-Action Production Deployment
+
+Date/context:
+
+- This section records user-provided production deployment and verification results for the CSP `form-action` cleanup.
+- The CSP cleanup was committed as `cf3429a` (`Remove raw IP form-action CSP origins`).
+- The cleanup removed hardcoded raw server IP/port and cross-site origins from the shared Helmet `form-action` directive.
+- Production CSP now relies on same-origin form submission only: `form-action 'self'`.
+- No session IDs, cookies, CSRF values, scanner source IPs, private key paths, internal secrets, or credential material are copied into this document.
+
+Local verification summary:
+
+- Local production-like Docker verification passed before the commit.
+- Both local production-like containers built, started, and reported healthy.
+- Local Fruition Forest Garden and The Tecnoagrarian homepage, `robots.txt`, and `sitemap.xml` endpoints returned `200 OK`.
+- Local CSP headers showed `form-action 'self'`.
+- Raw IP/port `form-action` origins were gone locally.
+- Interactive admin form testing was not part of this verification; verification covered HTTP status, response headers, container health, and startup logs.
+
+Fruition Forest Garden production deployment result:
+
+- The cleanup commit was pushed to GitHub.
+- The production server checkout at `/opt/Sites` pulled the update.
+- Fruition Forest Garden was rebuilt and recreated first.
+- Fruition Forest Garden public checks returned `200 OK` for:
+  - `https://www.fruitionforestgarden.com/`
+  - `https://www.fruitionforestgarden.com/robots.txt`
+  - `https://www.fruitionforestgarden.com/sitemap.xml`
+- The Fruition Forest Garden CSP header showed `form-action 'self'`.
+- The Fruition Forest Garden CSP header no longer included raw IP/port `form-action` origins.
+
+The Tecnoagrarian production deployment result:
+
+- The first The Tecnoagrarian deployment attempt was interrupted by SSH connection closure before completion.
+- A later The Tecnoagrarian-only deployment succeeded.
+- The Tecnoagrarian production image was rebuilt.
+- `tta-blog-prod` was recreated and started.
+- The Tecnoagrarian public checks returned `200 OK` for:
+  - `https://www.thetecnoagrarian.com/`
+  - `https://www.thetecnoagrarian.com/robots.txt`
+  - `https://www.thetecnoagrarian.com/sitemap.xml`
+- The Tecnoagrarian CSP header showed `form-action 'self'`.
+- The Tecnoagrarian CSP header no longer included raw IP/port or cross-site `form-action` origins.
+
+Final container verification:
+
+- `ffg-blog-prod` was up and healthy.
+- `tta-blog-prod` was up and healthy.
+- Fresh logs showed normal production startup.
+
+Bot/scanner noise note:
+
+- Bot/scanner traffic continued to appear after deployment.
+- This is expected hostile internet background noise and is not evidence that the CSP cleanup failed.
+- Continue avoiding scanner source IPs, cookie values, CSRF values, and other sensitive request details in documentation.
+
+Conclusion:
+
+- The CSP `form-action 'self'` cleanup from commit `cf3429a` is now deployed to both production sites.
+- Both public sites returned `200 OK` for homepage, `robots.txt`, and `sitemap.xml` after deployment.
+- Both production containers were healthy after deployment.
+- Production CSP headers now rely on same-origin form submission and no longer expose the old raw IP/port `form-action` origins.
