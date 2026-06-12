@@ -1,217 +1,223 @@
-# GitHub Authentication Setup (thetecnoagrarian Account)
+# GitHub Authentication Setup
 
-**Purpose**: Fix authentication when using the **thetecnoagrarian** GitHub account—especially for a **new repo** or a second project. Use this for this project and share with the other project.
+This document is a public-safe guide for GitHub authentication patterns. It uses placeholders only and must not contain live secrets, private key paths, private usernames, personal machine paths, private server details, or account-specific credential history.
 
----
+## 1. Purpose
 
-## Do this now (new repo not working)
+Use this guide when setting up or troubleshooting Git access for this repository or a future repository.
 
-1. **Get your public key** (run on your Mac):
+It explains the safe concepts behind:
+
+- GitHub SSH authentication
+- GitHub HTTPS authentication with a personal access token
+- local credential helpers
+- deploy keys
+- SSH agent forwarding at a conceptual level
+
+Real credentials belong in a password manager, keychain, or private ignored notes. They do not belong in tracked repository documentation.
+
+## 2. Safety Rules
+
+Never commit:
+
+- real personal access tokens
+- passwords or passphrases
+- private keys or private key contents
+- recovery codes or backup codes
+- real machine-specific paths
+- private server names, users, IPs, or access details
+- command history that exposes credential material
+- password manager item names that reveal private structure
+
+Use placeholders in tracked documentation:
+
+- `<GITHUB_USERNAME>`
+- `<REPO_OWNER>`
+- `<REPO_NAME>`
+- `<SSH_KEY_PATH>`
+- `<GITHUB_PAT>`
+- `<KEYCHAIN_OR_PASSWORD_MANAGER>`
+- `<DEPLOY_USER>`
+- `<SERVER_HOST>`
+
+Generic examples such as `~/.ssh/id_ed25519` are acceptable when they are clearly examples and not project-specific paths.
+
+## 3. Recommended Public-Safe Authentication Options
+
+Prefer SSH for day-to-day Git operations when the user controls a local key and GitHub has the matching public key.
+
+Use HTTPS with a personal access token only when SSH is not appropriate or when a tool requires HTTPS.
+
+Use deploy keys for machine or server access to a specific repository. Deploy keys should be scoped narrowly and documented with placeholders in tracked docs.
+
+Use private ignored notes for exact operator details such as key names, host aliases, private server access, or password manager item references.
+
+## 4. SSH Authentication Placeholder Workflow
+
+1. Confirm the repository remote uses SSH:
+
    ```bash
-   cat ~/.ssh/id_ed25519_tta.pub
+   git remote -v
    ```
-   Copy the whole line.
 
-2. **Add it to GitHub** (pick one):
-   - **Account (recommended)**  
-     GitHub → Profile → **Settings** → **SSH and GPG keys** → **New SSH key** → paste key, save.  
-     Then it works for **all** thetecnoagrarian repos, including new ones.
-   - **This repo only**  
-     Open the **new repo** → **Settings** → **Deploy keys** → **Add deploy key** → paste key, check **Allow write access** if you push, save.
+   Expected shape:
 
-3. **Use SSH remote** (in the new repo folder):
+   ```text
+   origin  git@github.com:<REPO_OWNER>/<REPO_NAME>.git (fetch)
+   origin  git@github.com:<REPO_OWNER>/<REPO_NAME>.git (push)
+   ```
+
+2. If the remote uses HTTPS and SSH is intended, update it with placeholders:
+
    ```bash
-   git remote set-url origin git@github.com:thetecnoagrarian/YOUR_NEW_REPO_NAME.git
+   git remote set-url origin git@github.com:<REPO_OWNER>/<REPO_NAME>.git
    ```
-   Replace `YOUR_NEW_REPO_NAME` with the actual repo name.
 
-4. **Test**:
+3. Add the public key to GitHub:
+
+   - Account-level key: useful when one local identity should access multiple repositories.
+   - Repository deploy key: useful when a key should access only one repository.
+
+   Do not paste public or private key material into tracked docs.
+
+4. Optional local SSH config shape:
+
+   ```text
+   Host github.com
+     HostName github.com
+     User git
+     IdentityFile <SSH_KEY_PATH>
+     IdentitiesOnly yes
+   ```
+
+   Keep the real `<SSH_KEY_PATH>` in private local configuration or private ignored notes, not tracked docs.
+
+5. Test authentication:
+
    ```bash
    ssh -T git@github.com
    git fetch origin
    ```
-   If both succeed, authentication is fixed.
 
----
+   Do not paste private error output into tracked docs if it includes account, host, path, or key details.
 
-## Quick summary
+## 5. HTTPS / Personal Access Token Placeholder Workflow
 
-- **GitHub account**: `thetecnoagrarian`
-- **SSH key used for GitHub from this Mac**: `~/.ssh/id_ed25519_tta` (TTA-MacBook-Deploy-Key-2025)
-- **New repo**: You must add this same **public key** to the new repo (or to the account once). Below is the full flow.
+When HTTPS is required, the remote shape is:
 
----
+```text
+https://github.com/<REPO_OWNER>/<REPO_NAME>.git
+```
 
-## Option A: One key for all repos (recommended)
+Use a GitHub personal access token as the password when GitHub prompts for authentication.
 
-Add your SSH public key to your **GitHub account** (not per-repo). Then it works for every repo under `thetecnoagrarian`, including new ones.
+Store the token in `<KEYCHAIN_OR_PASSWORD_MANAGER>` or a supported credential helper. Do not put the token in:
 
-### 1. Get your public key
+- tracked docs
+- shell history
+- remote URLs
+- `.env` files committed to Git
+- screenshots or logs
+
+Safe placeholder reference:
+
+```text
+<GITHUB_PAT>
+```
+
+Do not document the real token, token prefix, token suffix, scope list, or expiration date if that combination could identify a live credential.
+
+## 6. Local Credential Helpers
+
+Credential helpers can store HTTPS credentials locally.
+
+Conceptual examples:
 
 ```bash
-cat ~/.ssh/id_ed25519_tta.pub
+git config --global credential.helper <CREDENTIAL_HELPER>
 ```
 
-Copy the full line (starts with `ssh-ed25519`, ends with your email or label).
+Use the operating system keychain, Git Credential Manager, or another approved private credential store. Do not document the stored values in tracked repository files.
 
-### 2. Add it to thetecnoagrarian GitHub account
+If authentication behaves unexpectedly, inspect credential-helper configuration without printing saved token values.
 
-1. Log in to **GitHub** as **thetecnoagrarian**.
-2. Click your profile picture → **Settings**.
-3. Left sidebar: **SSH and GPG keys**.
-4. Click **New SSH key**.
-5. **Title**: e.g. `TTA-MacBook-Deploy-Key-2025`.
-6. **Key type**: Authentication Key.
-7. **Key**: Paste the output of `cat ~/.ssh/id_ed25519_tta.pub`.
-8. Click **Add SSH key**.
+## 7. Deploy Key Concept
 
-After this, **any new repo** under thetecnoagrarian will work with `git push` / `git pull` from this Mac. No per-repo step needed.
+A deploy key is an SSH key associated with one GitHub repository.
 
----
+Use deploy keys when:
 
-## Option B: Deploy key per repo (if you don’t use account key)
+- a server or automation needs access to one repository
+- access should be narrower than a full user account
+- read-only access is enough, unless write access is explicitly required
 
-If you only use **deploy keys** (one key per repo), each **new repo** needs the same key added.
+Placeholder-only deploy key notes:
 
-### 1. Get your public key
-
-```bash
-cat ~/.ssh/id_ed25519_tta.pub
+```text
+Repository: <REPO_OWNER>/<REPO_NAME>
+Key role: <READ_ONLY_OR_WRITE_DEPLOY_KEY>
+Stored in: <KEYCHAIN_OR_PASSWORD_MANAGER>
+Server user: <DEPLOY_USER>
+Server host: <SERVER_HOST>
 ```
 
-Copy the full line.
+Do not track the real private key, public key body, fingerprint, server hostname, server IP, username, or password manager item name unless the user explicitly approves a private ignored note.
 
-### 2. Add it to the new repo as a deploy key
+## 8. Agent Forwarding Concept
 
-1. Open the **new repo** on GitHub (e.g. `thetecnoagrarian/YourNewRepo`).
-2. **Settings** → **Deploy keys** (in the left sidebar).
-3. **Add deploy key**.
-4. **Title**: e.g. `TTA-MacBook-Deploy-Key-2025`.
-5. **Key**: Paste the public key.
-6. If this machine will push (not just pull): check **Allow write access**.
-7. **Add key**.
+SSH agent forwarding can allow a remote host to use a local SSH agent for a GitHub operation. This can be useful, but it expands the trust boundary for that session.
 
-Repeat for every new repo you create.
+Tracked docs may explain the concept, but exact server commands, usernames, hostnames, key names, and session details belong in private ignored notes.
 
----
+Before using agent forwarding:
 
-## Make sure Git uses SSH (and the right key)
+- confirm the host is trusted
+- confirm the purpose and duration
+- avoid leaving long-lived sessions open
+- avoid documenting private connection details in tracked files
 
-### 1. Remote URL must be SSH
+## 9. What Belongs In Private Ignored Notes
 
-```bash
-git remote -v
-```
+Private ignored notes may contain operator-specific details when needed, such as:
 
-You want:
+- exact SSH key filenames
+- exact SSH host aliases
+- exact deploy usernames
+- exact server hostnames or IPs
+- password manager item references
+- account-specific troubleshooting history
+- one-time migration or recovery notes
 
-- `origin  git@github.com:thetecnoagrarian/REPO_NAME.git  (fetch)`
-- `origin  git@github.com:thetecnoagrarian/REPO_NAME.git  (push)`
+Those notes must stay ignored and must not be copied into public tracked docs.
 
-If you see `https://github.com/...` instead:
+## 10. Verification Checklist
 
-```bash
-git remote set-url origin git@github.com:thetecnoagrarian/REPO_NAME.git
-```
+Use this checklist with placeholders:
 
-Replace `REPO_NAME` with the actual repo name (e.g. `Sites`, or your new repo).
+- `git remote -v` shows the intended remote type.
+- SSH remotes use `git@github.com:<REPO_OWNER>/<REPO_NAME>.git`.
+- HTTPS remotes use `https://github.com/<REPO_OWNER>/<REPO_NAME>.git`.
+- The required public key is added to GitHub or to the repository deploy keys.
+- The local SSH config points to the intended key path without exposing it in tracked docs.
+- `ssh -T git@github.com` succeeds for SSH workflows.
+- `git fetch origin` succeeds.
+- No tokens, passwords, private keys, machine paths, or private server details are copied into documentation.
 
-### 2. SSH config so GitHub uses the TTA key
+## 11. Troubleshooting Checklist
 
-Your Mac should use the TTA key for `github.com`. In `~/.ssh/config` you want:
+If authentication fails:
 
-```
-Host github.com
-  IdentityFile ~/.ssh/id_ed25519_tta
-  IdentitiesOnly yes
-```
+- Confirm the remote URL type.
+- Confirm whether the workflow is SSH or HTTPS.
+- Confirm the key or token exists in a private credential store.
+- Confirm the GitHub account or repository has the matching public key or deploy key.
+- Confirm local SSH config uses the intended host alias and key.
+- Confirm deploy keys have write access only when pushing is required.
+- Confirm the credential helper is not using a stale HTTPS token.
+- Keep all real credential values out of chat, logs, screenshots, and tracked docs.
 
-If you have multiple GitHub accounts, you can use a host alias (see “Multiple GitHub accounts” below).
+## 12. Redaction Note
 
----
+This file was sanitized to remove project-specific account, key, server, and credential workflow details.
 
-## Test authentication
-
-```bash
-ssh -T git@github.com
-```
-
-Expected:
-
-- `Hi thetecnoagrarian/...! You've successfully authenticated...`  
-  → SSH is working for that account.
-- `Permission denied (publickey)`  
-  → Key not added to account or repo, or wrong key used (check `~/.ssh/config` and that you added the key from `id_ed25519_tta.pub`).
-
-Then in your repo:
-
-```bash
-git fetch origin
-# or
-git push origin main
-```
-
-If those work, authentication is fixed.
-
----
-
-## Checklist for a new repo (this project or the other)
-
-- [ ] Public key added to **thetecnoagrarian** (either **account** SSH key or **deploy key** on the new repo).
-- [ ] Remote is SSH: `git@github.com:thetecnoagrarian/REPO_NAME.git`.
-- [ ] `~/.ssh/config` has `Host github.com` and `IdentityFile ~/.ssh/id_ed25519_tta`.
-- [ ] `ssh -T git@github.com` succeeds.
-- [ ] `git fetch` or `git push` works in the repo.
-
----
-
-## Multiple GitHub accounts (optional)
-
-If you use **thetecnoagrarian** for some repos and another account (e.g. fruitionforestgarden) for others:
-
-1. In `~/.ssh/config` define a host alias for thetecnoagrarian:
-
-   ```
-   Host github.com-thetecnoagrarian
-     HostName github.com
-     User git
-     IdentityFile ~/.ssh/id_ed25519_tta
-     IdentitiesOnly yes
-   ```
-
-2. Use that host in the remote URL for TTA repos:
-
-   ```bash
-   git remote set-url origin git@github.com-thetecnoagrarian:thetecnoagrarian/REPO_NAME.git
-   ```
-
-3. Other account: use a different host and key in `~/.ssh/config`, and set that repo’s remote to the matching host.
-
----
-
-## Server (Linode) and 1Password
-
-- **This Mac**: Uses `~/.ssh/id_ed25519_tta` for GitHub (and optionally 1Password for other things).
-- **Server**: Uses either:
-  - **SSH agent forwarding** from your Mac (1Password / TTA key), or  
-  - A **server deploy key** (e.g. TTA-Linode-Deploy-Key-2025) added to the repo or account.
-
-If the server runs `git pull` and you use agent forwarding, the server uses your Mac’s key. No extra key on the server is needed for GitHub. If you don’t use forwarding, add the server’s public key to thetecnoagrarian (account or deploy key) and use that on the server.
-
----
-
-## Summary for “the other project”
-
-1. **Same GitHub account (thetecnoagrarian)**  
-   Add the same public key (`~/.ssh/id_ed25519_tta.pub`) to the account **or** to that repo’s deploy keys.
-
-2. **Same Mac**  
-   Keep `Host github.com` and `IdentityFile ~/.ssh/id_ed25519_tta` in `~/.ssh/config`. Use SSH remote: `git@github.com:thetecnoagrarian/REPO_NAME.git`.
-
-3. **Test**  
-   `ssh -T git@github.com` then `git fetch` / `git push` in the new repo.
-
-4. **New repo**  
-   No new key is required if the key is already on the **account**. If you only use **deploy keys**, add the same key to the new repo as a deploy key with write access if you push from that Mac.
-
-This document is the single place to follow for fixing authentication for this project and for informing the other project.
+Future updates must keep this file placeholder-only. If exact operator details are needed, put them in a private ignored note or credential manager instead of this tracked document.
