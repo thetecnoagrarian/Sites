@@ -81,6 +81,9 @@ Thumbs.db
 
 # Sensitive local-only files
 Documents/SECRETS.md
+Documents/LOCAL_LOGIN_CREDENTIALS.md
+Documents/LOGIN_CREDENTIALS_SUMMARY.md
+Documents/1PASSWORD_CURSOR_SETUP.md
 **/SECRETS.md
 *.secrets.md
 secrets.md
