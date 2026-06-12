@@ -45,6 +45,92 @@ This audit is classification and conflict-finding only. It should not be treated
 | `Documents/ENVIRONMENT_TEMPLATE.md` | Reference/template doc | Needs Review | Validate or replace with canonical env example | High importance, medium content risk | Contains placeholder-style values, but migration docs found variables that appear stale, missing, or mismatched. |
 | `Documents/USERNAME_PASSWORD_UPDATE_GUIDE.md` | Credential/admin workflow guide | Needs Review | Sensitive-adjacent historical/reference doc | High | Contains admin identifier workflow and password-change command patterns. Do not treat as active without review and explicit approval. |
 
+### 2A. Current Cleanup Classification Update - 2026-06-12
+
+This update reflects later dependency remediation, logging redaction, CSP cleanup, Search Console fixes, `/index.html` redirect work, and live nginx non-www-to-www canonical redirects.
+
+Current confirmed context from recent documentation and operator-provided state:
+
+- `origin/main` is synchronized at `ec9d67f Redirect index.html to homepage`.
+- `/index.html` now redirects to `/` on both public sites.
+- Non-www HTTP and HTTPS now redirect to HTTPS `www` at the nginx edge for both sites.
+- `Search Console` "Page with redirect" for `http://www.thetecnoagrarian.com/` is expected and should not be treated as a failure.
+- CSP `form-action` cleanup is deployed and documented.
+- Logging redaction cleanup is deployed and documented.
+- Some live nginx changes happened directly on the server and should be documented only in sanitized, public-safe form.
+
+This section supersedes older status notes in this audit where they conflict with the current state.
+
+#### Public Tracked Docs To Keep Active
+
+| File path | Current role | Cleanup recommendation |
+|---|---|---|
+| `AGENTS.md` | Highest-priority safety and task instruction source | Keep active. |
+| `Documents/CODEX_WORKFLOW.md` | Codex operating procedure | Keep active. |
+| `Documents/AGENT_ORCHESTRATION_WORKFLOW.md` | Human + ChatGPT + Codex + Git workflow template | Keep active. |
+| `Documents/REPO_INVENTORY.md` | Safe repo and path inventory | Keep active; refresh when files are archived or renamed. |
+| `Documents/MONOREPO_CONTEXT.md` | High-level monorepo context | Keep active. |
+| `Documents/ARCHITECTURE_MAP.md` | Architecture map | Keep active; refresh after architecture-level source/config changes. |
+| `Documents/ENVIRONMENT_AND_SECRETS_MAP.md` | Environment and secret-boundary map | Keep active. |
+| `Documents/PRODUCTION_DEPLOYMENT_MODEL.md` | Public-safe production deployment model | Keep active; update for `/index.html`, non-www-to-www nginx redirects, and latest Search Console interpretation. |
+| `Documents/DEPLOYMENT_RUNBOOK.md` | Agent-safety deployment boundary and placeholder-first planning doc | Keep active, but not as the exact private operator runbook. |
+| `Documents/SEO_CRAWLABILITY_NOTES.md` | Active SEO/crawlability state | Keep active; update to mark sitemap/canonical, `/index.html`, and non-www redirects as deployed/current. |
+| `Documents/DEPENDENCY_REMEDIATION_LOG.md` | Chronological remediation and production verification log | Keep tracked as a log, but do not treat as the single current-status source. |
+| `Documents/DEPENDENCY_AUDIT_RESULTS.md` | Dependency evidence/reference | Keep as evidence. |
+| `Documents/DEPENDENCY_SECURITY_REMEDIATION_PLAN.md` | Dependency remediation plan | Keep as plan/reference. |
+| `Documents/TARGETED_DEPENDENCY_UPDATE_PLAN.md` | First-pass targeted dependency plan | Keep as plan/reference. |
+| `Documents/DOCUMENTATION_AUDIT.md` | Documentation classification and cleanup plan | Keep active and refresh during cleanup. |
+
+#### Public Tracked Docs That Are Mostly Historical Or Troubleshooting
+
+| File path | Current role | Cleanup recommendation |
+|---|---|---|
+| `Documents/DEPLOYMENT_DISCOVERY.md` | Historical/transitional deployment rediscovery note | Keep for now; later archive or summarize into history. |
+| `Documents/GOOGLE_INDEXING_DIAGNOSTIC.md` | Historical public-403/Search Console diagnostic | Keep for now; later archive after active SEO notes are refreshed. |
+| `Documents/MASTER_PROJECT_DOCUMENTATION.md` | Broad historical/context doc | Reclassify away from "master" authority unless fully refreshed. |
+| `Documents/LOCAL_DOCKER_SYNC_GUIDE.md` | Local testing/history reference | Keep as local testing reference only; not production authority. |
+| `Documents/LOCAL_SETUP_QUICKSTART.md` | Local setup reference | Keep, but ensure it points to current local production-like workflow. |
+| `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup/restore reference | Keep as high-risk reference; do not treat as primary deployment guide. |
+| `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Analytics cleanup/troubleshooting guide | Treat as high-risk operational reference; later sanitize or archive if stale. |
+| `Documents/DIRECTORY_AUTO_CREATION_FIX.md` | Historical troubleshooting note | Later archive or summarize into project history. |
+| `Documents/POST_LAUNCH_CLEANUP.md` | Historical cleanup guide | Later archive; destructive cleanup guidance must not remain active by default. |
+
+#### Public Tracked Credential-Adjacent Docs Requiring Human Safety Review
+
+These files are tracked, but their names and roles are credential-adjacent. They should be reviewed by the human operator before any broad cleanup, archive, or public-doc consolidation task. Do not reproduce values from them in future docs.
+
+| File path | Reason for caution | Recommendation |
+|---|---|---|
+| `Documents/1PASSWORD_CURSOR_SETUP.md` | 1Password/account-adjacent | Human safety review; consider private-only or sanitized replacement. |
+| `Documents/GITHUB_AUTHENTICATION_SETUP.md` | GitHub/SSH auth-adjacent | Human safety review; keep only placeholder-safe workflow if tracked. |
+| `Documents/LOCAL_LOGIN_CREDENTIALS.md` | Login/credential-adjacent | Human safety review; likely private-only or sanitized. |
+| `Documents/LOGIN_CREDENTIALS_SUMMARY.md` | Login/credential-adjacent | Human safety review; likely private-only or sanitized. |
+| `Documents/USERNAME_PASSWORD_UPDATE_GUIDE.md` | Password/admin-account workflow | Human safety review; keep only placeholder-safe rotation guidance if tracked. |
+
+#### Private / Ignored Docs Confirmed Path-Only
+
+These files were identified by path and ignore metadata only. They were not opened or summarized in this update.
+
+| File path | Ignore source | Recommendation |
+|---|---|---|
+| `Documents/LINODE_DEPLOYMENT_RUNBOOK.md` | `.git/info/exclude` | Keep private operator source of truth unless a sanitized public version is created. |
+| `Documents/PRIVATE_DEPLOYMENT_SESSION_NOTES.md` | `.git/info/exclude` | Keep private/local-only. |
+| `Documents/PRIVATE_SSH_AND_SECRETS_MAP.md` | `.git/info/exclude` | Keep private/local-only. |
+| `Documents/_MDC_NOTES.md` | `.git/info/exclude` | Keep private/local notes only. |
+| `Documents/SECRETS.md` | `.gitignore` | Keep ignored and off-limits. |
+
+#### Sanitized nginx Documentation Gap
+
+Current gap: live nginx non-www-to-www canonical redirects are part of current production behavior, but the public tracked docs should not contain private server details, exact private paths, credential material, or certificate/key contents.
+
+Recommendation:
+
+- Add a sanitized nginx canonical redirect template later.
+- Preferred path: `nginx/templates/canonical-host-redirects.example.conf`.
+- Acceptable docs-only alternative: `Documents/NGINX_CANONICAL_REDIRECT_TEMPLATE.md`.
+- Use placeholders such as `[DOMAIN]`, `[WWW_DOMAIN]`, and `[CERT_PATH]`.
+- Redact or omit live server IPs, private usernames, private key paths, certificate contents, cookie values, session values, CSRF values, and private operator commands.
+
 ## 3. Proposed Source-of-Truth Hierarchy
 
 This hierarchy is proposed, not final.
@@ -68,15 +154,27 @@ Use for repo structure, package relationships, shared versus site-specific bound
 ### Environment / Deployment Layer
 
 - `Documents/ENVIRONMENT_AND_SECRETS_MAP.md`
+- `Documents/PRODUCTION_DEPLOYMENT_MODEL.md`
 - `Documents/DEPLOYMENT_RUNBOOK.md`
+- private/local-only `Documents/LINODE_DEPLOYMENT_RUNBOOK.md`, path-only
 - `Documents/ENVIRONMENT_TEMPLATE.md` if validated
 
-Use for environment-variable names, secret classification, placeholder handling, deployment planning, and high-risk operational boundaries.
+Use for environment-variable names, secret classification, placeholder handling, deployment planning, production model, and high-risk operational boundaries.
+
+Current interpretation:
+
+- `Documents/PRODUCTION_DEPLOYMENT_MODEL.md` should be the public-safe production model.
+- `Documents/DEPLOYMENT_RUNBOOK.md` should remain the agent-safety and placeholder-oriented deployment planning doc.
+- `Documents/LINODE_DEPLOYMENT_RUNBOOK.md` is ignored/private and may be the exact operator runbook, but it must stay path-only in public docs unless sanitized.
+- `Documents/DEPLOYMENT_DISCOVERY.md` is historical/transitional rather than active deployment authority.
+- Local Docker docs are local testing references, not production deployment authority.
 
 ### Migration / History Layer
 
 - `Documents/CURSOR_TO_CODEX_MIGRATION.md`
 - `Documents/MASTER_PROJECT_DOCUMENTATION.md`
+- `Documents/DEPLOYMENT_DISCOVERY.md`
+- `Documents/GOOGLE_INDEXING_DIAGNOSTIC.md`
 - future `Documents/PROJECT_HISTORY.md` or `Documents/HISTORICAL_NOTES.md`
 
 Use to preserve why things changed, not necessarily to control current operations.
@@ -356,13 +454,16 @@ Revisit Cursor residue only if a missing rule, prompt, or decision cannot be rec
 
 Proposed staged plan:
 
-1. Finish this documentation audit.
-2. Review actual websites/admin flows with the user.
-3. Resolve source-of-truth conflicts.
-4. Consolidate historical docs into history/archive docs.
-5. Update active docs and `AGENTS.md` if needed.
-6. Begin dependency/security remediation.
-7. Create a deployment checklist or operator checklist only when needed.
+1. Update this documentation audit with the latest cleanup classification.
+2. Update `Documents/PRODUCTION_DEPLOYMENT_MODEL.md` with public-safe current production facts: `/index.html` redirect, nginx non-www-to-www redirects, and Search Console redirect interpretation.
+3. Update `Documents/SEO_CRAWLABILITY_NOTES.md` so sitemap/canonical, `/index.html`, and non-www redirect status are current.
+4. Add a sanitized nginx canonical redirect template or placeholder-only documentation.
+5. Review tracked credential-adjacent docs with the human operator before any archive, rename, or public consolidation.
+6. Resolve source-of-truth conflicts in active docs.
+7. Consolidate historical docs into `Documents/PROJECT_HISTORY.md`, `Documents/HISTORICAL_NOTES.md`, or an archive folder.
+8. Update `AGENTS.md` only if cleanup reveals a durable rule that belongs in the highest-priority instruction layer.
+9. Continue dependency/security remediation as a separate full-audit workflow.
+10. Create a deployment operator checklist only when repeated deployments make it worth the extra artifact.
 
 This plan does not authorize cleanup. Each stage should be a separate scoped task.
 
@@ -388,12 +489,14 @@ Sensitive paths may be listed when needed, but contents must not be opened or re
 
 ## 15. Recommended Next Tasks
 
-1. Commit `Documents/DOCUMENTATION_AUDIT.md` after light audit.
-2. Review the actual websites/admin flows with the user.
-3. Create scoped notes from website review.
-4. Resolve the highest-value documentation conflicts.
-5. Create dependency/security remediation plan.
-6. Start dependency/security remediation only after full-audit workflow is ready.
+1. Commit this `Documents/DOCUMENTATION_AUDIT.md` update after light audit.
+2. Update `Documents/PRODUCTION_DEPLOYMENT_MODEL.md` with the current public-safe production deployment and nginx canonical redirect state.
+3. Update `Documents/SEO_CRAWLABILITY_NOTES.md` with current Search Console/crawlability status.
+4. Create a sanitized nginx canonical redirect template under `nginx/templates/` or a docs-only equivalent.
+5. Human-review tracked credential-adjacent docs before any public cleanup.
+6. Resolve the highest-value documentation conflicts.
+7. Archive or consolidate historical docs only after active docs are current.
+8. Continue dependency/security remediation as a separate full-audit workflow.
 
 ## 16. Open Questions
 
@@ -407,3 +510,6 @@ Sensitive paths may be listed when needed, but contents must not be opened or re
 - How should actual website review findings be folded into docs?
 - Should older operational docs be redacted before being kept long-term?
 - Should `Documents/ENVIRONMENT_TEMPLATE.md` be replaced by per-site examples or one canonical template?
+- Should tracked credential-adjacent docs be sanitized, made private-only, or archived?
+- Should the sanitized nginx canonical redirect template live under `nginx/templates/` or `Documents/`?
+- Should private operator runbooks remain only in `.git/info/exclude`, or should there be a documented private-doc convention?
