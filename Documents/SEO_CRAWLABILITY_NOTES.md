@@ -1,8 +1,25 @@
 # SEO Crawlability Notes
 
-This document records the sitemap and canonical URL changes added after the Fruition Forest Garden public crawler fix.
+This document records the current SEO crawlability, sitemap, canonical URL, and Search Console cleanup state for Fruition Forest Garden and The Tecnoagrarian.
 
 No secrets, private deployment details, real server targets, private key paths, or environment values are included here.
+
+## Current Status
+
+Known technical crawlability fixes are deployed and verified, but Search Console has not necessarily cleared every affected row yet.
+
+Current confirmed state:
+
+- Public Google search already shows Fruition Forest Garden results, including the homepage and at least one post. This was not a total crawlability outage.
+- Shared public crawler access is fixed.
+- Sitemap support is deployed for both sites.
+- Canonical tags are deployed for public routes on both sites.
+- CSP `form-action` cleanup is deployed; production now relies on same-origin form submission.
+- `/index.html` now redirects to `/` on both sites.
+- Non-www HTTP and HTTPS variants now redirect to HTTPS `www` at the nginx edge for both sites.
+- Search Console validation has started for several affected rows.
+
+Do not claim that Search Console has fully cleared yet. The current position is that the known technical fixes are deployed and verified, and remaining Search Console rows should be evaluated after Google recrawls.
 
 ## Sitemap Endpoint
 
@@ -72,6 +89,38 @@ Canonical coverage:
 
 Search pages use the clean `/search` canonical URL and intentionally drop query-string noise.
 
+## Redirect Cleanup
+
+### `/index.html`
+
+The `/index.html` 404 issue was fixed in app code by commit `ec9d67f` (`Redirect index.html to homepage`).
+
+Current production behavior:
+
+- Fruition Forest Garden `/index.html` returns `301` with `Location: /`.
+- The Tecnoagrarian `/index.html` returns `301` with `Location: /`.
+
+This is expected and should be treated as a healthy redirect. Do not create additional app changes for this known redirected URL variant unless future checks show a concrete regression.
+
+### Non-www To HTTPS `www`
+
+The duplicate non-www homepage issue was fixed at the nginx/edge layer, not in app code, Docker, or GitHub.
+
+Current verified behavior:
+
+| URL | Expected current result |
+|---|---|
+| `https://fruitionforestgarden.com/` | `301` to `https://www.fruitionforestgarden.com/` |
+| `https://www.fruitionforestgarden.com/` | `200 OK` |
+| `http://fruitionforestgarden.com/` | `301` to `https://www.fruitionforestgarden.com/` |
+| `http://www.fruitionforestgarden.com/` | `301` to `https://www.fruitionforestgarden.com/` |
+| `https://thetecnoagrarian.com/` | `301` to `https://www.thetecnoagrarian.com/` |
+| `https://www.thetecnoagrarian.com/` | `200 OK` |
+| `http://thetecnoagrarian.com/` | `301` to `https://www.thetecnoagrarian.com/` |
+| `http://www.thetecnoagrarian.com/` | `301` to `https://www.thetecnoagrarian.com/` |
+
+Search Console "Page with redirect" for redirected canonical variants, including `http://www.thetecnoagrarian.com/`, is expected and healthy. It should not be treated as a failure.
+
 ## Public Versus Private Paths
 
 Public crawlable paths:
@@ -104,11 +153,22 @@ Safe source inspection did not find a clear published/draft state in the shared 
 
 Needs Review: if draft/private post state is added later, sitemap generation should filter to published public content only.
 
+## Search Console Interpretation
+
+Google Search Console categories should be interpreted carefully:
+
+- `Page with redirect`: expected for canonicalized HTTP, non-www, and `/index.html` variants when they redirect to the preferred URL.
+- `Alternate page with proper canonical tag`: expected when a duplicate page points to the intended canonical target.
+- `Crawled - currently not indexed`: not automatically a code defect. Investigate only if a representative URL also shows a concrete technical problem such as `403`, `404`, `noindex`, wrong canonical, blocked robots, or bad redirect behavior.
+- Historical `403` rows may remain visible for a while after the public crawler fix. Validate representative examples rather than assuming the old blocker still exists.
+
+Do not recommend extra app changes for known redirected URL variants when the redirect target is correct.
+
 ## Deployment And Verification
 
-This change was not deployed by this documentation/code task.
+Known sitemap, canonical, `/index.html`, CSP form-action, and non-www redirect fixes are deployed and verified from prior production checks.
 
-After deployment, verify with public HTTP checks:
+Representative public HTTP checks:
 
 ```bash
 curl -I https://www.fruitionforestgarden.com/sitemap.xml
@@ -125,18 +185,24 @@ Expected:
 - `/sitemap.xml` returns `200`
 - sitemap response is XML
 - homepage HTML includes the expected canonical URL
+- `/index.html` returns `301` to `/`
+- non-www variants redirect to HTTPS `www`
 - public pages do not include `noindex` when indexing is intended
 - admin/private routes remain protected
 
-After live checks pass, submit these sitemaps in Google Search Console:
+Submit or keep submitted these sitemaps in Google Search Console:
 
 - `https://www.fruitionforestgarden.com/sitemap.xml`
 - `https://www.thetecnoagrarian.com/sitemap.xml`
 
+Use URL Inspection only for representative remaining examples after the known fixes have had time to recrawl.
+
 ## Follow-Up Items
 
-- Decide whether The Tecnoagrarian should be deployed to pick up shared crawler and sitemap behavior.
+- Wait roughly 2-7 days for Google recrawl and Search Console validation to update before treating remaining rows as new defects.
+- Do not click `Validate Fix` repeatedly. Recheck representative examples first.
+- Inspect only specific remaining bad URLs if Search Console continues reporting them after recrawl.
+- Add a sanitized nginx canonical redirect template to the repo later.
 - Add a formal sitemap/canonical test later if a test harness is selected.
 - Review whether canonical URL generation should be consolidated with Open Graph URL generation.
-- Review CSP/source config later without exposing operational-sensitive values.
 - Add published/draft filtering to sitemap generation if the content model gains explicit publication state.
