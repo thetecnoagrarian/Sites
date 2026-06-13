@@ -1,137 +1,196 @@
-# Username & Password Update Guide
+# Username and Password Update Guide
 
-## Overview
-This guide explains how to update usernames and passwords for both blog sites. The process is straightforward and doesn't require complex 1Password integration - you'll just store the password in 1Password for your records.
+This document is a public-safe template for credential rotation and account updates. It uses placeholders only and must not contain real usernames, passwords, tokens, private server details, session values, cookies, CSRF values, database URLs, recovery codes, private paths, or project-specific account history.
 
-## Current Usernames
-- **Fruition Forest Garden**: `fruitionforestgarden@protonmail.com`
-- **The Tecnoagrarian**: `tta_admin`
+## 1. Purpose
 
-## Target Username
-- **Both sites**: `MDC`
+Use this guide to plan and verify account credential updates without exposing real credential material in tracked documentation.
 
-## Process
+This guide applies to:
 
-### Step 1: Generate Secure Password
+- personal accounts
+- admin accounts
+- service accounts
+- repository or hosting accounts
+- application login accounts
 
-**Option A: Use 1Password Password Generator** (Recommended)
-1. Open 1Password
-2. Use the password generator
-3. Settings: 20-24 characters, include symbols
-4. Copy the generated password
+It is not a place to store credentials. Real values belong in `<PASSWORD_MANAGER>`, an approved keychain, or private ignored notes.
 
-**Option B: Use Node.js**
-```bash
-node -e "const crypto = require('crypto'); console.log('Secure password:', crypto.randomBytes(24).toString('base64'));"
-```
+## 2. Safety Rules
 
-### Step 2: Store Password in 1Password
-- Create a new login item in 1Password
-- Title: "Blog Admin - MDC"
-- Username: `MDC`
-- Password: (paste the generated password)
-- Notes: "Admin credentials for both fruitionforestgarden.com and thetecnoagrarian.com"
+Never commit:
 
-### Step 3: Update Usernames and Passwords
+- real usernames
+- real email addresses if they identify a private account
+- old or new passwords
+- password reset links
+- recovery codes or MFA backup codes
+- tokens or token fragments
+- cookies or session values
+- CSRF values
+- database URLs
+- private server users, hosts, IPs, or access details
+- private key paths
+- local machine paths
+- password manager item names that reveal private structure
 
-**For Fruition Forest Garden:**
-```bash
-# Get server details from Documents/SECRETS.md first
-# Replace [SSH_USER]@[SERVER_IP] with actual values
+Use placeholders in tracked docs:
 
-# 1. Change username
-ssh [SSH_USER]@[SERVER_IP] "docker exec ffg-blog-prod node /app/fruitionforestgarden/scripts/change-username.js fruitionforestgarden@protonmail.com MDC"
+- `<ACCOUNT_USERNAME>`
+- `<ACCOUNT_EMAIL>`
+- `<NEW_PASSWORD>`
+- `<OLD_PASSWORD>`
+- `<PASSWORD_MANAGER>`
+- `<RECOVERY_EMAIL>`
+- `<MFA_DEVICE>`
+- `<SERVICE_NAME>`
+- `<ADMIN_URL>`
+- `<SERVER_HOST>`
+- `<DEPLOY_USER>`
+- `<SECRET_NAME>`
+- `<SECRET_VALUE>`
 
-# 2. Change password (use the password you generated)
-# IMPORTANT: Use single quotes around the password to prevent bash from interpreting special characters (!, $, etc.)
-ssh [SSH_USER]@[SERVER_IP] 'docker exec ffg-blog-prod node /app/fruitionforestgarden/scripts/change-password.js MDC '"'YOUR_NEW_PASSWORD_HERE'"
+If an exact value is needed for operation, keep it in private ignored notes or a credential manager, not this file.
 
-# 3. Verify
-ssh [SSH_USER]@[SERVER_IP] "docker exec ffg-blog-prod sqlite3 /app/data/blog.db \"SELECT username, isAdmin FROM users WHERE username = 'MDC';\""
-```
+## 3. When To Rotate Credentials
 
-**For The Tecnoagrarian:**
-```bash
-# Get server details from Documents/SECRETS.md first
-# Replace [SSH_USER]@[SERVER_IP] with actual values
+Rotate credentials when:
 
-# 1. Change username
-ssh [SSH_USER]@[SERVER_IP] "docker exec tta-blog-prod node /app/thetecnoagrarian/scripts/change-username.js tta_admin MDC"
+- a person leaves a role or no longer needs access
+- access was shared more broadly than intended
+- a device was lost, replaced, or compromised
+- a token, password, cookie, session, or recovery code may have been exposed
+- an account is being transferred to a new owner
+- a password manager or MFA device is being reorganized
+- a service changes its authentication requirements
+- periodic security review calls for rotation
 
-# 2. Change password (use the same password you used for FFG)
-# IMPORTANT: Use single quotes around the password to prevent bash from interpreting special characters (!, $, etc.)
-ssh [SSH_USER]@[SERVER_IP] 'docker exec tta-blog-prod node /app/thetecnoagrarian/scripts/change-password.js MDC '"'YOUR_NEW_PASSWORD_HERE'"
+Do not rotate production or admin credentials casually. Plan the change, verify recovery paths, and avoid locking out the operator.
 
-# 3. Verify
-ssh [SSH_USER]@[SERVER_IP] "docker exec tta-blog-prod sqlite3 /app/data/blog.db \"SELECT username, isAdmin FROM users WHERE username = 'MDC';\""
-```
+## 4. Preparation Checklist
 
-**Alternative Method (if the above doesn't work):**
-If you have issues with special characters, you can also set the password as an environment variable first:
-```bash
-# Set password variable (use single quotes to prevent interpretation)
-PASSWORD='YOUR_NEW_PASSWORD_HERE'
+Before changing credentials:
 
-# Then use it in the command (replace [SSH_USER]@[SERVER_IP] with values from Documents/SECRETS.md)
-ssh [SSH_USER]@[SERVER_IP] "docker exec ffg-blog-prod node /app/fruitionforestgarden/scripts/change-password.js MDC '$PASSWORD'"
-```
+- Identify `<SERVICE_NAME>`.
+- Identify whether the account is personal, admin, service, or deployment-related.
+- Confirm who owns final approval.
+- Confirm recovery access is available.
+- Confirm MFA is working.
+- Confirm the current credential is stored in `<PASSWORD_MANAGER>` or a private approved store.
+- Confirm where the updated credential must be saved.
+- Confirm whether automation, deployment, CI, or scheduled jobs depend on the credential.
+- Confirm a rollback or recovery path exists.
+- Decide whether the change needs a maintenance window.
 
-### Step 4: Restart Containers
-This invalidates existing sessions, forcing you to log in with the new credentials:
-```bash
-# Replace [SSH_USER]@[SERVER_IP] with values from Documents/SECRETS.md
-ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.prod.yml restart fruitionforestgarden thetecnoagrarian"
-```
+Do not paste real credentials into chat, terminal transcripts, screenshots, or tracked docs during planning.
 
-### Step 5: Test Login
-1. Visit both admin pages:
-   - `https://ffg-new.fruitionforestgarden.com/admin/login`
-   - `https://thetecnoagrarian.com/admin/login`
-2. Log in with:
-   - Username: `MDC`
-   - Password: (the password you generated and stored in 1Password)
+## 5. Password Manager Update Workflow
 
-## Why Not Full 1Password Integration?
+Use this placeholder-only workflow:
 
-Full 1Password integration would require:
-- 1Password CLI installation on the server
-- API keys and authentication setup
-- Additional complexity for minimal benefit
+1. Open `<PASSWORD_MANAGER>`.
+2. Locate the item for `<SERVICE_NAME>`.
+3. Confirm the item owner and purpose.
+4. Generate or choose `<NEW_PASSWORD>` inside the password manager.
+5. Update the service account password through the service UI or approved admin interface.
+6. Save the updated credential in `<PASSWORD_MANAGER>`.
+7. Remove stale duplicate items if approved.
+8. Record a private note that rotation happened, without copying the password into tracked docs.
 
-**Current approach is simpler:**
-- ✅ Generate password once
-- ✅ Store in 1Password for your records
-- ✅ Use standard scripts (already working)
-- ✅ No additional server dependencies
+Tracked docs may record that rotation happened, but not the old value, new value, reset link, recovery code, or password manager item name if it reveals private structure.
 
-## Troubleshooting
+## 6. Username Or Email Update Workflow
 
-**If username change fails:**
-- Check that the old username is correct
-- Verify the user exists: `docker exec [container] sqlite3 /app/data/blog.db "SELECT * FROM users;"`
-- Make sure you're using the correct server IP from `Documents/SECRETS.md`
+Changing a username or email can affect login, recovery, notifications, integrations, and audit history.
 
-**If password change fails:**
-- Make sure you're using the NEW username (MDC) after changing it
-- Check password length (minimum 16 characters recommended)
-- **Special characters in password**: If your password contains `!`, `$`, `\``, or other special characters, bash may try to interpret them. Use single quotes around the password:
-  ```bash
-  # Wrong (bash interprets ! as history expansion):
-  ssh deploy@172.236.119.220 "docker exec ffg-blog-prod node ... MDC MyPass!123"
-  
-  # Correct (single quotes prevent interpretation):
-  ssh deploy@172.236.119.220 'docker exec ffg-blog-prod node ... MDC '"'MyPass!123'"
-  ```
+Before changing `<ACCOUNT_USERNAME>` or `<ACCOUNT_EMAIL>`:
 
-**If login fails after changes:**
-- Make sure containers were restarted
-- Clear browser cookies/cache
-- Try incognito/private browsing mode
+- Confirm the new identifier is available.
+- Confirm `<RECOVERY_EMAIL>` is current.
+- Confirm MFA still works after the change.
+- Confirm account notifications are received.
+- Confirm integrations do not rely on the old identifier.
+- Confirm saved credentials in `<PASSWORD_MANAGER>` are updated.
+- Confirm private ignored notes are updated if they reference the old identifier.
 
-## Security Notes
+Do not publish real account identifiers in tracked docs unless they are intentionally public project information.
 
-- ✅ Passwords are hashed with bcrypt (industry standard)
-- ✅ Scripts validate input and prevent common mistakes
-- ✅ Username "admin" is blocked for security
-- ✅ Sessions are invalidated on container restart
+## 7. MFA And Recovery Checks
 
+Before and after credential rotation:
+
+- Confirm `<MFA_DEVICE>` is present and working.
+- Confirm backup MFA methods are current.
+- Confirm `<RECOVERY_EMAIL>` is accessible.
+- Confirm recovery codes are regenerated if required.
+- Store recovery codes only in `<PASSWORD_MANAGER>` or another approved private store.
+- Remove recovery methods that belong to retired devices or former users.
+
+Never commit recovery codes, MFA backup codes, authenticator seeds, QR codes, screenshots, or device-specific secrets.
+
+## 8. Service And Admin Account Review
+
+For each `<SERVICE_NAME>`, review:
+
+- who owns the account
+- whether the account should be personal, shared, service, or admin
+- whether the account has more privilege than needed
+- whether unused accounts can be disabled
+- whether service accounts have scoped credentials
+- whether admin access is protected by MFA
+- whether any automation depends on the account
+
+For `<ADMIN_URL>` workflows, keep real URLs private if they reveal internal or sensitive access paths.
+
+## 9. Post-Change Verification Checklist
+
+After updating credentials:
+
+- Log out and log back in through the normal path.
+- Confirm MFA still works.
+- Confirm the password manager item opens and autofills correctly.
+- Confirm recovery email and notifications work.
+- Confirm expected admin or service actions still work.
+- Confirm no stale token or password remains in local notes.
+- Confirm no tracked docs contain real values.
+- Confirm no `.env` files, runtime secrets, cookies, sessions, or CSRF values were copied into Git.
+- Confirm any private ignored notes were updated if needed.
+
+If production, deployment, CI, or automation depends on the credential, perform a separate approved verification plan before assuming the rotation is complete.
+
+## 10. What Belongs In Private Ignored Notes
+
+Private ignored notes may contain operator-specific details when necessary:
+
+- exact account usernames
+- exact account email addresses
+- password manager item references
+- private service URLs
+- private admin URLs
+- private server hostnames
+- private deploy usernames
+- rotation dates and operator notes
+- recovery process notes
+
+Private notes must remain ignored. Do not copy their contents into public tracked docs.
+
+## 11. Troubleshooting
+
+If login fails after a credential update:
+
+- Confirm the correct `<SERVICE_NAME>` is being accessed.
+- Confirm the password manager item was updated.
+- Confirm browser autofill is not using a stale credential.
+- Confirm MFA is using the correct device.
+- Confirm the username or email did not change unexpectedly.
+- Confirm the account is not locked or disabled.
+- Confirm recovery email access is available.
+- Confirm any service account or automation credential was updated separately.
+
+Do not troubleshoot by pasting passwords, tokens, cookies, session IDs, CSRF values, reset links, or recovery codes into chat or tracked docs.
+
+## 12. Redaction Note
+
+This file was sanitized to remove project-specific account, credential, server, and command details.
+
+Future updates must keep this file placeholder-only. If exact operator details are needed, store them in `<PASSWORD_MANAGER>` or private ignored notes instead of tracked documentation.
