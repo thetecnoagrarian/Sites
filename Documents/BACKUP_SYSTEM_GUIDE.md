@@ -1,302 +1,262 @@
-# Automatic Backup System Guide
+# Backup System Guide
+
+This guide is a public-safe backup and restore planning document for the project.
+It intentionally uses placeholders only. Real hosts, users, paths, secrets,
+archive names, credentials, certificates, and operator command history must stay
+in private ignored notes or a password manager.
+
+## 1. Purpose
+
+The purpose of this guide is to describe what should be backed up, how backup
+and restore work should be planned, and what safety checks should happen before
+any recovery action.
+
+This file is not an executable production runbook. It should not contain live
+server details or copy/paste-ready production commands.
+
+Use placeholders such as:
+
+- `<PROJECT_NAME>`
+- `<SERVER_HOST>`
+- `<DEPLOY_USER>`
+- `<APP_ROOT>`
+- `<BACKUP_ROOT>`
+- `<LOCAL_BACKUP_DIR>`
+- `<REMOTE_BACKUP_DIR>`
+- `<DATABASE_PATH>`
+- `<UPLOADS_DIR>`
+- `<CONFIG_DIR>`
+- `<DOCKER_VOLUME>`
+- `<BACKUP_ARCHIVE>`
+- `<RESTORE_TARGET>`
+- `<PASSWORD_MANAGER>`
+- `<SECRET_NAME>`
+
+## 2. Safety Rules
+
+Backups and restores can affect live data. Treat them as high-risk operations.
+
+- Do not commit real backup archives, database files, upload folders, logs,
+  private keys, certificates, or credential exports.
+- Do not commit real server names, deploy users, private paths, database URLs,
+  access tokens, passwords, session secrets, CSRF secrets, or IP allowlists.
+- Do not store restore commands with live targets in tracked documentation.
+- Do not restore over production data without explicit human approval, a current
+  backup, and a rollback plan.
+- Do not ask an agent to inspect real backups, databases, uploads, runtime
+  folders, or secrets unless the user explicitly approves that exact task.
+- Use private ignored notes for real operational details and this tracked guide
+  for safe planning.
+
+## 3. Backup Scope
+
+A complete backup plan should account for each category of project state.
+
+| Category | Examples | Git status | Notes |
+|---|---|---|---|
+| Source code | application code, shared code, templates, scripts | Tracked in Git | Git is the source of truth for committed code. |
+| Documentation | public-safe docs, templates, placeholder runbooks | Tracked in Git | Keep secret values out of tracked docs. |
+| Database state | `<DATABASE_PATH>` or managed database export | Runtime data | Back up and restore with explicit approval only. |
+| Uploads/media | `<UPLOADS_DIR>` | Runtime/user-generated data | Preserve permissions and ownership expectations. |
+| Runtime configuration | env files, secret values, private config | Private only | Store in `<PASSWORD_MANAGER>` or ignored notes. |
+| Certificates/keys | TLS material, private keys, signing keys | Private only | Never commit certificate contents or private keys. |
+| Logs | application logs, access logs, error logs | Runtime data | Useful for diagnosis; may contain sensitive data. |
+| Backup archives | `<BACKUP_ARCHIVE>` | Private/runtime data | Store outside the repo and verify integrity. |
+
+## 4. What Belongs in Git Versus Private Notes
+
+Belongs in Git:
+
+- placeholder-only backup policy
+- backup scope descriptions
+- restore-test checklist
+- sanitized examples
+- public-safe operational assumptions
+- non-secret template paths
+
+Belongs in private ignored notes:
+
+- real `<SERVER_HOST>` values
+- real `<DEPLOY_USER>` values
+- real `<APP_ROOT>` and `<BACKUP_ROOT>` values
+- real database and upload paths
+- real archive names and retention locations
+- real scheduler configuration
+- real credential storage locations
+- exact operator command history
+- emergency contact or account recovery details
+
+## 5. Backup Frequency Planning
+
+Choose backup frequency based on acceptable data loss and recovery time.
+
+| Data type | Suggested planning question | Typical policy shape |
+|---|---|---|
+| Database | How much edited content can be recreated? | Frequent backups, verified regularly. |
+| Uploads/media | How often are files added or changed? | Regular backups and periodic integrity checks. |
+| Configuration | How often do env or service settings change? | Back up after each intentional change. |
+| Documentation/source | Are changes committed and pushed? | Git history plus remote repository. |
+
+Define these values privately:
+
+- recovery point objective
+- recovery time objective
+- retention period
+- offsite storage target
+- restore-test cadence
+- person responsible for verification
 
-**Purpose**: Understand how backups work and what gets backed up.
+## 6. Database Backup Placeholder Workflow
 
----
+This is a planning workflow only, not a command recipe.
 
-## 📦 What Gets Backed Up
+1. Identify the database source as `<DATABASE_PATH>` or another documented
+   source.
+2. Confirm the target backup location as `<BACKUP_ROOT>` or
+   `<REMOTE_BACKUP_DIR>`.
+3. Create a dated `<BACKUP_ARCHIVE>` using an approved private procedure.
+4. Verify that the archive exists and is non-empty.
+5. Verify that the backup can be listed or opened in a safe non-production
+   context.
+6. Record the backup date, scope, and verification status in private ignored
+   notes.
+7. Do not copy database contents into chat, tracked docs, or commits.
 
-### For Each Site (FFG & TTA):
-
-1. **Database** (`blog.db`)
-   - All posts, categories, users, sessions
-   - Analytics data (page views, unique visitors)
-   - Complete SQLite database file
-
-2. **Uploads Directory** (`/app/data/uploads/`)
-   - All uploaded images (thumbnails, medium, large sizes)
-   - Original image files
-   - Compressed as `.tar.gz` archive
-
-### What's NOT Backed Up:
-
-- Source code (in Git repository)
-- Docker images (can be rebuilt)
-- Nginx configuration (in `/etc/nginx/`)
-- SSL certificates (managed by Certbot)
-
----
-
-## ⚙️ How Automatic Backups Work
-
-### Current Status: ⚠️ **MANUAL SETUP REQUIRED**
-
-The backup scripts exist, but **cron jobs need to be set up manually** to run automatically.
-
-### Backup Scripts Available:
-
-1. **Container Script** (`/app/scripts/backup.sh`)
-   - Runs inside Docker containers
-   - Backs up database and uploads
-   - Stores backups in `/app/backups/` (inside container)
-
-2. **Host Script** (`/opt/Sites/scripts/backup-host.sh`)
-   - Runs on the server host
-   - Executes container backups
-   - Copies backups to `/opt/Sites/backups/` (on host)
-
----
-
-## 🔄 Backup Process Flow
-
-```
-Cron Job (2 AM daily)
-    ↓
-Host Script: /opt/Sites/scripts/backup-host.sh
-    ↓
-For each site (FFG & TTA):
-    ↓
-1. Execute: docker exec [container] /app/scripts/backup.sh
-    ↓
-2. Inside container:
-   - Backup database → /app/backups/blog_YYYY-MM-DD_HH-MM.db
-   - Backup uploads → /app/backups/uploads_YYYY-MM-DD_HH-MM.tar.gz
-   - Clean up backups older than 14 days
-    ↓
-3. Copy backups from container to host:
-   - docker cp [container]:/app/backups → /opt/Sites/backups/[site]/
-    ↓
-4. Clean up old host backups (14 days retention)
-```
-
----
-
-## 📋 Setting Up Automatic Backups
-
-### Step 1: Verify Backup Scripts Exist
-
-```bash
-# SSH to server
-ssh deploy@172.236.119.220
-
-# Check if scripts exist
-ls -la /opt/Sites/scripts/backup*.sh
-
-# Check if scripts exist in containers
-docker exec ffg-blog-prod ls -la /app/scripts/backup.sh
-docker exec tta-blog-prod ls -la /app/scripts/backup.sh
-```
-
-### Step 2: Copy Scripts to Containers (If Needed)
-
-```bash
-# Copy backup script to containers
-docker cp /opt/Sites/scripts/backup.sh ffg-blog-prod:/app/scripts/backup.sh
-docker cp /opt/Sites/scripts/backup.sh tta-blog-prod:/app/scripts/backup.sh
-
-# Make scripts executable
-docker exec ffg-blog-prod chmod +x /app/scripts/backup.sh
-docker exec tta-blog-prod chmod +x /app/scripts/backup.sh
-```
-
-### Step 3: Test Manual Backup
-
-```bash
-# Test backup for FFG
-docker exec ffg-blog-prod /app/scripts/backup.sh
-
-# Test backup for TTA
-docker exec tta-blog-prod /app/scripts/backup.sh
-
-# Test host script (backs up both)
-/opt/Sites/scripts/backup-host.sh
-```
-
-### Step 4: Set Up Cron Job
-
-```bash
-# Edit crontab
-crontab -e
-
-# Add these lines (runs daily at 2 AM):
-0 2 * * * /opt/Sites/scripts/backup-host.sh >> /opt/Sites/backups/backup.log 2>&1
-
-# Or run individual backups:
-# 0 2 * * * docker exec ffg-blog-prod /app/scripts/backup.sh >> /opt/Sites/backups/ffg/backup.log 2>&1
-# 0 2 * * * docker exec tta-blog-prod /app/scripts/backup.sh >> /opt/Sites/backups/tta/backup.log 2>&1
-```
-
-### Step 5: Verify Cron Job
-
-```bash
-# List cron jobs
-crontab -l
-
-# Check cron service is running
-sudo systemctl status cron
-# or
-sudo systemctl status crond
-```
-
----
-
-## 📍 Backup Locations
-
-### Inside Containers:
-- **FFG**: `/app/backups/` (inside `ffg-blog-prod` container)
-- **TTA**: `/app/backups/` (inside `tta-blog-prod` container)
-
-### On Host Server:
-- **Main Location**: `/opt/Sites/backups/`
-  - `/opt/Sites/backups/ffg/` - FFG backups
-  - `/opt/Sites/backups/tta/` - TTA backups
-  - `/opt/Sites/backups/backup.log` - Backup log file
-
-### Backup File Names:
-- Database: `blog_YYYY-MM-DD_HH-MM.db`
-- Uploads: `uploads_YYYY-MM-DD_HH-MM.tar.gz`
-- Example: `blog_2025-11-13_02-00.db`
-
----
-
-## ⏰ Backup Schedule
-
-### Recommended Schedule:
-- **Frequency**: Daily
-- **Time**: 2:00 AM (low traffic time)
-- **Retention**: 14 days (automatically deleted after)
-
-### Current Status:
-- ⚠️ **Not automatically scheduled** - Needs cron job setup
-- ✅ **Scripts exist** - Ready to use
-- ✅ **Manual backups work** - Can run anytime
-
----
-
-## 🧪 Manual Backup Commands
-
-### Run Backup for One Site:
-
-```bash
-# FFG backup
-ssh deploy@172.236.119.220 "docker exec ffg-blog-prod /app/scripts/backup.sh"
-
-# TTA backup
-ssh deploy@172.236.119.220 "docker exec tta-blog-prod /app/scripts/backup.sh"
-```
-
-### Run Backup for Both Sites:
-
-```bash
-# Host script (backs up both)
-ssh deploy@172.236.119.220 "/opt/Sites/scripts/backup-host.sh"
-```
-
-### Check Backup Status:
-
-```bash
-# List recent backups
-ssh deploy@172.236.119.220 "ls -lht /opt/Sites/backups/ffg/ | head -10"
-ssh deploy@172.236.119.220 "ls -lht /opt/Sites/backups/tta/ | head -10"
-
-# Check backup sizes
-ssh deploy@172.236.119.220 "du -sh /opt/Sites/backups/*"
-```
-
----
-
-## 🗑️ Automatic Cleanup
-
-### Retention Policy:
-- **Retention Period**: 14 days
-- **Automatic Deletion**: Backups older than 14 days are automatically deleted
-- **Cleanup Runs**: Every time backup script runs
-
-### Manual Cleanup:
-
-```bash
-# Delete backups older than 14 days manually
-find /opt/Sites/backups -type f -mtime +14 -delete
-
-# Delete backups older than 7 days (if needed)
-find /opt/Sites/backups -type f -mtime +7 -delete
-```
-
----
-
-## 📊 Backup Statistics
-
-### Check Backup Status:
-
-```bash
-# Count backups
-ssh deploy@172.236.119.220 "find /opt/Sites/backups -name '*.db' | wc -l"
-ssh deploy@172.236.119.220 "find /opt/Sites/backups -name '*.tar.gz' | wc -l"
-
-# Total backup size
-ssh deploy@172.236.119.220 "du -sh /opt/Sites/backups"
-
-# List recent backups with sizes
-ssh deploy@172.236.119.220 "ls -lht /opt/Sites/backups/ffg/ | head -5"
-```
-
----
-
-## 🔍 Verify Backups Are Working
-
-### Check Backup Logs:
-
-```bash
-# View backup log
-ssh deploy@172.236.119.220 "tail -50 /opt/Sites/backups/backup.log"
-
-# Check for errors
-ssh deploy@172.236.119.220 "grep -i error /opt/Sites/backups/backup.log"
-```
-
-### Test Backup Restoration:
-
-```bash
-# Verify database backup is valid
-ssh deploy@172.236.119.220 "docker exec ffg-blog-prod sqlite3 /app/backups/blog_YYYY-MM-DD_HH-MM.db 'PRAGMA integrity_check;'"
-
-# Verify uploads backup
-ssh deploy@172.236.119.220 "tar -tzf /opt/Sites/backups/ffg/uploads_YYYY-MM-DD_HH-MM.tar.gz | head -10"
-```
-
----
-
-## ⚠️ Important Notes
-
-1. **Cron Jobs Not Set Up**: Automatic backups require manual cron job setup
-2. **Backup Location**: Backups stored in `/opt/Sites/backups/` on host
-3. **Retention**: 14 days automatic cleanup
-4. **Database Only**: Backs up database and uploads, not source code
-5. **Source Code**: Code is in Git repository (separate backup)
-
----
-
-## ✅ Quick Setup Checklist
-
-- [ ] Verify backup scripts exist in containers
-- [ ] Test manual backup works
-- [ ] Set up cron job for automatic backups
-- [ ] Verify cron job is running
-- [ ] Check backup location exists
-- [ ] Test backup restoration
-- [ ] Monitor backup logs
-
----
-
-## 🚀 Next Steps
-
-1. **Set up cron job** for automatic daily backups
-2. **Test backup restoration** to verify backups work
-3. **Monitor backup logs** to ensure they're running
-4. **Set up off-site backup** (optional - copy to external storage)
-
----
-
-**Last Updated**: November 13, 2025  
-**Status**: Scripts ready, cron job setup required for automation
-
+If a future task needs exact commands, create a private operator runbook or use
+placeholders in a public-safe template.
+
+## 7. Upload/Media Backup Placeholder Workflow
+
+Uploads and media are runtime/user-generated data, not source code.
+
+1. Identify the upload source as `<UPLOADS_DIR>`.
+2. Confirm whether uploads live in a bind-mounted path, a named
+   `<DOCKER_VOLUME>`, or another runtime location.
+3. Create a backup archive using an approved private procedure.
+4. Preserve file names, directory structure, permissions, and timestamps where
+   required by the application.
+5. Verify a representative sample in a safe non-production location.
+6. Record verification results in private ignored notes.
+
+Do not commit upload folders or generated media backups.
+
+## 8. Config and Secrets Boundary
+
+Configuration and secrets require separate handling.
+
+Tracked docs may mention variable names such as `<SECRET_NAME>`, but must not
+include real values. Runtime secret material belongs in `<PASSWORD_MANAGER>`,
+private ignored notes, or the approved production secret store.
+
+Keep these out of tracked backup documentation:
+
+- real env file contents
+- database URLs
+- passwords
+- access tokens
+- session secrets
+- CSRF secrets
+- private keys
+- certificate contents
+- credential exports
+- live allowlists
+- exact secret storage item names if they expose private structure
+
+## 9. Local and Offsite Backup Concepts
+
+A healthy backup plan should avoid a single point of failure.
+
+Recommended concepts:
+
+- keep at least one local backup location such as `<LOCAL_BACKUP_DIR>`
+- keep at least one offsite or external backup location such as
+  `<REMOTE_BACKUP_DIR>`
+- protect backup archives with appropriate access controls
+- verify that backups can be restored, not just created
+- track retention and cleanup rules privately
+- avoid storing all backups on the same host as production
+
+Do not document real storage endpoints or account details in this file.
+
+## 10. Restore-Test Planning
+
+Restore testing should happen in a safe target, never directly over production
+without explicit approval.
+
+Before a restore test:
+
+- identify `<BACKUP_ARCHIVE>`
+- identify `<RESTORE_TARGET>`
+- confirm that `<RESTORE_TARGET>` is not production unless explicitly approved
+- confirm the expected application version
+- confirm database schema compatibility
+- confirm upload/media compatibility
+- confirm secrets and env config are available privately
+- define success criteria
+- define rollback steps
+
+After a restore test:
+
+- verify that the application starts
+- verify representative public pages
+- verify representative admin workflows only if approved
+- verify representative uploaded media
+- document findings in private ignored notes or a sanitized tracked summary
+
+## 11. Verification Checklist
+
+Use this checklist after a backup or restore-related procedure.
+
+- Backup scope was defined before work began.
+- Runtime data sources were identified by placeholder or private note.
+- No real secrets were copied into tracked documentation.
+- Backup archive location was recorded privately.
+- Backup integrity was checked.
+- Restore target was confirmed before any restore action.
+- Production was not modified without explicit approval.
+- Verification results were recorded.
+- Any failure or uncertainty was marked as Needs Review.
+
+## 12. Incident/Recovery Checklist
+
+During an incident, slow down and separate diagnosis from recovery.
+
+1. Identify the affected service or data category.
+2. Preserve current state where possible.
+3. Confirm the latest verified backup.
+4. Confirm who approved recovery work.
+5. Confirm the intended `<RESTORE_TARGET>`.
+6. Confirm what data may be overwritten.
+7. Perform recovery only through an approved private procedure.
+8. Verify the restored service or data.
+9. Record a sanitized incident summary in tracked docs only if useful.
+10. Keep detailed private operational notes out of Git.
+
+## 13. What Belongs in Private Ignored Notes
+
+Private ignored notes may contain details that are necessary for operations but
+unsafe for tracked documentation.
+
+Examples:
+
+- real hostnames or server addresses
+- real deploy users
+- real backup paths
+- real database paths
+- real upload paths
+- real scheduler details
+- real archive names
+- exact private command history
+- password manager item names
+- credential rotation notes
+- restore-test evidence that includes private data
+
+These notes should remain ignored and should not be staged or committed.
+
+## 14. Redaction Note
+
+This guide has been sanitized to be public-safe and placeholder-only. Future
+updates should preserve that boundary.
+
+If an exact backup or restore command is needed, keep it in private ignored
+operator notes or write it with placeholders and an explicit approval warning.
