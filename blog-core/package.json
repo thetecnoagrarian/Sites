@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "echo 'No build step required for Node.js package'",
-    "test": "echo 'Tests will be added in future phases'"
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
-    content TEXT NOT NULL,
+    body TEXT NOT NULL,
     description TEXT,
     excerpt TEXT,
     images TEXT,          -- JSON array of image paths
@@ -68,4 +68,3 @@ CREATE TRIGGER IF NOT EXISTS categories_updated_at
 BEGIN
     UPDATE categories SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
-

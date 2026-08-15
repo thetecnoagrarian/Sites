@@ -56,7 +56,7 @@ async function getHeroOgImagePath() {
 async function buildOgTags(post, req = null) {
   const baseUrl = getBaseUrl(req);
   const title = post?.title || 'Fruition Forest Garden';
-  const desc = post?.description || (post?.content ? post.content.substring(0, 160) + '...' : 'A blog about our adventure building our homestead on a undeveloped 20 acres in Michigan\'s Upper Peninsula.');
+  const desc = post?.description || (post?.body ? post.body.substring(0, 160) + '...' : 'A blog about our adventure building our homestead on a undeveloped 20 acres in Michigan\'s Upper Peninsula.');
   const url = post ? `${baseUrl}/post/${post.slug || ''}` : `${baseUrl}/`;
   
   // Debug log for images
@@ -108,4 +108,4 @@ async function buildOgTags(post, req = null) {
 }
 
 // Remove the Express middleware and res.send interception logic
-export default buildOgTags; 
+export default buildOgTags;
