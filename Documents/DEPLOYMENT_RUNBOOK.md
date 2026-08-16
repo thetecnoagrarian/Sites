@@ -41,13 +41,18 @@ Confirmed production model from safe files:
 - nginx is configured as a reverse proxy and static-file front end.
 - Backups are intended to cover runtime database and uploads data.
 
-Inferred workflow:
+Canonical change workflow:
 
-1. Code changes are made locally.
-2. Local checks or local production-like checks are performed.
-3. CI runs on push or pull request.
-4. A human reviews status and approves deployment.
-5. Production services are rebuilt/restarted through Docker Compose on the target host.
+1. ChatGPT planning.
+2. Codex implementation.
+3. Risk-appropriate local checks.
+4. Isolated Docker verification when required.
+5. Git review and commit.
+6. GitHub CI.
+7. Explicit manual production deployment approval and execution.
+8. Live verification.
+
+GitHub is source control plus advisory CI. Pushing to GitHub does not deploy production; deployment remains manual and operator-controlled.
 
 Needs Review: the exact canonical production deployment path and final service names must be confirmed before use.
 
@@ -259,6 +264,52 @@ docker compose -f docker-compose.local-prod.yml up --build -d
 docker compose -f docker-compose.local-prod.yml logs -f [SERVICE_NAME]
 docker compose -f docker-compose.local-prod.yml down
 ```
+
+### Verification Classes
+
+Choose the smallest verification class proportionate to the change:
+
+- **Git checks only:** documentation, non-rendered planning files, and similarly low-risk changes. Use status, focused diffs, and whitespace checks.
+- **Lightweight local verification:** literal content or template copy, narrow static assets, and minor CSS or public-JavaScript changes that do not materially alter runtime behavior. Use focused lint, syntax, render, or browser checks as appropriate.
+- **Isolated Docker verification:** application/runtime code, shared `blog-core`, routes, structural templates/layout, authentication or middleware, CSP/security headers, analytics, dependencies, Docker/build behavior, uploads/static serving, and significant frontend/layout changes.
+
+### Isolated Local Test Harness
+
+The isolated harness has two modes:
+
+- `docker-compose.test.yml` is **Mode B**, the final local production-like gate. It builds both applications from `docker/Dockerfile.prod.site`, uses `NODE_ENV=production`, and contains no application source-code bind mounts.
+- `docker-compose.test.dev.yml` is **Mode A**, the fast iteration override. Use it together with the base file. It sets `NODE_ENV=test` and mounts only `blog-core/src` plus the selected site `src` read-only. Relevant shared or application JavaScript changes may require a controlled container restart; no watch tooling is included.
+
+Local endpoints are limited to:
+
+- Fruition Forest Garden: `http://127.0.0.1:4000`
+- The Tecnoagrarian: `http://127.0.0.1:4002`
+
+Both modes retain dedicated Compose-managed `ffg_test_*` and `tta_test_*` data/log volumes. They must never use existing local or production databases, uploads, logs, backups, or other runtime data. The one-shot fixture services wait for each application health check, then apply `tests/fixtures/local-test-seed.sql` to that site's fresh test database. The fixture is synthetic and idempotent; successful completion is required before route/search verification.
+
+Docker commands remain approval-required. After approval, use the base file alone for Mode B or layer the development override for Mode A:
+
+```bash
+# Mode B: final local production-like gate
+docker compose -f docker-compose.test.yml up --build -d
+
+# Mode A: fast iteration override
+docker compose -f docker-compose.test.yml -f docker-compose.test.dev.yml up --build -d
+```
+
+Before route or search checks, use the same Compose file set with `ps --all`: both application services must report healthy and both one-shot fixture services must have exited successfully with status `0`.
+
+The first isolated harness does not cover:
+
+- nginx;
+- TLS;
+- HTTP-to-HTTPS redirects;
+- non-www-to-www redirects;
+- secure-cookie behavior over HTTPS;
+- production proxy/client-IP behavior;
+- edge caching.
+
+These remain live post-deployment checks unless a separate edge-testing profile is intentionally created later.
 
 ## 6. Production Workflow
 

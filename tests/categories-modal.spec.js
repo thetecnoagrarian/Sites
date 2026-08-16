@@ -57,7 +57,7 @@ test.describe('Categories Modal', () => {
       const menuBox = await categoriesMenu.boundingBox();
       const viewportHeight = page.viewportSize().height;
       const modalBottom = menuBox.y + menuBox.height;
-      expect(modalBottom).toBeCloseTo(viewportHeight, 1); // Allow 1px tolerance
+      expect(Math.abs(modalBottom - viewportHeight)).toBeLessThanOrEqual(1); // Allow 1px tolerance
       
       // Take screenshot
       await page.screenshot({ path: 'tests/screenshots/categories-modal-open-mobile.png' });
@@ -246,4 +246,3 @@ test.describe('Categories Modal', () => {
     });
   });
 });
-

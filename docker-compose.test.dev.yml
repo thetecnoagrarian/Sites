@@ -1,0 +1,16 @@
+services:
+  fruitionforestgarden:
+    environment:
+      NODE_ENV: test
+      APP_ROLE: test
+    volumes:
+      - ./blog-core/src:/app/blog-core/src:ro
+      - ./fruitionforestgarden/src:/app/fruitionforestgarden/src:ro
+
+  thetecnoagrarian:
+    environment:
+      NODE_ENV: test
+      APP_ROLE: test
+    volumes:
+      - ./blog-core/src:/app/blog-core/src:ro
+      - ./thetecnoagrarian/src:/app/thetecnoagrarian/src:ro
