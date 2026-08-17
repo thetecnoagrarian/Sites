@@ -281,7 +281,7 @@ Keep those details in local-only private notes or secret-management systems.
 ## Relationship To Other Docs
 
 - `Documents/DEPLOYMENT_RUNBOOK.md` remains the agent-safety and placeholder-oriented deployment planning doc.
-- `Documents/DEPLOYMENT_DISCOVERY.md` records the rediscovery process and is historical/context.
+- `Documents/archive/deployment/DEPLOYMENT_DISCOVERY.md` records the rediscovery process and is historical/context.
 - `Documents/LOCAL_DOCKER_SYNC_GUIDE.md` is a local testing reference, not production deployment authority.
 - `Documents/LOCAL_SETUP_QUICKSTART.md` is a local production-like testing reference.
 - Private local operator notes remain outside Git.

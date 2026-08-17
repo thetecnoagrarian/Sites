@@ -159,7 +159,7 @@ Documentation directory entries visible by safe listing:
 - `Documents/ENVIRONMENT_TEMPLATE.md`
 - `Documents/MASTER_PROJECT_DOCUMENTATION.md`
 - `Documents/GITHUB_AUTHENTICATION_SETUP.md`
-- `Documents/DIRECTORY_AUTO_CREATION_FIX.md`
+- `Documents/archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md` (historical troubleshooting note)
 - `Documents/BACKUP_SYSTEM_GUIDE.md`
 
 Credential-sensitive documentation entries are listed in the sensitive section and were not opened.

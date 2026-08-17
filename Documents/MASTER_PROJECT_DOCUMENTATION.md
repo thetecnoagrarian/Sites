@@ -312,7 +312,7 @@ npm run dev:all  # Starts both sites on ports 3000 and 3002
 ssh deploy@172.236.119.220 "cd /opt/Sites && docker-compose -f docker-compose.prod.yml up --build -d [SERVICE_NAME]"
 ```
 
-> **Note**: For local development setup and directory auto-creation fixes, see [DIRECTORY_AUTO_CREATION_FIX.md](./DIRECTORY_AUTO_CREATION_FIX.md)
+> **Note**: For historical background on the local directory auto-creation fix, see [the archived directory auto-creation note](./archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md)
 
 ---
 
@@ -729,7 +729,7 @@ ssh [SSH_USER]@[SERVER_IP] "/opt/Sites/scripts/backup-host.sh"
 - ✅ **Local Development Fix**: Fixed local dev crashes when directories don't exist
 - ✅ **TTA Default Paths**: Updated TTA to use local paths by default (matching FFG)
 - ✅ **Better Error Handling**: Improved error messages for directory creation failures
-- ✅ **Documentation**: Added [DIRECTORY_AUTO_CREATION_FIX.md](./DIRECTORY_AUTO_CREATION_FIX.md) guide
+- ✅ **Documentation**: Added the now-archived [DIRECTORY_AUTO_CREATION_FIX.md](./archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md) guide
 
 ### Version 2.5.0 - November 11, 2025
 - ✅ **WebP Image Format**: New uploads automatically converted to WebP (25-35% smaller than JPEG)
@@ -810,7 +810,7 @@ This master document consolidates all previous documentation files:
 **Active Documentation Files:**
 - `MASTER_PROJECT_DOCUMENTATION.md` - This file (single source of truth)
 - `GITHUB_AUTHENTICATION_SETUP.md` - GitHub/SSH auth for thetecnoagrarian account and new repos
-- `DIRECTORY_AUTO_CREATION_FIX.md` - Local development directory auto-creation guide
+- `archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md` - Historical local development directory auto-creation guide
 - `ENVIRONMENT_TEMPLATE.md` - Template for production `.env` configuration
 - `FFG_LAUNCH_READINESS.md` - Fruition Forest Garden launch checklist
 - `USERNAME_PASSWORD_UPDATE_GUIDE.md` - Admin credential management guide

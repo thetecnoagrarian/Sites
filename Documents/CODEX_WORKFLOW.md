@@ -379,7 +379,7 @@ Staged migration sequence:
 5. `Documents/ENVIRONMENT_AND_SECRETS_MAP.md`
 6. `Documents/DEPLOYMENT_RUNBOOK.md`
 7. `Documents/CODEX_WORKFLOW.md`
-8. `Documents/CURSOR_TO_CODEX_MIGRATION.md`
+8. `Documents/archive/migration/CURSOR_TO_CODEX_MIGRATION.md` as the historical migration record
 9. `Documents/DOCUMENTATION_AUDIT.md`
 10. dependency/security remediation after the documentation foundation
 
@@ -460,9 +460,9 @@ When source and docs conflict, document the conflict or ask the user. Do not gue
 
 Next safe tasks:
 
-1. Create `Documents/CURSOR_TO_CODEX_MIGRATION.md`.
-2. Create `Documents/DOCUMENTATION_AUDIT.md`.
-3. After documentation foundation is complete, create a dependency/security remediation plan.
+1. Keep `Documents/DOCUMENTATION_AUDIT.md` current as documentation is consolidated.
+2. Consult `Documents/archive/migration/CURSOR_TO_CODEX_MIGRATION.md` only for migration history.
+3. Keep dependency/security remediation separate from documentation consolidation.
 
 Dependency/security remediation should remain separate from documentation migration and should start with review, not automatic fixes.
 

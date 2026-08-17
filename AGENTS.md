@@ -86,7 +86,7 @@ Codex migration documentation should live in `Documents/`:
 - `Documents/ENVIRONMENT_AND_SECRETS_MAP.md`
 - `Documents/DEPLOYMENT_RUNBOOK.md`
 - `Documents/CODEX_WORKFLOW.md`
-- `Documents/CURSOR_TO_CODEX_MIGRATION.md`
+- `Documents/archive/migration/CURSOR_TO_CODEX_MIGRATION.md` (historical migration record)
 - `Documents/DOCUMENTATION_AUDIT.md`
 
 ## Environment and secrets documentation rules
@@ -155,7 +155,7 @@ Recommended order:
 4. Create `Documents/ENVIRONMENT_AND_SECRETS_MAP.md`
 5. Create `Documents/DEPLOYMENT_RUNBOOK.md`
 6. Create `Documents/CODEX_WORKFLOW.md`
-7. Create `Documents/CURSOR_TO_CODEX_MIGRATION.md`
+7. Record completed migration history in `Documents/archive/migration/CURSOR_TO_CODEX_MIGRATION.md`
 8. Create `Documents/DOCUMENTATION_AUDIT.md`
 
 ## Operator preference

@@ -189,9 +189,9 @@ This helps diagnose:
 
 ## Related Documentation
 
-- [LOCAL_SETUP_QUICKSTART.md](./LOCAL_SETUP_QUICKSTART.md) - Local development setup
-- [ENVIRONMENT_TEMPLATE.md](./ENVIRONMENT_TEMPLATE.md) - Environment variable reference
-- [MASTER_PROJECT_DOCUMENTATION.md](./MASTER_PROJECT_DOCUMENTATION.md) - Overall project docs
+- [LOCAL_SETUP_QUICKSTART.md](../../LOCAL_SETUP_QUICKSTART.md) - Local development setup
+- [ENVIRONMENT_TEMPLATE.md](../../ENVIRONMENT_TEMPLATE.md) - Environment variable reference
+- [MASTER_PROJECT_DOCUMENTATION.md](../../MASTER_PROJECT_DOCUMENTATION.md) - Overall project docs
 
 ---
 
@@ -201,4 +201,3 @@ This helps diagnose:
 - Directory creation happens before database/file operations, preventing race conditions
 - Error handling ensures clear feedback if something goes wrong
 - Docker paths are preserved via environment variables, maintaining production compatibility
-
