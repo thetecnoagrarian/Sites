@@ -311,6 +311,35 @@ The first isolated harness does not cover:
 
 These remain live post-deployment checks unless a separate edge-testing profile is intentionally created later.
 
+### Permanent Downloadable Assets
+
+Permanent site-specific public assets should normally live under the appropriate site public tree:
+
+- `fruitionforestgarden/src/public`
+- `thetecnoagrarian/src/public`
+
+The existing `express.static()` setup serves these directories at the site URL root. For example, `src/public/downloads/example.pdf` maps to `/downloads/example.pdf` for that site. The production Docker build copies these public trees into the image, so committing or pushing an asset does not make it live by itself: Mode B can prove that the candidate production-like image contains and serves it, but production must still be rebuilt/recreated and verified live.
+
+`/uploads` remains the writable runtime-upload path. It is appropriate for runtime uploads, but it is not the preferred location for permanent downloadable assets that should be reproducible after a fresh build from repository state.
+
+Use this normal verification sequence for a permanent downloadable asset:
+
+1. Place it under the appropriate site `src/public` tree.
+2. Verify it locally as appropriate.
+3. Use Mode B as the definitive local production-like check.
+4. Confirm the expected URL returns HTTP `200`.
+5. Confirm the expected MIME type.
+6. Confirm byte integrity or a checksum when the file is important or duplicated across sites.
+7. Commit and push the verified asset.
+8. Manually deploy and rebuild/recreate the production service with explicit approval.
+9. Verify the live URL and response headers.
+
+For PDFs, normal in-browser display is acceptable when a forced `Content-Disposition: attachment` response is not required.
+
+Shared `blog-core` participates in static-serving behavior but does not currently provide a shared public-assets directory. Using one repository copy across sites would require an intentional architecture change and should not be introduced casually for a one-off asset.
+
+Deployment boundary: local Mode B validation proves the candidate image behaves correctly; live verification proves the currently deployed production image contains the asset. Mode B success is not evidence that production has already been updated.
+
 ## 6. Production Workflow
 
 Confirmed from `docker-compose.prod.yml`:
