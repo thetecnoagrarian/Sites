@@ -1,8 +1,10 @@
 # Dependency Security Remediation Plan
 
+> **Current-use note:** The first targeted patch pass is complete. Use `Documents/DEPENDENCY_REMEDIATION_LOG.md` for completed changes and current remaining risk; this document remains the staged plan for unresolved dependency families.
+
 ## 1. Purpose
 
-This document plans dependency/security remediation before any package changes are made.
+This document plans staged dependency/security remediation, including work that remains after the first targeted patch pass.
 
 The goal is to address real dependency risk without breaking the two production sites, especially shared `blog-core` behavior that both Fruition Forest Garden and The Tecnoagrarian rely on.
 
@@ -418,15 +420,15 @@ Depending on the approved scope, additional targeted commands may be needed for 
 
 ## 13. Recommended Next Task
 
-Run an approved read-only dependency audit command set.
+Refresh the read-only dependency evidence, then prepare a narrowly scoped plan for one unresolved runtime family identified in `Documents/DEPENDENCY_REMEDIATION_LOG.md`.
 
 Recommended next prompt:
 
 ```text
 Read AGENTS.md first and follow it strictly.
-Run read-only dependency audit commands only.
+Review the current dependency audit and remediation log, then run only the approved read-only dependency audit commands needed to refresh them.
 Do not fix, install new packages, deploy, run Docker, or modify files.
 Capture current audit paths, direct/transitive ownership, and production/dev relevance.
 ```
 
-After the read-only audit, prepare a targeted package update plan with specific version candidates, expected lockfile changes, and a test/deployment checklist.
+After refreshing the evidence, prepare a targeted update plan for one unresolved dependency family with specific version candidates, expected lockfile changes, and a test/deployment checklist.

@@ -129,7 +129,7 @@ These areas may be important for operations and recovery, but they should not be
 
 ### Documentation as Source of Truth
 
-`AGENTS.md` identifies `Documents/`, `Documents/MASTER_PROJECT_DOCUMENTATION.md`, and `AGENTS.md` as primary documentation areas. For Codex migration work, documentation should be created under `Documents/`.
+`AGENTS.md` identifies `Documents/` and `AGENTS.md` as the primary documentation areas. The former broad master document is archived at `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` for historical context and is not current operational authority. For Codex migration work, documentation should be created under `Documents/`.
 
 Documentation should preserve workflows, architectural context, and safety boundaries without exposing secrets. If docs conflict with code, record the conflict instead of guessing.
 

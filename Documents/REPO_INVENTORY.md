@@ -157,7 +157,11 @@ Documentation directory entries visible by safe listing:
 - `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` (historical local Docker note)
 - `Documents/USERNAME_PASSWORD_UPDATE_GUIDE.md`
 - `Documents/ENVIRONMENT_TEMPLATE.md`
-- `Documents/MASTER_PROJECT_DOCUMENTATION.md`
+- `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` (historical project context)
+- `Documents/archive/dependencies/TARGETED_DEPENDENCY_UPDATE_PLAN.md` (historical dependency plan)
+- `Documents/DEPENDENCY_SECURITY_REMEDIATION_PLAN.md`
+- `Documents/DEPENDENCY_AUDIT_RESULTS.md`
+- `Documents/DEPENDENCY_REMEDIATION_LOG.md`
 - `Documents/GITHUB_AUTHENTICATION_SETUP.md`
 - `Documents/archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md` (historical troubleshooting note)
 - `Documents/BACKUP_SYSTEM_GUIDE.md`

@@ -1,6 +1,8 @@
 # Master Project Documentation
 ## Fruition Forest Garden & The Tecnoagrarian Blog Platform
 
+> **Archived historical record:** This document is not current operational authority. Use `AGENTS.md` and the focused active documents under `Documents/` for current guidance.
+
 ---
 
 ## ⚠️ IMPORTANT CSS RULE
@@ -312,7 +314,7 @@ npm run dev:all  # Starts both sites on ports 3000 and 3002
 ssh deploy@172.236.119.220 "cd /opt/Sites && docker-compose -f docker-compose.prod.yml up --build -d [SERVICE_NAME]"
 ```
 
-> **Note**: For historical background on the local directory auto-creation fix, see [the archived directory auto-creation note](./archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md)
+> **Note**: For historical background on the local directory auto-creation fix, see [the archived directory auto-creation note](../troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md)
 
 ---
 
@@ -562,7 +564,7 @@ TRUSTED_IPS=[your-trusted-ip]
 - **thetecnoagrarian account**: Delete and re-add 2 keys with new names
 - **fruitionforestgarden account**: Delete "local github_ed25519" key
 
-**New repo / authentication issues:** See [GITHUB_AUTHENTICATION_SETUP.md](./GITHUB_AUTHENTICATION_SETUP.md) for fixing GitHub auth with thetecnoagrarian account (add key to account or as deploy key, set SSH remote, test).
+**New repo / authentication issues:** See [GITHUB_AUTHENTICATION_SETUP.md](../../GITHUB_AUTHENTICATION_SETUP.md) for the separate authentication reference.
 
 ### Authentication Workflow
 - **Admin Passwords**: Managed through application database
@@ -729,7 +731,7 @@ ssh [SSH_USER]@[SERVER_IP] "/opt/Sites/scripts/backup-host.sh"
 - ✅ **Local Development Fix**: Fixed local dev crashes when directories don't exist
 - ✅ **TTA Default Paths**: Updated TTA to use local paths by default (matching FFG)
 - ✅ **Better Error Handling**: Improved error messages for directory creation failures
-- ✅ **Documentation**: Added the now-archived [DIRECTORY_AUTO_CREATION_FIX.md](./archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md) guide
+- ✅ **Documentation**: Added the now-archived [DIRECTORY_AUTO_CREATION_FIX.md](../troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md) guide
 
 ### Version 2.5.0 - November 11, 2025
 - ✅ **WebP Image Format**: New uploads automatically converted to WebP (25-35% smaller than JPEG)
@@ -807,8 +809,8 @@ This master document consolidates all previous documentation files:
 - ✅ nginx-ssl-fix-instructions.md
 - ✅ setup-thetecnoagrarian-com-manual.txt
 
-**Active Documentation Files:**
-- `MASTER_PROJECT_DOCUMENTATION.md` - This file (single source of truth)
+**Documentation files at the time of this historical record:**
+- `MASTER_PROJECT_DOCUMENTATION.md` - This archived historical file
 - `GITHUB_AUTHENTICATION_SETUP.md` - GitHub/SSH auth for thetecnoagrarian account and new repos
 - `archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md` - Historical local development directory auto-creation guide
 - `ENVIRONMENT_TEMPLATE.md` - Template for production `.env` configuration

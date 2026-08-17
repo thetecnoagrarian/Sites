@@ -1,5 +1,7 @@
 # Targeted Dependency Update Plan
 
+> **Archived historical record:** The first targeted remediation pass is complete. Use `Documents/DEPENDENCY_REMEDIATION_LOG.md` for completed work and remaining risk, and `Documents/DEPENDENCY_SECURITY_REMEDIATION_PLAN.md` for the active unresolved workstream.
+
 ## Safety Boundary
 
 This is a dependency remediation planning document only.

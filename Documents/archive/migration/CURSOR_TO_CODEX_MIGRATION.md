@@ -63,7 +63,7 @@ The safer model is to keep architecture, workflows, deployment rules, environmen
 | `Documents/CODEX_WORKFLOW.md` | Defines how Codex should operate safely in this repo. | Use at session startup and before edits, audits, commits, dependency work, or deployment-related work. | workflow context |
 | `Documents/CURSOR_TO_CODEX_MIGRATION.md` | Tracks what has been extracted from Cursor-era context and what remains to review before cancelling Cursor. | Use to finish the migration and assess cancellation risk. | workflow context |
 | `Documents/DOCUMENTATION_AUDIT.md` | Planned future audit of documentation consistency, staleness, and conflicts. | Use after creation to decide what docs need cleanup. | workflow context |
-| `Documents/MASTER_PROJECT_DOCUMENTATION.md` | Historical/current master project notes. | Use cautiously because some status and operational guidance may drift. Prefer newer migration docs for Codex safety boundaries. | safe context with review needed |
+| `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` | Archived master project notes. | Historical context only. Prefer current focused docs for Codex safety boundaries and operations. | safe context with review needed |
 
 ## 5. Safe Codex Setup Now Established
 
@@ -188,5 +188,5 @@ Dependency/security remediation should begin after the documentation foundation 
 - Which operational docs are current and which are historical?
 - Which root or site-level Docker/Compose files are canonical?
 - Should dependency remediation begin immediately after the documentation audit, or should it wait for a separate planning task?
-- Should `Documents/MASTER_PROJECT_DOCUMENTATION.md` remain the master document, or should newer focused docs become the practical source of truth for Codex work?
+- The former master document is archived at `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md`; current focused docs are the practical source of truth for Codex work.
 - Should Cursor be cancelled only after Codex successfully completes a full documentation audit using repo files alone?

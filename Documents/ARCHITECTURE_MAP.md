@@ -272,6 +272,8 @@ Common view folders:
 - `src/views/admin/`
 - top-level page templates such as home, about, search, category, error, 404, and 500 pages.
 
+CSS maintenance rule: avoid `!important` in committed styles. Use it only for temporary debugging, remove it before completion, and resolve lasting conflicts through selector specificity, cascade order, or refactoring.
+
 ### Important Site Differences
 
 Confirmed differences visible from safe inspection:

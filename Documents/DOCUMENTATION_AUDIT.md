@@ -2,7 +2,7 @@
 
 This document audits the project documentation after the Cursor-to-Codex migration foundation.
 
-It identifies active guidance, historical context, stale or conflicting information, and consolidation candidates. It does not rewrite, delete, move, rename, or consolidate any existing documentation.
+It identifies active guidance, historical context, stale or conflicting information, and consolidation candidates, and records approved archive batches.
 
 No real `.env` files, `Documents/SECRETS.md`, runtime databases, uploads, backups, private keys, certificates, credential exports, or secret values were inspected.
 
@@ -19,7 +19,7 @@ The goals are:
 - preserve useful history without treating every older instruction as current
 - prepare for later dependency/security remediation
 
-This audit is classification and conflict-finding only. It should not be treated as a cleanup commit or documentation rewrite.
+This audit is the current classification record and archive log. It does not authorize future cleanup or operational changes beyond an explicitly approved task.
 
 ## 2. Current Documentation Landscape
 
@@ -34,13 +34,13 @@ This audit is classification and conflict-finding only. It should not be treated
 | `Documents/CODEX_WORKFLOW.md` | Codex workflow | Active | Keep as active Codex operating procedure | Medium | Defines startup, scope, audit, commit, dependency, and deployment boundaries. |
 | `Documents/archive/migration/CURSOR_TO_CODEX_MIGRATION.md` | Migration/workflow history | Archived | Preserve as historical context; current workflow lives in active Codex guidance | Low | The migration foundation and documentation audit are complete. |
 | `Documents/AGENT_ORCHESTRATION_WORKFLOW.md` | Reusable workflow template | Active | Keep as project-local copy and possible template seed | Low | Captures human + ChatGPT + Codex + Git + docs operating model. |
-| `Documents/MASTER_PROJECT_DOCUMENTATION.md` | Master historical/context doc | Needs Review | Reclassify as historical/context unless refreshed | High | Contains useful history and some live-looking operational/account/access details. Newer focused docs should be trusted first for safety boundaries. |
+| `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` | Broad project history | Archived | Preserve as historical context only | High | Current guidance is distributed across focused docs; sensitive-adjacent and stale operational detail must not control current work. |
 | `Documents/archive/troubleshooting/LOCAL_SETUP_QUICKSTART.md` | Local production-like setup history | Archived | Preserve as historical setup context | Medium | Current local production-like and isolated testing guidance lives in the runbook. |
 | `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` | Local Docker workflow history | Archived | Preserve as historical setup context | High | Contains superseded direct Docker/deployment instructions and is not current authority. |
-| `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup operational guide | Needs Review | Operational reference, likely superseded by runbook for safety | High | Contains backup/cron/restore/check commands and live-looking server/container details. Keep for history; do not use as direct execution guide without approval. |
+| `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup planning guide | Active but cautious | Keep as placeholder-only planning reference | High | Tracked architecture still supports database-and-upload backup concepts. The guide does not establish live schedules or authorize backup/restore actions. |
 | `Documents/GITHUB_AUTHENTICATION_SETUP.md` | GitHub auth reference | Needs Review | Sensitive-adjacent reference or historical setup note | High | Contains account, SSH, key path, and auth workflow details. Do not reproduce private details in future docs. |
 | `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md` | Cleanup/troubleshooting history | Archived | Preserve as migration-era cleanup context | High | Destructive cleanup instructions must not be treated as current operational guidance. |
-| `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Analytics cleanup guide | Needs Review | High-risk operational reference | High | Contains database cleanup concepts and production command patterns. Treat as approval-required and probably historical until verified. |
+| `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Analytics cleanup planning guide | Active but cautious | Keep as placeholder-only planning reference | High | Tracked analytics models, middleware, routes, and cleanup script still exist. The guide does not authorize database mutation or claim live state. |
 | `Documents/archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md` | Troubleshooting / change history | Archived | Preserve as historical technical context | Medium | Current source still implements the fix; the archived note must not be used to inspect real env files. |
 | `Documents/ENVIRONMENT_TEMPLATE.md` | Reference/template doc | Needs Review | Validate or replace with canonical env example | High importance, medium content risk | Contains placeholder-style values, but migration docs found variables that appear stale, missing, or mismatched. |
 | `Documents/USERNAME_PASSWORD_UPDATE_GUIDE.md` | Credential/admin workflow guide | Needs Review | Sensitive-adjacent historical/reference doc | High | Contains admin identifier workflow and password-change command patterns. Do not treat as active without review and explicit approval. |
@@ -70,7 +70,26 @@ Batch 2 moved three completed setup and cleanup records into existing archive ca
 
 Tracked Markdown under `Documents/` changed from 23 active and 4 archived files to 20 active and 7 archived files. This is a 25.9% reduction from the original 27-document active baseline. The remaining dependency workstream was not archived because unresolved runtime risk remains documented there.
 
-### 2C. Current Cleanup Classification Update - 2026-06-12
+### 2C. Documentation Archive Batch 3 - 2026-08-17
+
+Batch 3 moved two superseded documents into new archive categories after transferring the only durable current rule that was not already represented in focused documentation:
+
+| Reviewed document | Classification | Basis |
+|---|---|---|
+| `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` | `CONSOLIDATE_THEN_ARCHIVE` | Focused docs supersede its broad operational role; its unique CSS maintenance rule moved to the architecture map. |
+| `Documents/BACKUP_SYSTEM_GUIDE.md` | `KEEP_ACTIVE` | It is now placeholder-only planning, and tracked backup architecture still covers database and upload state; live execution details remain unverified. |
+| `Documents/ANALYTICS_CLEANUP_GUIDE.md` | `KEEP_ACTIVE` | It is now placeholder-only planning, and the tracked analytics models, middleware, routes, and cleanup script still exist. |
+| `Documents/DEPENDENCY_SECURITY_REMEDIATION_PLAN.md` | `KEEP_ACTIVE` | Its staged model still covers unresolved dependency families; the current-use note points to the remediation log for present status. |
+| `Documents/archive/dependencies/TARGETED_DEPENDENCY_UPDATE_PLAN.md` | `ARCHIVE_NOW` | The first targeted pass is complete and its current evidence and remaining risks are recorded in active dependency docs. |
+
+| Archived document | Current canonical replacement |
+|---|---|
+| `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` | Current focused docs; its CSS maintenance rule now lives in `Documents/ARCHITECTURE_MAP.md` |
+| `Documents/archive/dependencies/TARGETED_DEPENDENCY_UPDATE_PLAN.md` | `Documents/DEPENDENCY_REMEDIATION_LOG.md` for completed work and remaining risk, plus `Documents/DEPENDENCY_SECURITY_REMEDIATION_PLAN.md` for the unresolved workstream |
+
+Tracked Markdown under `Documents/` changed from 20 active and 7 archived files to 18 active and 9 archived files. This is a 33.3% reduction from the original 27-document active baseline. `Documents/BACKUP_SYSTEM_GUIDE.md` and `Documents/ANALYTICS_CLEANUP_GUIDE.md` remain active as placeholder-only planning references; neither authorizes production operations. Unresolved dependency evidence also remains active.
+
+### 2D. Current Cleanup Classification Update - 2026-06-12
 
 This update reflects later dependency remediation, logging redaction, CSP cleanup, Search Console fixes, `/index.html` redirect work, and live nginx non-www-to-www canonical redirects.
 
@@ -103,7 +122,8 @@ This section supersedes older status notes in this audit where they conflict wit
 | `Documents/DEPENDENCY_REMEDIATION_LOG.md` | Chronological remediation and production verification log | Keep tracked as a log, but do not treat as the single current-status source. |
 | `Documents/DEPENDENCY_AUDIT_RESULTS.md` | Dependency evidence/reference | Keep as evidence. |
 | `Documents/DEPENDENCY_SECURITY_REMEDIATION_PLAN.md` | Dependency remediation plan | Keep as plan/reference. |
-| `Documents/TARGETED_DEPENDENCY_UPDATE_PLAN.md` | First-pass targeted dependency plan | Keep as plan/reference. |
+| `Documents/BACKUP_SYSTEM_GUIDE.md` | Placeholder-only backup planning reference | Keep active; live schedules, paths, and restore readiness still require operator verification. |
+| `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Placeholder-only analytics retention and cleanup planning reference | Keep active; any data mutation requires separate approval and live-state verification. |
 | `Documents/DOCUMENTATION_AUDIT.md` | Documentation classification and cleanup plan | Keep active and refresh during cleanup. |
 
 #### Public Tracked Docs That Are Mostly Historical Or Troubleshooting
@@ -112,11 +132,10 @@ This section supersedes older status notes in this audit where they conflict wit
 |---|---|---|
 | `Documents/archive/deployment/DEPLOYMENT_DISCOVERY.md` | Historical/transitional deployment rediscovery note | Archived in Batch 1; use the active deployment docs for current guidance. |
 | `Documents/archive/seo/GOOGLE_INDEXING_DIAGNOSTIC.md` | Historical public-403/Search Console diagnostic | Archived in Batch 1; use `SEO_CRAWLABILITY_NOTES.md` for current state. |
-| `Documents/MASTER_PROJECT_DOCUMENTATION.md` | Broad historical/context doc | Reclassify away from "master" authority unless fully refreshed. |
+| `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` | Broad historical/context doc | Archived in Batch 3; use current focused docs for operational authority. |
+| `Documents/archive/dependencies/TARGETED_DEPENDENCY_UPDATE_PLAN.md` | Completed first-pass dependency plan | Archived in Batch 3; use the remediation log and active security plan for current dependency work. |
 | `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` | Local testing/history reference | Archived in Batch 2; use the runbook for current local workflows. |
 | `Documents/archive/troubleshooting/LOCAL_SETUP_QUICKSTART.md` | Local setup reference | Archived in Batch 2; use the runbook for current local workflows. |
-| `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup/restore reference | Keep as high-risk reference; do not treat as primary deployment guide. |
-| `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Analytics cleanup/troubleshooting guide | Treat as high-risk operational reference; later sanitize or archive if stale. |
 | `Documents/archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md` | Historical troubleshooting note | Archived in Batch 1 after confirming the source still implements the fix. |
 | `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md` | Historical cleanup guide | Archived in Batch 2; destructive cleanup guidance is no longer active by default. |
 
@@ -197,7 +216,8 @@ Current interpretation:
 ### Migration / History Layer
 
 - `Documents/archive/migration/CURSOR_TO_CODEX_MIGRATION.md`
-- `Documents/MASTER_PROJECT_DOCUMENTATION.md`
+- `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md`
+- `Documents/archive/dependencies/TARGETED_DEPENDENCY_UPDATE_PLAN.md`
 - `Documents/archive/deployment/DEPLOYMENT_DISCOVERY.md`
 - `Documents/archive/seo/GOOGLE_INDEXING_DIAGNOSTIC.md`
 - future `Documents/PROJECT_HISTORY.md` or `Documents/HISTORICAL_NOTES.md`
@@ -215,7 +235,7 @@ Use to preserve why things changed, not necessarily to control current operation
 - `Documents/USERNAME_PASSWORD_UPDATE_GUIDE.md`
 - `Documents/archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md`
 
-Use cautiously. Many of these should become historical/reference docs or be consolidated after review.
+Use cautiously. The active backup and analytics guides are placeholder-only planning references; they do not authorize production operations. Credential-adjacent documents still require human safety review.
 
 ## 4. Active Source-of-Truth Recommendations
 
@@ -271,11 +291,10 @@ Reference it for local, local-production-like, production, backup, and rollback 
 
 The following docs preserve useful history but should not automatically control future work:
 
-- `Documents/MASTER_PROJECT_DOCUMENTATION.md`
+- `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md`
+- `Documents/archive/dependencies/TARGETED_DEPENDENCY_UPDATE_PLAN.md`
 - `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md`
-- `Documents/BACKUP_SYSTEM_GUIDE.md`
 - `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md`
-- `Documents/ANALYTICS_CLEANUP_GUIDE.md`
 - `Documents/archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md`
 - `Documents/GITHUB_AUTHENTICATION_SETUP.md`
 - `Documents/USERNAME_PASSWORD_UPDATE_GUIDE.md`
@@ -287,15 +306,12 @@ Reasons:
 - Some include sensitive-adjacent account, key, path, host, or admin details.
 - Some overlap with newer focused docs that now define safer boundaries.
 
-These files should be summarized or consolidated later, not blindly deleted. They may explain why the repo is in its current shape.
+Archived files preserve context and must not be treated as current authority. Credential-adjacent files remain unchanged pending human safety review.
 
 ## 6. Consolidation Candidates
 
 | Candidate | Value preserved | Why stale or redundant | Retain | Review before consolidation |
 |---|---|---|---|---|
-| `Documents/MASTER_PROJECT_DOCUMENTATION.md` | Broad history, status notes, architecture and operational milestones | Newer focused docs supersede many safety, environment, deployment, and workflow sections | High-level timeline, major decisions, CSS rule if still desired | Remove or redact sensitive-adjacent details; verify current status |
-| `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup model, retention concept, restore awareness | Contains direct operational commands and server/container assumptions | Backup concepts and unresolved automation status | Verify scripts, schedule, restore procedure, and current host layout |
-| `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Analytics cleanup concept and retention idea | Contains database mutation commands and point-in-time stats | Retention concept and all-time stats idea | Verify current analytics schema and backup-before-cleanup workflow |
 | `Documents/GITHUB_AUTHENTICATION_SETUP.md` | GitHub auth troubleshooting | Sensitive-adjacent and account/key oriented | Generic GitHub auth lessons with placeholders | Redact account/key specifics if moved into active docs |
 | `Documents/USERNAME_PASSWORD_UPDATE_GUIDE.md` | Admin credential update workflow | Sensitive-adjacent and production-affecting | High-level account-rotation concept | Replace identifiers with placeholders and require explicit approval |
 
@@ -343,10 +359,10 @@ Consistent safety guidance in active docs:
 
 Needs Review items:
 
-- `Documents/MASTER_PROJECT_DOCUMENTATION.md` contains sensitive-adjacent account/access details and direct deployment guidance. Treat as historical/context until cleaned.
+- `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` contains sensitive-adjacent and stale operational detail. It is archived history and must not control current work.
 - `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` preserves superseded setup and deployment examples as historical context.
-- `Documents/BACKUP_SYSTEM_GUIDE.md` includes direct SSH/Docker/backup/delete patterns. Treat as high-risk operational reference only.
-- `Documents/ANALYTICS_CLEANUP_GUIDE.md` includes database mutation and cleanup commands. Treat as high-risk.
+- `Documents/BACKUP_SYSTEM_GUIDE.md` is placeholder-only planning. Live backup schedules, exact runtime state, and restore readiness remain unverified and require operator review before action.
+- `Documents/ANALYTICS_CLEANUP_GUIDE.md` is placeholder-only planning. Any analytics deletion remains a separately approved, backup-gated production action.
 - `Documents/GITHUB_AUTHENTICATION_SETUP.md` includes account and SSH key configuration details. Treat as sensitive-adjacent.
 - `Documents/USERNAME_PASSWORD_UPDATE_GUIDE.md` includes admin identifier and password rotation workflow details. Treat as sensitive-adjacent and approval-required.
 - `Documents/ENVIRONMENT_TEMPLATE.md` contains placeholder values but needs validation against active source and Compose references.
@@ -363,7 +379,7 @@ Use for deployment concepts, preflight checklist, rollback concepts, and approva
 
 ### Historical Deployment Notes
 
-- `Documents/MASTER_PROJECT_DOCUMENTATION.md`
+- `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md`
 - `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md`
 - `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md`
 
@@ -392,7 +408,7 @@ Current production-like and isolated local workflow guidance lives in `Documents
 - `Documents/DEPLOYMENT_RUNBOOK.md`
 - `Documents/BACKUP_SYSTEM_GUIDE.md`
 
-The runbook should control safety boundaries. The backup guide may preserve workflow history, but restore and cleanup actions are high-risk.
+The runbook controls safety boundaries. The backup guide supports placeholder-only planning, while live scheduling, restore, and cleanup actions remain high-risk and separately approval-gated.
 
 ### High-Risk Actions Requiring Approval
 
@@ -522,8 +538,6 @@ Sensitive paths may be listed when needed, but contents must not be opened or re
 ## 16. Open Questions
 
 - Which docs are truly active source-of-truth?
-- Should `Documents/MASTER_PROJECT_DOCUMENTATION.md` become historical/context rather than master?
-- Should `Documents/PROJECT_HISTORY.md` or `Documents/HISTORICAL_NOTES.md` be created?
 - Which operational docs are current versus historical?
 - Which Compose workflow is canonical?
 - Should Node 20 become the documented baseline?

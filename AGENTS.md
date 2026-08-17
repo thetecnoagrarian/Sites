@@ -11,9 +11,10 @@ The repo includes site-specific code, shared blog-core code, Docker/deployment f
 
 Primary documentation lives in:
 
-- `Documents/MASTER_PROJECT_DOCUMENTATION.md`
 - `Documents/`
 - `AGENTS.md`
+
+Historical project context is preserved in `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md`; it is not current operational authority.
 
 ## Highest-priority safety rules
 
