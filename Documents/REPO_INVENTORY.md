@@ -152,9 +152,9 @@ Generated or runtime test output:
 Documentation directory entries visible by safe listing:
 
 - `Documents/ANALYTICS_CLEANUP_GUIDE.md`
-- `Documents/POST_LAUNCH_CLEANUP.md`
-- `Documents/LOCAL_SETUP_QUICKSTART.md`
-- `Documents/LOCAL_DOCKER_SYNC_GUIDE.md`
+- `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md` (historical cleanup note)
+- `Documents/archive/troubleshooting/LOCAL_SETUP_QUICKSTART.md` (historical local setup note)
+- `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` (historical local Docker note)
 - `Documents/USERNAME_PASSWORD_UPDATE_GUIDE.md`
 - `Documents/ENVIRONMENT_TEMPLATE.md`
 - `Documents/MASTER_PROJECT_DOCUMENTATION.md`

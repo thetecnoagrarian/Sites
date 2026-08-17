@@ -2,7 +2,7 @@
 
 **Goal**: Match your local Docker environment with production for testing.
 
-> **Note**: For historical background on the pure-local directory fix, see [the archived directory auto-creation note](./archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md).
+> **Note**: For historical background on the pure-local directory fix, see [the archived directory auto-creation note](./DIRECTORY_AUTO_CREATION_FIX.md).
 > Use `npm run dev:all` for quick local testing without Docker.
 
 ---

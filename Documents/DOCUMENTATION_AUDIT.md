@@ -35,11 +35,11 @@ This audit is classification and conflict-finding only. It should not be treated
 | `Documents/archive/migration/CURSOR_TO_CODEX_MIGRATION.md` | Migration/workflow history | Archived | Preserve as historical context; current workflow lives in active Codex guidance | Low | The migration foundation and documentation audit are complete. |
 | `Documents/AGENT_ORCHESTRATION_WORKFLOW.md` | Reusable workflow template | Active | Keep as project-local copy and possible template seed | Low | Captures human + ChatGPT + Codex + Git + docs operating model. |
 | `Documents/MASTER_PROJECT_DOCUMENTATION.md` | Master historical/context doc | Needs Review | Reclassify as historical/context unless refreshed | High | Contains useful history and some live-looking operational/account/access details. Newer focused docs should be trusted first for safety boundaries. |
-| `Documents/LOCAL_SETUP_QUICKSTART.md` | Local production-like setup | Needs Review | Operational reference or consolidation candidate | Medium | Useful local-prod concept, but includes commands that start Docker and sample env content. Prefer runbook for approval boundaries. |
-| `Documents/LOCAL_DOCKER_SYNC_GUIDE.md` | Local Docker workflow history | Needs Review | Historical/context or local workflow reference | High | Contains older setup steps, Docker commands, copying `.env`, cleanup commands, and live-looking deployment examples. |
+| `Documents/archive/troubleshooting/LOCAL_SETUP_QUICKSTART.md` | Local production-like setup history | Archived | Preserve as historical setup context | Medium | Current local production-like and isolated testing guidance lives in the runbook. |
+| `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` | Local Docker workflow history | Archived | Preserve as historical setup context | High | Contains superseded direct Docker/deployment instructions and is not current authority. |
 | `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup operational guide | Needs Review | Operational reference, likely superseded by runbook for safety | High | Contains backup/cron/restore/check commands and live-looking server/container details. Keep for history; do not use as direct execution guide without approval. |
 | `Documents/GITHUB_AUTHENTICATION_SETUP.md` | GitHub auth reference | Needs Review | Sensitive-adjacent reference or historical setup note | High | Contains account, SSH, key path, and auth workflow details. Do not reproduce private details in future docs. |
-| `Documents/POST_LAUNCH_CLEANUP.md` | Cleanup/troubleshooting guide | Needs Review | Historical cleanup candidate | High | Contains deletion, backup, Docker, and production path guidance. Cleanup commands require explicit approval. |
+| `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md` | Cleanup/troubleshooting history | Archived | Preserve as migration-era cleanup context | High | Destructive cleanup instructions must not be treated as current operational guidance. |
 | `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Analytics cleanup guide | Needs Review | High-risk operational reference | High | Contains database cleanup concepts and production command patterns. Treat as approval-required and probably historical until verified. |
 | `Documents/archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md` | Troubleshooting / change history | Archived | Preserve as historical technical context | Medium | Current source still implements the fix; the archived note must not be used to inspect real env files. |
 | `Documents/ENVIRONMENT_TEMPLATE.md` | Reference/template doc | Needs Review | Validate or replace with canonical env example | High importance, medium content risk | Contains placeholder-style values, but migration docs found variables that appear stale, missing, or mismatched. |
@@ -58,7 +58,19 @@ Batch 1 moved four historical documents into categorized archive folders without
 
 Tracked Markdown under `Documents/` changed from 27 active and 0 archived files to 23 active and 4 archived files. This is a 14.8% reduction from the original active-doc baseline. The archive remains historical context, not current operational authority.
 
-### 2B. Current Cleanup Classification Update - 2026-06-12
+### 2B. Documentation Archive Batch 2 - 2026-08-17
+
+Batch 2 moved three completed setup and cleanup records into existing archive categories:
+
+| Archived document | Current canonical replacement |
+|---|---|
+| `Documents/archive/troubleshooting/LOCAL_SETUP_QUICKSTART.md` | Local and isolated test guidance in `Documents/DEPLOYMENT_RUNBOOK.md` |
+| `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` | Mode A, Mode B, and production-like workflow in `Documents/DEPLOYMENT_RUNBOOK.md` |
+| `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md` | Deployment, rollback, and destructive-action boundaries in `Documents/DEPLOYMENT_RUNBOOK.md` |
+
+Tracked Markdown under `Documents/` changed from 23 active and 4 archived files to 20 active and 7 archived files. This is a 25.9% reduction from the original 27-document active baseline. The remaining dependency workstream was not archived because unresolved runtime risk remains documented there.
+
+### 2C. Current Cleanup Classification Update - 2026-06-12
 
 This update reflects later dependency remediation, logging redaction, CSP cleanup, Search Console fixes, `/index.html` redirect work, and live nginx non-www-to-www canonical redirects.
 
@@ -101,12 +113,12 @@ This section supersedes older status notes in this audit where they conflict wit
 | `Documents/archive/deployment/DEPLOYMENT_DISCOVERY.md` | Historical/transitional deployment rediscovery note | Archived in Batch 1; use the active deployment docs for current guidance. |
 | `Documents/archive/seo/GOOGLE_INDEXING_DIAGNOSTIC.md` | Historical public-403/Search Console diagnostic | Archived in Batch 1; use `SEO_CRAWLABILITY_NOTES.md` for current state. |
 | `Documents/MASTER_PROJECT_DOCUMENTATION.md` | Broad historical/context doc | Reclassify away from "master" authority unless fully refreshed. |
-| `Documents/LOCAL_DOCKER_SYNC_GUIDE.md` | Local testing/history reference | Keep as local testing reference only; not production authority. |
-| `Documents/LOCAL_SETUP_QUICKSTART.md` | Local setup reference | Keep, but ensure it points to current local production-like workflow. |
+| `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` | Local testing/history reference | Archived in Batch 2; use the runbook for current local workflows. |
+| `Documents/archive/troubleshooting/LOCAL_SETUP_QUICKSTART.md` | Local setup reference | Archived in Batch 2; use the runbook for current local workflows. |
 | `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup/restore reference | Keep as high-risk reference; do not treat as primary deployment guide. |
 | `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Analytics cleanup/troubleshooting guide | Treat as high-risk operational reference; later sanitize or archive if stale. |
 | `Documents/archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md` | Historical troubleshooting note | Archived in Batch 1 after confirming the source still implements the fix. |
-| `Documents/POST_LAUNCH_CLEANUP.md` | Historical cleanup guide | Later archive; destructive cleanup guidance must not remain active by default. |
+| `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md` | Historical cleanup guide | Archived in Batch 2; destructive cleanup guidance is no longer active by default. |
 
 #### Public Tracked Credential-Adjacent Docs Requiring Human Safety Review
 
@@ -195,10 +207,10 @@ Use to preserve why things changed, not necessarily to control current operation
 ### Operational / Troubleshooting Layer
 
 - `Documents/BACKUP_SYSTEM_GUIDE.md`
-- `Documents/LOCAL_SETUP_QUICKSTART.md`
-- `Documents/LOCAL_DOCKER_SYNC_GUIDE.md`
+- `Documents/archive/troubleshooting/LOCAL_SETUP_QUICKSTART.md`
+- `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md`
 - `Documents/GITHUB_AUTHENTICATION_SETUP.md`
-- `Documents/POST_LAUNCH_CLEANUP.md`
+- `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md`
 - `Documents/ANALYTICS_CLEANUP_GUIDE.md`
 - `Documents/USERNAME_PASSWORD_UPDATE_GUIDE.md`
 - `Documents/archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md`
@@ -260,9 +272,9 @@ Reference it for local, local-production-like, production, backup, and rollback 
 The following docs preserve useful history but should not automatically control future work:
 
 - `Documents/MASTER_PROJECT_DOCUMENTATION.md`
-- `Documents/LOCAL_DOCKER_SYNC_GUIDE.md`
+- `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md`
 - `Documents/BACKUP_SYSTEM_GUIDE.md`
-- `Documents/POST_LAUNCH_CLEANUP.md`
+- `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md`
 - `Documents/ANALYTICS_CLEANUP_GUIDE.md`
 - `Documents/archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md`
 - `Documents/GITHUB_AUTHENTICATION_SETUP.md`
@@ -282,10 +294,7 @@ These files should be summarized or consolidated later, not blindly deleted. The
 | Candidate | Value preserved | Why stale or redundant | Retain | Review before consolidation |
 |---|---|---|---|---|
 | `Documents/MASTER_PROJECT_DOCUMENTATION.md` | Broad history, status notes, architecture and operational milestones | Newer focused docs supersede many safety, environment, deployment, and workflow sections | High-level timeline, major decisions, CSS rule if still desired | Remove or redact sensitive-adjacent details; verify current status |
-| `Documents/LOCAL_SETUP_QUICKSTART.md` | Local production-like setup concept | Overlaps `DEPLOYMENT_RUNBOOK.md` and includes Docker commands | Conceptual local-prod workflow | Confirm canonical local setup and env handling |
-| `Documents/LOCAL_DOCKER_SYNC_GUIDE.md` | History of Docker sync workflow | May describe old creation steps and direct production examples | Rationale for local-prod workflow | Redact live-looking access details; confirm if commands are still current |
 | `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup model, retention concept, restore awareness | Contains direct operational commands and server/container assumptions | Backup concepts and unresolved automation status | Verify scripts, schedule, restore procedure, and current host layout |
-| `Documents/POST_LAUNCH_CLEANUP.md` | Cleanup history and production path rationale | Cleanup is destructive and time-sensitive | Cleanup decision history and "do not delete active project" warnings | Verify whether migration/cleanup is complete |
 | `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Analytics cleanup concept and retention idea | Contains database mutation commands and point-in-time stats | Retention concept and all-time stats idea | Verify current analytics schema and backup-before-cleanup workflow |
 | `Documents/GITHUB_AUTHENTICATION_SETUP.md` | GitHub auth troubleshooting | Sensitive-adjacent and account/key oriented | Generic GitHub auth lessons with placeholders | Redact account/key specifics if moved into active docs |
 | `Documents/USERNAME_PASSWORD_UPDATE_GUIDE.md` | Admin credential update workflow | Sensitive-adjacent and production-affecting | High-level account-rotation concept | Replace identifiers with placeholders and require explicit approval |
@@ -335,7 +344,7 @@ Consistent safety guidance in active docs:
 Needs Review items:
 
 - `Documents/MASTER_PROJECT_DOCUMENTATION.md` contains sensitive-adjacent account/access details and direct deployment guidance. Treat as historical/context until cleaned.
-- `Documents/LOCAL_DOCKER_SYNC_GUIDE.md` includes copying real env files and live-looking production command examples. Treat as historical/context.
+- `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` preserves superseded setup and deployment examples as historical context.
 - `Documents/BACKUP_SYSTEM_GUIDE.md` includes direct SSH/Docker/backup/delete patterns. Treat as high-risk operational reference only.
 - `Documents/ANALYTICS_CLEANUP_GUIDE.md` includes database mutation and cleanup commands. Treat as high-risk.
 - `Documents/GITHUB_AUTHENTICATION_SETUP.md` includes account and SSH key configuration details. Treat as sensitive-adjacent.
@@ -355,8 +364,8 @@ Use for deployment concepts, preflight checklist, rollback concepts, and approva
 ### Historical Deployment Notes
 
 - `Documents/MASTER_PROJECT_DOCUMENTATION.md`
-- `Documents/LOCAL_DOCKER_SYNC_GUIDE.md`
-- `Documents/POST_LAUNCH_CLEANUP.md`
+- `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md`
+- `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md`
 
 These contain useful context but should not override the runbook.
 
@@ -364,7 +373,7 @@ These contain useful context but should not override the runbook.
 
 - root `package.json`
 - `docker-compose.yml`
-- `Documents/LOCAL_SETUP_QUICKSTART.md`
+- `Documents/archive/troubleshooting/LOCAL_SETUP_QUICKSTART.md` (historical context)
 - `Documents/archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md` (historical context)
 
 Needs Review: choose canonical "ordinary local dev" path.
@@ -373,10 +382,10 @@ Needs Review: choose canonical "ordinary local dev" path.
 
 - `docker-compose.local-prod.yml`
 - `Documents/DEPLOYMENT_RUNBOOK.md`
-- `Documents/LOCAL_SETUP_QUICKSTART.md`
-- `Documents/LOCAL_DOCKER_SYNC_GUIDE.md`
+- `Documents/archive/troubleshooting/LOCAL_SETUP_QUICKSTART.md` (historical context)
+- `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` (historical context)
 
-Needs Review: confirm whether `docker-compose.local-prod.yml` is the preferred production-like local workflow.
+Current production-like and isolated local workflow guidance lives in `Documents/DEPLOYMENT_RUNBOOK.md`; the archived files preserve setup history only.
 
 ### Backup / Restore Notes
 

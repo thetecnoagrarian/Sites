@@ -189,7 +189,7 @@ This helps diagnose:
 
 ## Related Documentation
 
-- [LOCAL_SETUP_QUICKSTART.md](../../LOCAL_SETUP_QUICKSTART.md) - Local development setup
+- [LOCAL_SETUP_QUICKSTART.md](./LOCAL_SETUP_QUICKSTART.md) - Historical local development setup
 - [ENVIRONMENT_TEMPLATE.md](../../ENVIRONMENT_TEMPLATE.md) - Environment variable reference
 - [MASTER_PROJECT_DOCUMENTATION.md](../../MASTER_PROJECT_DOCUMENTATION.md) - Overall project docs
 
