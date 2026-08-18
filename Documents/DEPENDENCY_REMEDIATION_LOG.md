@@ -1,5 +1,52 @@
 # Dependency Remediation Log
 
+## Pass 4: Morgan 1.11.0
+
+### Scope
+
+This was a single-family shared-runtime remediation completed on 2026-08-18.
+
+- Updated direct `@ffg/blog-core` dependency `morgan` from `1.10.1` to `1.11.0` and regenerated only the authoritative root workspace lockfile.
+- Morgan's `on-finished` range changed from `~2.3.0` to `~2.4.1`; the obsolete nested `on-finished@2.3.0` copy was removed and Morgan now deduplicates to the existing root `on-finished@2.4.1` resolution.
+- No application source, production configuration, Dockerfile, Compose file, site-local lockfile, authentication, CSRF, or logging-format change was required.
+- Did not remediate another dependency family or work on the separate sanitize-html route-wiring concern.
+
+Morgan was prioritized over higher-severity installed findings because the current shared `morgan('combined')` middleware runs before route authentication and its `:remote-user` token receives request-derived Basic Authorization username data. The fix was also a contained compatible update. Higher-severity remaining families are still installed and, where shown by the production audit, production-present, but current source review did not establish equivalent request control over their vulnerable behaviors. Installed, production-present, reachable, and exploitable remain separate conclusions.
+
+### Audit Result
+
+| Audit | Before | After | Morgan finding |
+|---|---:|---:|---|
+| Full workspaces | 13: 1 low, 2 moderate, 8 high, 2 critical | 12: 1 low, 1 moderate, 8 high, 2 critical | Removed |
+| Production-only | 10: 1 low, 2 moderate, 6 high, 1 critical | 9: 1 low, 1 moderate, 6 high, 1 critical | Removed |
+
+The count change is exactly the removed Morgan family. No unrelated package version changed. Remaining full-audit families are `body-parser`, `brace-expansion`, `glob`, `handlebars`, `lodash`, `minimatch`, `nanoid`, `path-to-regexp`, `picomatch`, `postcss`, `sanitize-html`, and `shell-quote`.
+
+### Focused HTTP and Shared-Core Validation
+
+- Added a focused `blog-core` regression that starts an actual loopback HTTP server with the unchanged production `combined` Morgan format and an isolated in-memory stream.
+- Sent an ordinary request and a synthetic Basic Authorization request whose username contained representative line-breaking and control bytes.
+- Morgan emitted exactly one event per request. The malicious event retained one physical line terminator, contained no literal request-controlled control bytes, and represented the dangerous bytes and backslash with visible escapes.
+- Normal `combined` request method, path, protocol, and status logging remained present.
+- The complete shared-core suite passed: 2 tests, 2 passed, 0 failed.
+
+### Mode B Validation
+
+- Built both site images from `docker/Dockerfile.prod.site` in the isolated `sites-local-test` project; both images contained `morgan@1.11.0`.
+- Both standard application containers became healthy, and both one-shot fixture services exited successfully with status `0`.
+- Both homepages and both health routes returned `200`.
+- Because the standard Mode B services intentionally use warning-level logging, each already-built site image was also started briefly as a disposable service-local probe with only `LOG_LEVEL=info` overridden. Production files and the standard Compose definition were not changed.
+- For each site, ordinary and malicious synthetic `/health` probes returned `200`, produced exactly two filtered Morgan events, preserved one physical line for the malicious marker, and showed the request-controlled control bytes as escapes rather than literal bytes.
+- Scoped logs contained no SQLite, permission, unhandled, fatal, or startup failures.
+- The isolated containers, network, and all disposable test volumes were removed after validation.
+
+### Validation Status
+
+`MORGAN_REMEDIATION_VALIDATED`
+
+- No production access or deployment occurred.
+- Nothing was staged, committed, or pushed.
+
 ## Pass 3: Sharp 0.35.3
 
 ### Scope

@@ -1,6 +1,24 @@
 # Dependency Audit Results
 
-> **Current-use note (2026-08-18):** A fresh audit and targeted Sharp follow-up supersede the earlier counts below for current remediation decisions. Sharp is now resolved at `0.35.3` and Multer remains at `2.2.0`; earlier captures remain below as historical evidence.
+> **Current-use note (2026-08-18):** The Morgan follow-up below is the current audit baseline. Morgan is now resolved at `1.11.0`, Sharp at `0.35.3`, and Multer at `2.2.0`; earlier captures remain below as historical evidence.
+
+## 2026-08-18 Morgan Follow-up
+
+- `morgan` changed from `1.10.1` to `1.11.0` in shared `blog-core` with no application or production configuration change.
+- Morgan's nested `on-finished@2.3.0` copy was removed; Morgan now deduplicates to the existing root `on-finished@2.4.1` resolution allowed by its updated `~2.4.1` range.
+- Pre-change full audit: 13 vulnerabilities — 1 low, 2 moderate, 8 high, 2 critical.
+- Current full audit: 12 vulnerabilities — 1 low, 1 moderate, 8 high, 2 critical.
+- Pre-change production-only audit: 10 vulnerabilities — 1 low, 2 moderate, 6 high, 1 critical.
+- Current production-only audit: 9 vulnerabilities — 1 low, 1 moderate, 6 high, 1 critical.
+- The one-family reduction is exactly the removed Morgan log-forging advisory; no other dependency family was intentionally remediated or changed.
+- Morgan was selected despite higher-severity installed findings because shared `morgan('combined')` logging runs before route authentication and its `:remote-user` token receives request-derived Basic Authorization username data. The compatible direct update had a small blast radius. Installed, production-present, reachable, and exploitable remain distinct classifications for the unresolved families.
+- A focused actual-HTTP shared-core regression passed. An ordinary request and a synthetic control-character Basic username produced one Morgan event each; the malicious event remained one physical log line, contained safe visible escapes, and preserved normal `combined` logging behavior.
+- The complete shared-core suite passed 2 of 2 tests.
+- Isolated Mode B built both sites with `morgan@1.11.0`; both standard containers became healthy, both fixture jobs exited `0`, and both homepages and health routes returned `200`.
+- Disposable info-level probes using the already-built FFG and TTA images confirmed that ordinary and malicious health requests each produced one filtered Morgan event, control bytes were escaped, and the forged marker remained on one physical log line. No production or Compose configuration was changed.
+- Scoped Mode B logs contained no SQLite, permission, unhandled, fatal, or startup failures. Containers, the network, and disposable volumes were removed afterward.
+- Remaining full-audit families are `body-parser`, `brace-expansion`, `glob`, `handlebars`, `lodash`, `minimatch`, `nanoid`, `path-to-regexp`, `picomatch`, `postcss`, `sanitize-html`, and `shell-quote`.
+- Separate non-dependency work remains unchanged: successful-upload temporary-file cleanup, sanitize-html route-wiring review, stale site-local lockfiles, Docker/npm reproducibility work, and Linux musl amd64 Sharp validation before production deployment.
 
 ## 2026-08-18 Sharp Follow-up
 
