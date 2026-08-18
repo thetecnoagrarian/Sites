@@ -1,5 +1,63 @@
 # Dependency Remediation Log
 
+## Pass 3: Sharp 0.35.3
+
+### Scope
+
+This was a single-family shared-runtime remediation completed on 2026-08-18.
+
+- Updated `sharp` from `0.32.6` to `0.35.3` in `@ffg/blog-core` and regenerated only the authoritative root workspace lockfile.
+- Raised the root, shared-core, and both site Node engine declarations to `>=20.9.0`, the minimum supported by Sharp 0.35.
+- Replaced the obsolete post-install `npm rebuild sharp --platform=linuxmusl --arch=x64` step with `npm ci --omit=dev --include=optional`, allowing npm to select Sharp's native optional packages for the actual build platform.
+- Kept existing npm lifecycle-script protections; no broad script enablement was added.
+- Did not update the stale site-local lockfiles, remove the runtime `vips` package, change application image-processing code, fix upload cleanup, or remediate another dependency family.
+
+### Audit Result
+
+The fresh pre-change audit had moved since the Multer snapshot because new unrelated advisories were published. The table compares the same checkout immediately before and after only the Sharp change.
+
+| Audit | Before | After | Sharp finding |
+|---|---:|---:|---|
+| Full workspaces | 14: 1 low, 2 moderate, 9 high, 2 critical | 13: 1 low, 2 moderate, 8 high, 2 critical | Removed |
+| Production-only | 11: 1 low, 2 moderate, 7 high, 1 critical | 10: 1 low, 2 moderate, 6 high, 1 critical | Removed |
+
+No unrelated advisory family was remediated. Remaining full-audit families are `body-parser`, `brace-expansion`, `glob`, `handlebars`, `lodash`, `minimatch`, `morgan`, `nanoid`, `path-to-regexp`, `picomatch`, `postcss`, `sanitize-html`, and `shell-quote`.
+
+### Dependency and Native Runtime Validation
+
+- Local macOS ARM64 validation used Node `24.12.0`, Sharp `0.35.3`, libvips `8.18.3`, `@img/sharp-darwin-arm64@0.35.3`, and `@img/sharp-libvips-darwin-arm64@1.3.2`.
+- The authoritative lockfile now records Sharp's platform-specific optional packages and removes the obsolete Sharp 0.32 prebuild-download dependency chain.
+- Both Mode B images built from the canonical `docker/Dockerfile.prod.site` without the removed rebuild command or its unsupported flag warning.
+- Both running containers reported Linux ARM64, Alpine `3.23.4`, Node `20.20.2`, Sharp `0.35.3`, libvips `8.18.3`, and the expected `linuxmusl-arm64` Sharp and libvips packages.
+- An amd64 image was not built locally. CI declares Node 20 but does not build Docker images, so linuxmusl-x64 remains a deployment-candidate validation requirement before production use.
+
+### Targeted Authenticated Mode B Validation
+
+- Added a separate three-test Chromium Sharp suite without modifying the existing Multer regression.
+- Used the disposable synthetic admin, normal login, browser session, CSRF-bearing forms, and real protected routes.
+- FFG and TTA post routes each processed synthetic large non-square JPEG and PNG inputs.
+- Each input produced decodable `thumbnail`, `medium`, and `large` WebP variants within the configured bounds while preserving aspect ratio; public upload URLs returned `200` with WebP content types.
+- Corrupt bytes declared as `image/png` reached Sharp but created no post and no processed variants on either site.
+- Invalid non-image MIME inputs created no processed variants.
+- FFG hero processing produced a decodable `1920x960` hero WebP and `1200x630` Open Graph WebP; corrupt hero input left valid outputs in place.
+- Both application containers remained healthy, both fixture services exited `0`, both health routes returned `200`, and the scoped logs contained no SQLite, permission, unhandled, or fatal errors.
+- The unchanged authenticated Multer suite passed all three tests after the Sharp upgrade.
+- The shared `blog-core` unit test passed.
+
+### Cleanup Observation
+
+- Successful two-image post processing retained two source files for each site.
+- FFG removed its corrupt post source file; TTA retained one corrupt post source file; FFG retained one corrupt hero source file.
+- These differences confirm existing route-level cleanup behavior. Cleanup was intentionally not changed in this dependency batch.
+
+### Validation Status
+
+`SHARP_REMEDIATION_VALIDATED`
+
+- No production access or deployment occurred.
+- The isolated `sites-local-test` project and its disposable volumes were removed after validation.
+- Nothing was staged, committed, or pushed.
+
 ## Pass 2: Multer 2.2.0
 
 ### Scope

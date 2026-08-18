@@ -1,6 +1,22 @@
 # Dependency Audit Results
 
-> **Current-use note (2026-08-18):** A fresh audit and targeted Multer follow-up supersede the original counts below for current remediation decisions. Multer is now resolved at `2.2.0`; the original capture remains below as historical evidence.
+> **Current-use note (2026-08-18):** A fresh audit and targeted Sharp follow-up supersede the earlier counts below for current remediation decisions. Sharp is now resolved at `0.35.3` and Multer remains at `2.2.0`; earlier captures remain below as historical evidence.
+
+## 2026-08-18 Sharp Follow-up
+
+- `sharp` changed from `0.32.6` to `0.35.3` in shared `blog-core`; the root and all runtime package engine declarations now require Node `>=20.9.0`.
+- The inherited libvips advisory family no longer appears in either audit.
+- Fresh pre-change full audit: 14 vulnerabilities — 1 low, 2 moderate, 9 high, 2 critical.
+- Current full audit: 13 vulnerabilities — 1 low, 2 moderate, 8 high, 2 critical.
+- Fresh pre-change production-only audit: 11 vulnerabilities — 1 low, 2 moderate, 7 high, 1 critical.
+- Current production-only audit: 10 vulnerabilities — 1 low, 2 moderate, 6 high, 1 critical.
+- The one-family reduction is exactly the removed Sharp finding. Counts that differ from the prior Multer snapshot reflect newly published unrelated advisories, not changes made by this batch.
+- Docker now installs production dependencies with optional packages enabled and relies on npm's platform selection. The obsolete hard-coded linuxmusl-x64 Sharp rebuild step was removed.
+- Native Mode B validation passed on Linux ARM64 with Alpine `3.23.4`, Node `20.20.2`, Sharp `0.35.3`, libvips `8.18.3`, and the expected `linuxmusl-arm64` packages. An amd64 Docker build was not performed locally and remains a pre-production validation requirement.
+- A separate authenticated Sharp suite passed for both sites and the FFG hero route: JPEG and PNG inputs, large non-square dimensions, three bounded WebP post variants, FFG hero and `1200x630` Open Graph output, corrupt image bytes, invalid MIME, public output serving, and post-processing health.
+- The unchanged authenticated Multer suite and the shared `blog-core` unit test also passed.
+- Successful-upload and corrupt-input source-file retention remains inconsistent by route. This is preexisting cleanup debt and was not changed.
+- Remaining full-audit families are `body-parser`, `brace-expansion`, `glob`, `handlebars`, `lodash`, `minimatch`, `morgan`, `nanoid`, `path-to-regexp`, `picomatch`, `postcss`, `sanitize-html`, and `shell-quote`; none was remediated in this batch.
 
 ## 2026-08-18 Multer Follow-up
 

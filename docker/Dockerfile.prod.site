@@ -26,11 +26,8 @@ COPY package.json package-lock.json* ./
 COPY blog-core/package.json ./blog-core/
 COPY ${SITE_DIR_NAME}/package.json ./${SITE_DIR_NAME}/
 
-# Install dependencies using workspace (production only)
-RUN npm ci --omit=dev && npm cache clean --force
-
-# Rebuild Sharp for Alpine Linux compatibility (must be done after npm install)
-RUN npm rebuild sharp --platform=linuxmusl --arch=x64
+# Install production dependencies, including Sharp's platform-specific optional packages
+RUN npm ci --omit=dev --include=optional && npm cache clean --force
 
 # Copy source code (only what's needed for production)
 COPY blog-core/src ./blog-core/src
