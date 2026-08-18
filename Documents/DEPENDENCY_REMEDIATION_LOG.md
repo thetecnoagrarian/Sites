@@ -1,5 +1,65 @@
 # Dependency Remediation Log
 
+## Pass 2: Multer 2.2.0
+
+### Scope
+
+This was a single-family shared-runtime remediation completed on 2026-08-18.
+
+- Updated `multer` from `2.1.1` to `2.2.0` in `@ffg/blog-core`.
+- Updated only the root workspace lockfile for the Multer resolution; npm also synchronized the already-declared Express peer metadata without changing the resolved Express version.
+- Did not update Sharp, Handlebars, Express, sanitize-html, Morgan, PostCSS, Nanoid, Glob, Minimatch, Brace Expansion, body-parser, nodemon, or another dependency family.
+- Did not change application authentication, CSRF, upload routes, or upload cleanup behavior.
+
+### Audit Result
+
+| Audit | Before | After | Multer finding |
+|---|---:|---:|---|
+| Full workspaces | 13: 1 low, 2 moderate, 9 high, 1 critical | 12: 1 low, 2 moderate, 8 high, 1 critical | Removed |
+| Production-only | 12: 1 low, 2 moderate, 8 high, 1 critical | 11: 1 low, 2 moderate, 7 high, 1 critical | Removed |
+
+No unrelated severity count changed.
+
+### Targeted Authenticated Mode B Validation
+
+- Added one idempotent synthetic admin to the disposable local-test SQL fixture.
+- Used normal login, session, CSRF-bearing forms, and real protected routes; no bypass route or forged session cookie was used.
+- Added one focused Chromium test file covering both sites and the FFG hero route.
+- Passed three targeted tests covering:
+  - one valid post image;
+  - multiple valid post images;
+  - invalid/non-image MIME rejection;
+  - upload-size rejection using a 1 KiB Mode B-only limit and a 2 KiB in-memory payload;
+  - 26-file rejection against the 25-file route cap;
+  - deeply nested multipart field names;
+  - malformed multipart input;
+  - valid and invalid FFG hero-image uploads.
+- An explicit network-abort test was not added; malformed multipart input covered the safely reproducible incomplete-request path.
+- Both site images built, both app containers were healthy, and both fixture services exited `0`.
+- Homepage, health, synthetic post, robots, and sitemap routes returned `200` for both sites.
+- Scoped logs showed no SQLite, permission, or unhandled-exception failures.
+
+Mode B test transport note:
+
+- `docker-compose.test.yml` retains production defaults and exposes explicit test-only overrides. This targeted run used `MODE_B_NODE_ENV=test` so session cookies work over the harness's plain local HTTP transport, plus `MODE_B_MAX_FILE_SIZE=1024` for the oversize case.
+- `APP_ROLE` remains `production`.
+- This is test-only and does not change the production Dockerfile, production Compose configuration, or production authentication behavior.
+
+### Cleanup Observation
+
+- Rejected invalid-MIME, oversize, over-count, and malformed multipart cases added no temporary files.
+- Successful post and hero uploads left their source files in the temporary upload directory: four for FFG and three for TTA during the targeted run.
+- Source inspection and runtime counts show this is preexisting application success-path cleanup debt, not evidence that Multer `2.2.0` regressed cleanup.
+- Cleanup debt was intentionally not fixed in this dependency batch.
+
+### Validation Status
+
+`MULTER_REMEDIATION_VALIDATED`
+
+- No production access or deployment occurred.
+- The isolated `sites-local-test` project and its disposable volumes were removed after validation.
+- Nothing was staged, committed, or pushed during the remediation task.
+
 ## Pass 1: Express 4.x, Multer, sanitize-html
 
 ### Scope

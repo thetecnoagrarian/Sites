@@ -1,5 +1,19 @@
 # Dependency Audit Results
 
+> **Current-use note (2026-08-18):** A fresh audit and targeted Multer follow-up supersede the original counts below for current remediation decisions. Multer is now resolved at `2.2.0`; the original capture remains below as historical evidence.
+
+## 2026-08-18 Multer Follow-up
+
+- `multer` changed from `2.1.1` to `2.2.0` in shared `blog-core`.
+- The Multer nested-field denial-of-service and aborted-upload cleanup advisories no longer appear in either audit.
+- Current full audit: 12 vulnerabilities — 1 low, 2 moderate, 8 high, 1 critical.
+- Current production-only audit: 11 vulnerabilities — 1 low, 2 moderate, 7 high, 1 critical.
+- The one-family reduction from the pre-change baseline is exactly the removed Multer finding; unrelated severity counts did not change.
+- Targeted authenticated Mode B tests passed for both sites: one and multiple valid images, invalid MIME, the test-only size limit, 26-file rejection against the 25-file route cap, deeply nested multipart field names, and malformed multipart input.
+- The FFG hero route passed valid-image and invalid-MIME tests.
+- Multer rejection and malformed-input cases added no temporary files. Successful processing still leaves uploaded source files in the temporary directory; that is preexisting application cleanup debt and was not changed in this dependency batch.
+- Mode B used a synthetic disposable admin and normal login/CSRF flow. The targeted run set test-only `MODE_B_NODE_ENV=test` and `MODE_B_MAX_FILE_SIZE=1024` overrides; ordinary Mode B retains production defaults, `APP_ROLE` remains `production`, and production configuration was not changed.
+
 ## Safety Boundary
 
 This is a read-only dependency audit capture.

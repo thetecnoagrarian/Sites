@@ -2,6 +2,20 @@ PRAGMA foreign_keys = ON;
 
 BEGIN;
 
+-- Synthetic Mode B-only admin for authenticated regression tests.
+-- The matching deterministic password exists only in the targeted test file.
+INSERT INTO users (username, password_hash, role, isAdmin)
+VALUES (
+    'mode-b-multer-admin',
+    '$2a$10$riTWDti8/y7SXVHX.rWsqea1g/P.UXA3L0PxCelxvGn7z6BrRtnOC',
+    'admin',
+    1
+)
+ON CONFLICT(username) DO UPDATE SET
+    password_hash = excluded.password_hash,
+    role = excluded.role,
+    isAdmin = excluded.isAdmin;
+
 INSERT INTO categories (name, slug)
 VALUES ('Local Test Category', 'local-test-category')
 ON CONFLICT(slug) DO UPDATE SET
