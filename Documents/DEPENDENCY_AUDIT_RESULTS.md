@@ -1,6 +1,25 @@
 # Dependency Audit Results
 
-> **Current-use note (2026-08-19):** The sanitize-html follow-up below is the current audit baseline. sanitize-html is now resolved at `2.17.5`, Morgan at `1.11.0`, Sharp at `0.35.3`, and Multer at `2.2.0`; earlier captures remain below as historical evidence.
+> **Current-use note (2026-08-19):** The better-sqlite3 follow-up below is the current audit baseline. better-sqlite3 is now validated at `12.11.1`, sanitize-html at `2.17.5`, Morgan at `1.11.0`, Sharp at `0.35.3`, and Multer at `2.2.0`; earlier captures remain below as historical evidence.
+
+## 2026-08-19 better-sqlite3 Follow-up
+
+- `better-sqlite3` changed from `11.10.0` to `12.11.1` in shared `blog-core`; bundled SQLite changed from `3.49.2` to `3.53.2`, while `better-sqlite3-session-store@0.1.0` remained unchanged.
+- `12.11.1` was selected as the newest published stable candidate found after the proposed `12.12.0` target proved unpublished. The selected release explicitly supports Node 20 in its engine declaration.
+- The pre-better-sqlite snapshot supplied for this batch was 9 full-audit vulnerabilities: 1 low, 0 moderate, 7 high, 1 critical.
+- Fresh full-workspace audit: 9 vulnerabilities — 1 low, 0 moderate, 7 high, 1 critical.
+- The pre-better-sqlite production-only snapshot was 8 vulnerabilities: 1 low, 0 moderate, 6 high, 1 critical.
+- Fresh production-only audit: 8 vulnerabilities — 1 low, 0 moderate, 6 high, 1 critical.
+- `better-sqlite3` appears in neither fresh audit, and both severity totals are unchanged. An audit without the repository workflow's explicit `--workspaces` scope also sees root dev-tool findings; that broader count is not the full-workspace comparison used for this batch.
+- The focused compatibility suite passed 3 of 3 tests, including database lifecycle, intentional rollback, and complete `better-sqlite3-session-store` lifecycle coverage. The shared-core suite passed 5 of 5, Morgan passed 1 of 1, and sanitize-html passed 3 of 3.
+- A disposable database created and written with `11.10.0` / SQLite `3.49.2` opened and accepted writes under `12.11.1` / SQLite `3.53.2`, then reopened and accepted reads/writes under `11.10.0`. Sessions and triggers remained functional, journal mode remained `delete`, integrity was `ok`, and no foreign-key violations were found.
+- Both no-cache production-style site builds completed with Node `20.20.2`, ABI `115`, Linux ARM64, Alpine `3.23.4`, musl, and source-compiled `better-sqlite3@12.11.1`. Both final images loaded the native addon and reported SQLite `3.53.2`.
+- The separately validated builder pin is npm `11.19.0`; the final multi-stage runtime image retains npm `10.8.2` from the Node base image and does not use npm during application runtime.
+- Both Mode B applications became healthy and both fixture jobs exited `0`. Normal authenticated and CSRF-bearing flows passed session reuse, synthetic post create/read/update/delete, container restart/database reopen, and session persistence after restart on both sites.
+- Post-activity integrity checks returned `ok`, zero foreign-key violations, and `delete` journal mode for both site databases.
+- The unchanged authenticated Chromium Multer and Sharp suites each passed 3 of 3 tests. Scoped logs contained no SQLite, native-addon, database-locking, session-store, permission, startup, unhandled, or fatal errors.
+- Node 24 migration remains pending, including Linux musl ARM64 prebuilt and Linux musl AMD64 native/prebuilt validation. No production access or deployment occurred.
+- Remaining full-workspace audit families are `body-parser`, `brace-expansion`, `glob`, `handlebars`, `minimatch`, `nanoid`, `path-to-regexp`, `picomatch`, and `postcss`.
 
 ## 2026-08-19 sanitize-html Follow-up
 

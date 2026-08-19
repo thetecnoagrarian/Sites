@@ -264,6 +264,15 @@ Direct `blog-core` runtime dependency and used in shared and site image processi
 
 Direct `blog-core` runtime dependency and used in shared/site database code. Native build/runtime behavior needs extra caution in Docker.
 
+Current validated state as of 2026-08-19:
+
+- Upgraded from `11.10.0` to published stable `12.11.1`; the proposed `12.12.0` target was not published.
+- Bundled SQLite moved from `3.49.2` to `3.53.2`; `better-sqlite3-session-store@0.1.0` did not change.
+- Local lifecycle, transaction rollback, session-store lifecycle, and disposable `11.10.0` -> `12.11.1` -> `11.10.0` forward/rollback compatibility gates passed.
+- Both Node `20.20.2` Linux musl ARM64 Mode B images compiled the native addon from source, loaded it, passed authenticated database/session/post flows across container restart, and retained clean integrity and foreign-key checks.
+- Unchanged Multer and Sharp authenticated regressions passed. `better-sqlite3` remains absent from full and production npm audit findings.
+- Node 24 is still a separate migration gate requiring Linux musl ARM64 prebuilt and Linux musl AMD64 native/prebuilt validation.
+
 ## 8. Recommended Remediation Sequence
 
 ### Stage 0: Baseline

@@ -1,5 +1,55 @@
 # Dependency Remediation Log
 
+## Pass 6: better-sqlite3 12.11.1
+
+### Scope
+
+This was a single-family shared-runtime remediation validated on 2026-08-19.
+
+- Updated the direct `@ffg/blog-core` dependency from `better-sqlite3@11.10.0` to `12.11.1` and regenerated only the authoritative root workspace lockfile.
+- The bundled SQLite library moved from `3.49.2` to `3.53.2`; `better-sqlite3-session-store@0.1.0` remained unchanged.
+- `12.11.1` was selected as the newest published stable release found for this batch after the proposed `12.12.0` target proved unpublished. Its declared engine range includes Node 20.
+- No other dependency family, database schema, session-store package, application route, authentication behavior, CSRF behavior, Node baseline, or site-local lockfile changed.
+
+### Compatibility and Rollback Validation
+
+- The focused compatibility suite passed 3 tests with 0 failures and 0 skips. It covered schema initialization, prepared statements and positional bindings, representative user/category/post/relationship CRUD, image/caption metadata, transaction changes and `lastInsertRowid`, close/reopen, `integrity_check`, `foreign_key_check`, intentional rollback, and the complete session-store lifecycle.
+- Session coverage included set, get, touch, destroy, length, expiry, persistence across database reopen, and deterministic expired-session cleanup.
+- A disposable database created by `better-sqlite3@11.10.0` / SQLite `3.49.2` opened and accepted representative reads and writes under `12.11.1` / SQLite `3.53.2`.
+- The database then reopened under `11.10.0`; representative reads, writes, posts, sessions, and triggers remained functional. Journal mode remained `delete`, `integrity_check` returned `ok`, and `foreign_key_check` found no violations. The tested rollback path is viable.
+- The complete shared-core suite passed 5 tests with 0 failures and 0 skips. The unchanged focused Morgan regression passed 1 test, and the unchanged sanitize-html regression passed 3 tests.
+
+### Mode B and Native Runtime Validation
+
+- Previously completed no-cache builds of both site images used Node `20.20.2`, ABI `115`, Linux ARM64, Alpine `3.23.4`, and musl. `better-sqlite3@12.11.1` compiled successfully from source in both builder stages and loaded in both final images.
+- The Docker builder uses the separately validated exact npm `11.19.0` pin for `npm ci`. Because the Dockerfile is multi-stage, the final runtime stage retains the Node base image's npm `10.8.2`; npm is not used by the running applications.
+- Both running applications reported `better-sqlite3@12.11.1` and SQLite `3.53.2`, became healthy, and their fixture services exited `0`.
+- The local plain-HTTP authentication checks used the existing test-only `MODE_B_NODE_ENV=test` override while retaining `APP_ROLE=production`. Authentication and CSRF protections were not bypassed.
+- Normal authenticated flows on both sites established and reused sessions; created, read, updated, verified, and deleted synthetic posts; restarted each application container with its disposable data volume preserved; reopened each database; and retained authenticated sessions across restart.
+- After runtime activity, both databases returned `ok` from `integrity_check`, zero rows from `foreign_key_check`, and unchanged `delete` journal mode.
+- The unchanged authenticated Chromium Multer suite passed 3 tests. The unchanged authenticated Chromium Sharp suite passed 3 tests and produced valid image outputs. Known successful-upload source-file retention remains separate cleanup debt.
+- Scoped logs showed no SQLite, native-addon, node-gyp load, database-locking, session-store, permission, startup, unhandled, or fatal errors. Expected corrupt-image rejection messages remained nonfatal.
+
+### Audit Result
+
+| Audit | Pre-better-sqlite snapshot supplied for this batch | Fresh validation result | better-sqlite finding |
+|---|---:|---:|---|
+| Full workspaces | 9: 1 low, 0 moderate, 7 high, 1 critical | 9: 1 low, 0 moderate, 7 high, 1 critical | Absent |
+| Production-only | 8: 1 low, 0 moderate, 6 high, 1 critical | 8: 1 low, 0 moderate, 6 high, 1 critical | Absent |
+
+`better-sqlite3` appears in neither fresh audit, and both severity totals are unchanged. Remaining full-workspace audit families are `body-parser`, `brace-expansion`, `glob`, `handlebars`, `minimatch`, `nanoid`, `path-to-regexp`, `picomatch`, and `postcss`.
+
+### Remaining Runtime Work
+
+Node 24 migration remains a separate future workstream. It still requires Linux musl ARM64 prebuilt validation and Linux musl AMD64 native/prebuilt validation before the runtime baseline changes. The npm `allowScripts` policy warning also remains a separate reproducibility and supply-chain follow-up.
+
+### Validation Status
+
+`BETTER_SQLITE3_REMEDIATION_VALIDATED`
+
+- No production access or deployment occurred.
+- Nothing was staged, committed, or pushed.
+
 ## Pass 5: sanitize-html 2.17.5
 
 ### Scope
