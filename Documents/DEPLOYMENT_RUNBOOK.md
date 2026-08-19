@@ -123,6 +123,7 @@ Purpose:
 Runtime note:
 
 - Docker uses Node 20.
+- The production-style builder pins npm to `11.19.0`, whose declared Node support includes Node 20. Do not replace the pin with `npm@latest`; a moving npm major can become incompatible with the pinned Node runtime before `npm ci` runs. Reassess the npm pin together with any future Node runtime migration.
 - Package engines allow Node `>=18.0.0`.
 - Needs Review: confirm whether Node 20 is the intended production baseline.
 

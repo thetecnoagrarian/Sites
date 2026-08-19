@@ -13,8 +13,8 @@ RUN apk add --no-cache \
     g++ \
     && rm -rf /var/cache/apk/*
 
-# Update npm to latest version
-RUN npm install -g npm@latest
+# Install a Node 20-compatible npm version deterministically
+RUN npm install -g npm@11.19.0
 
 # Set working directory
 WORKDIR /app
