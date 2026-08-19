@@ -1,5 +1,54 @@
 # Dependency Remediation Log
 
+## Pass 5: sanitize-html 2.17.5
+
+### Scope
+
+This was a two-site, single-family dependency remediation completed on 2026-08-19.
+
+- Updated the direct `sanitize-html` dependency in both site packages from `2.17.4` to `2.17.5` and regenerated only the authoritative root workspace lockfile.
+- An initial uncommitted attempt at `2.17.7` was rejected during validation because that release declares Node `>=22.12.0`, while the production-style images currently run Node `20.20.2`.
+- `sanitize-html@2.17.5` declares no `engines` field. Its actual sanitizer behavior was therefore exercised under Node `20.20.2` rather than treating metadata absence as sufficient compatibility evidence.
+- The final parser graph remains `htmlparser2@10.1.0`, `dom-serializer@2.0.0`, `domelementtype@2.3.0`, `domhandler@5.0.3`, `domutils@3.2.2`, root `entities@7.0.1`, and serializer-local `entities@4.5.0`, unchanged from the original `2.17.4` baseline.
+- `postcss@8.5.15` and `nanoid@3.3.12` did not move. No other dependency family, Node baseline, Docker configuration, site-local lockfile, application source, route, authentication, or CSRF behavior changed.
+
+### Audit Result
+
+| Audit | Before | After | sanitize-html finding |
+|---|---:|---:|---|
+| Full workspaces | 12: 1 low, 1 moderate, 8 high, 2 critical | 11: 1 low, 0 moderate, 8 high, 2 critical | Removed |
+| Production-only | 9: 1 low, 1 moderate, 6 high, 1 critical | 8: 1 low, 0 moderate, 6 high, 1 critical | Removed |
+
+The direct `sanitize-html` advisory no longer appears. The installed transitive `postcss@8.5.15` and `nanoid@3.3.12` findings remain in both audits and were not remediated in this batch.
+
+### Sanitizer and Shared-Core Validation
+
+- The focused sanitizer regression passed locally under Node `24.12.0`: 3 passed, 0 failed, 0 skipped.
+- The same focused regression executed actual `sanitize-html@2.17.5` behavior in the built production-style image under Node `20.20.2`: 3 passed, 0 failed, 0 skipped.
+- Coverage preserved representative headings, paragraphs, links, lists, blockquotes, emphasis, underline, images, figure/figcaption, tables, and code/pre markup.
+- Coverage removed script, event handlers, JavaScript URLs, SVG, iframe, object, embed, style tags, and JavaScript schemes in `action`, `formaction`, `data`, `poster`, and `background` attributes.
+- The complete shared-core suite passed: 2 passed, 0 failed, 0 skipped.
+
+### Mode B Validation
+
+- Built both site images in the isolated `sites-local-test` project.
+- Both application containers became healthy, and both one-shot fixture services exited successfully with status `0`.
+- Both homepages and both health routes returned `200`.
+- Both running services reported Node `20.20.2` and `sanitize-html@2.17.5`.
+- Scoped logs contained no dependency-loading, startup, SQLite, permission, or fatal errors.
+- The isolated containers, network, and all disposable test volumes were removed after validation.
+
+### Remaining Application Security Work
+
+This dependency update does not resolve the source-level stored-XSS design gap because active post create/update routes still do not apply `sanitize-html`. Caption script-context XSS and the multipart CSRF verification gap also remain separate workstreams. The dependency regression policy documents and tests intended sanitizer behavior only; it is not an authentication, CSRF, or route-wiring bypass.
+
+### Validation Status
+
+`SANITIZE_HTML_DEPENDENCY_VALIDATED`
+
+- No production access or deployment occurred.
+- Nothing was staged, committed, or pushed.
+
 ## Pass 4: Morgan 1.11.0
 
 ### Scope

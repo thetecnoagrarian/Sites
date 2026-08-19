@@ -1,6 +1,22 @@
 # Dependency Audit Results
 
-> **Current-use note (2026-08-18):** The Morgan follow-up below is the current audit baseline. Morgan is now resolved at `1.11.0`, Sharp at `0.35.3`, and Multer at `2.2.0`; earlier captures remain below as historical evidence.
+> **Current-use note (2026-08-19):** The sanitize-html follow-up below is the current audit baseline. sanitize-html is now resolved at `2.17.5`, Morgan at `1.11.0`, Sharp at `0.35.3`, and Multer at `2.2.0`; earlier captures remain below as historical evidence.
+
+## 2026-08-19 sanitize-html Follow-up
+
+- `sanitize-html` changed from `2.17.4` to `2.17.5` in both site packages, with only the authoritative root lockfile updated.
+- An uncommitted `2.17.7` candidate was rejected because it declares Node `>=22.12.0`, which does not satisfy the current production-style Node `20.20.2` runtime contract. Version `2.17.5` declares no `engines` field and passed actual sanitizer execution under Node `20.20.2`.
+- Pre-change full audit: 12 vulnerabilities — 1 low, 1 moderate, 8 high, 2 critical.
+- Current full audit: 11 vulnerabilities — 1 low, 0 moderate, 8 high, 2 critical.
+- Pre-change production-only audit: 9 vulnerabilities — 1 low, 1 moderate, 6 high, 1 critical.
+- Current production-only audit: 8 vulnerabilities — 1 low, 0 moderate, 6 high, 1 critical.
+- The one-family reduction is exactly the removed direct sanitize-html advisory. `postcss@8.5.15` and `nanoid@3.3.12` remain reported in both audits and were not changed.
+- The final parser graph is unchanged from the original `2.17.4` baseline: `htmlparser2@10.1.0`, `dom-serializer@2.0.0`, `domelementtype@2.3.0`, `domhandler@5.0.3`, `domutils@3.2.2`, root `entities@7.0.1`, and serializer-local `entities@4.5.0`.
+- The focused sanitizer regression passed 3 of 3 tests locally under Node `24.12.0` and 3 of 3 tests in the built image under Node `20.20.2`, covering preserved rich markup, removal of dangerous markup, and advisory-related URL attributes.
+- The complete shared-core suite passed 2 of 2 tests.
+- Isolated Mode B built both sites; both containers became healthy, both fixture jobs exited `0`, and both homepages and health routes returned `200`. Both services reported Node `20.20.2` and `sanitize-html@2.17.5`; scoped logs contained no dependency-loading, startup, SQLite, permission, or fatal errors.
+- The isolated Mode B containers, network, and disposable volumes were removed afterward. No production access or deployment occurred.
+- Source-level stored XSS remains unresolved because active create/update routes still do not call `sanitize-html`. Caption script-context XSS and multipart CSRF verification remain separate workstreams.
 
 ## 2026-08-18 Morgan Follow-up
 
