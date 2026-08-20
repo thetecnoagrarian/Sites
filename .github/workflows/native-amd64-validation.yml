@@ -139,9 +139,47 @@ jobs:
             --tag "native-amd64-tta-builder:$GITHUB_RUN_ID" \
             .
 
-          ffg_image="$(docker compose -p sites-local-test -f docker-compose.test.yml images -q fruitionforestgarden | head -n 1)"
-          tta_image="$(docker compose -p sites-local-test -f docker-compose.test.yml images -q thetecnoagrarian | head -n 1)"
-          [[ -n "$ffg_image" && -n "$tta_image" ]]
+          ffg_image_name="$(docker compose -p sites-local-test -f docker-compose.test.yml config --images fruitionforestgarden)"
+          tta_image_name="$(docker compose -p sites-local-test -f docker-compose.test.yml config --images thetecnoagrarian)"
+
+          if [[ -z "$ffg_image_name" || "$ffg_image_name" == *$'\n'* ]]; then
+            echo "::error::Could not resolve exactly one Compose image name for fruitionforestgarden"
+            exit 1
+          fi
+          if [[ -z "$tta_image_name" || "$tta_image_name" == *$'\n'* ]]; then
+            echo "::error::Could not resolve exactly one Compose image name for thetecnoagrarian"
+            exit 1
+          fi
+
+          echo "Resolved expected application image names:"
+          echo "  fruitionforestgarden: $ffg_image_name"
+          echo "  thetecnoagrarian: $tta_image_name"
+          echo "Relevant local Docker images:"
+          docker image ls --no-trunc --format '  {{.Repository}}:{{.Tag}} {{.ID}}' "$ffg_image_name"
+          docker image ls --no-trunc --format '  {{.Repository}}:{{.Tag}} {{.ID}}' "$tta_image_name"
+
+          resolve_image_id() {
+            local service="$1"
+            local image_name="$2"
+            local image_id
+
+            if ! image_id="$(docker image inspect --format '{{.Id}}' "$image_name" 2>/dev/null)"; then
+              echo "::error::Expected image '$image_name' for service '$service' was not found after the successful Compose build" >&2
+              return 1
+            fi
+            if [[ -z "$image_id" ]]; then
+              echo "::error::Docker returned an empty image ID for '$image_name' (service '$service')" >&2
+              return 1
+            fi
+
+            printf '%s\n' "$image_id"
+          }
+
+          ffg_image="$(resolve_image_id fruitionforestgarden "$ffg_image_name")"
+          tta_image="$(resolve_image_id thetecnoagrarian "$tta_image_name")"
+          echo "Resolved built application image IDs:"
+          echo "  $ffg_image_name -> $ffg_image"
+          echo "  $tta_image_name -> $tta_image"
           echo "FFG_IMAGE=$ffg_image" >> "$GITHUB_ENV"
           echo "TTA_IMAGE=$tta_image" >> "$GITHUB_ENV"
 
