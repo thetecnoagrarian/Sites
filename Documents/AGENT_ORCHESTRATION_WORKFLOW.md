@@ -377,7 +377,7 @@ Rules:
 - Use small commits grouped by dependency or risk category.
 - Update documentation if dependency remediation changes runtime assumptions.
 
-For this monorepo, existing docs already flag Node version alignment as a review item: package engines allow Node `>=18.0.0`, while Docker and CI use Node 20. Needs Review: decide whether Node 20 should become the documented baseline before dependency remediation begins.
+For this monorepo, active package engines require Node `>=24.0.0 <25`, while active Docker and CI paths use exact Node `24.19.0`; Docker remains on Alpine 3.23. Local ARM64 and emulated AMD64 gates passed, but an agent must keep final native Linux musl AMD64 validation as an explicit pre-deployment gate.
 
 ## 12. Deployment Operator Checklist Policy
 

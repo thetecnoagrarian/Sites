@@ -331,7 +331,7 @@ Known issues from safe docs/config inspection:
 
 - `UPLOAD_PATH` vs `UPLOADS_PATH`: root `docker-compose.yml` uses `UPLOAD_PATH`, while production/local-production Compose and app docs point to `UPLOADS_PATH`.
 - `DATABASE_URL` vs `DATABASE_PATH`: site examples documented in the environment map use `DATABASE_URL`, while active source/Compose references use `DATABASE_PATH`.
-- Node baseline: package manifests allow Node `>=18.0.0`, while Docker and CI use Node 20.
+- Node baseline is now aligned: active package manifests require Node `>=24.0.0 <25`, while Docker and CI use exact Node `24.19.0` on Alpine 3.23 for Docker.
 - Root Compose files versus site-level Docker/Compose files: both exist; canonical workflow remains Needs Review.
 - Local development workflow versus local production-like workflow: `docker-compose.yml`, `docker-compose.local-prod.yml`, local npm scripts, and older local docs describe different paths.
 - `nginx/blog.conf`: checked-in nginx config may be source of truth or reference only. Needs Review against actual deployment without inspecting private server state.
@@ -439,7 +439,7 @@ Available guidance:
 
 Unresolved questions that may affect remediation:
 
-- Should Node 20 become the documented baseline because Docker and CI use it?
+- Which native Linux musl AMD64 environment will perform the final Node 24 deployment-candidate validation?
 - Which workspace owns each dependency risk?
 - Which audit warnings are direct dependency issues versus transitive dependency issues?
 - Which tests are meaningful before and after dependency updates?
@@ -540,7 +540,7 @@ Sensitive paths may be listed when needed, but contents must not be opened or re
 - Which docs are truly active source-of-truth?
 - Which operational docs are current versus historical?
 - Which Compose workflow is canonical?
-- Should Node 20 become the documented baseline?
+- When and where will the final native Linux musl AMD64 Node 24 gate run before deployment?
 - Should generated/runtime cleanup happen before or after dependency remediation?
 - How should actual website review findings be folded into docs?
 - Should older operational docs be redacted before being kept long-term?

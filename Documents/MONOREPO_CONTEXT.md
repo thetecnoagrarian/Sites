@@ -36,7 +36,7 @@ Confirmed shared areas:
 - Operational documentation under `Documents/`.
 - Backup, deployment, and local workflow concepts.
 
-Both site manifests depend on `@ffg/blog-core` version `0.1.0`, use Node.js `>=18.0.0`, and identify `src/app.js` as the site entry point.
+Both site manifests depend on `@ffg/blog-core` version `0.1.0`, require Node.js `>=24.0.0 <25`, and identify `src/app.js` as the site entry point.
 
 ### What Appears Site-Specific
 
@@ -110,6 +110,8 @@ The Docker model appears to have three layers:
 - `docker-compose.prod.yml` for production-style services with named volumes.
 
 `docker/Dockerfile.prod.site` is a shared multi-stage production Dockerfile parameterized by site directory and site port. It installs production dependencies, copies shared and site source, creates runtime directories, configures a non-root user, and runs the selected site app.
+
+The active production and development Dockerfiles use the immutable official Node `24.19.0` Alpine 3.23 multi-architecture image reference. CI also uses Node `24.19.0`, and active package engines enforce the Node 24 major. Local ARM64 Mode B validation passed; emulated AMD64 build/startup validation is preliminary, so a native Linux musl AMD64 gate remains required before production deployment.
 
 Needs review: the canonical relationship among root-level and site-level Compose files should be documented in a future deployment runbook.
 

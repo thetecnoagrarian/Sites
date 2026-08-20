@@ -1,6 +1,19 @@
 # Dependency Audit Results
 
-> **Current-use note (2026-08-19):** The better-sqlite3 follow-up below is the current audit baseline. better-sqlite3 is now validated at `12.11.1`, sanitize-html at `2.17.5`, Morgan at `1.11.0`, Sharp at `0.35.3`, and Multer at `2.2.0`; earlier captures remain below as historical evidence.
+> **Current-use note (2026-08-20):** The Node 24 follow-up below is the current runtime and audit baseline. better-sqlite3 is validated at `12.11.1`, sanitize-html at `2.17.5`, Morgan at `1.11.0`, Sharp at `0.35.3`, and Multer at `2.2.0`; earlier captures remain below as historical evidence.
+
+## 2026-08-20 Node 24 Runtime Follow-up
+
+- Active production and development Docker paths now use the immutable official Node `24.19.0` Alpine 3.23 multi-architecture image, CI uses exact Node `24.19.0`, and all active package engines require `>=24.0.0 <25`.
+- Fresh no-cache Linux ARM64 Mode B builds completed for both sites with Node `24.19.0`, ABI `137`, Alpine `3.23.5`, musl `1.2.5-r23`, and builder npm `11.19.0`.
+- `better-sqlite3@12.11.1` used the published Node 24 ABI 137 prebuilt on local Darwin ARM64 and Linux musl ARM64, loaded successfully, and reported bundled SQLite `3.53.2`. Sharp `0.35.3` used its expected ARM64 optional packages, reported libvips `8.18.3`, and completed real image transformations.
+- Both ARM64 applications became healthy, fixture jobs exited `0`, home and health routes returned `200`, normal login and CSRF-bearing flows passed, sessions survived service restart, synthetic post CRUD passed, and post-activity integrity and foreign-key checks were clean.
+- Unchanged focused suites passed: shared-core 5/5, better-sqlite 3/3, Morgan 1/1, sanitize-html 3/3, authenticated Multer 3/3, authenticated Sharp 3/3, and targeted Chromium lifecycle 2/2.
+- Preliminary QEMU/emulated Linux musl AMD64 builds completed for both sites. Both images used ABI `137`, selected the better-sqlite x64 prebuilt and expected Sharp `linuxmusl-x64` packages, loaded native addons, completed database read/write and Sharp transformation, started successfully, and returned `200` for home and health routes.
+- Final native Linux musl AMD64 validation remains required before production deployment; emulation is not treated as native production proof.
+- Fresh full audit is unchanged at 9 vulnerabilities: 1 low, 0 moderate, 7 high, 1 critical. Fresh production audit is unchanged at 8: 1 low, 0 moderate, 6 high, 1 critical.
+- `sanitize-html` remains at `2.17.5`. Node 24 removes the prior engine obstacle to a separate `2.17.7` remediation batch, but no sanitizer dependency or source-level route wiring changed here.
+- No schema migration, production access, or deployment occurred.
 
 ## 2026-08-19 better-sqlite3 Follow-up
 
@@ -218,7 +231,7 @@ The following appeared in `npm audit --omit=dev --workspaces` and should be trea
 
 ### Priority 4: Cleanup/Modernization After Security Work
 
-1. Review Node baseline and decide whether Node 20 should become the documented requirement.
+1. Complete final native Linux musl AMD64 validation for the Node 24 deployment candidate.
 2. Review major upgrades separately, especially Express 5, `express-handlebars` 9, Sharp 0.34, Helmet 8, and `better-sqlite3` 12.
 3. Decide whether CI audit should eventually fail on high/critical findings instead of using `continue-on-error`.
 
@@ -265,7 +278,7 @@ Use this checklist after a future approved dependency remediation:
 - Why do some `npm ls` installed versions differ from inspected `package-lock.json` entries?
 - Which updates can be patch/minor without major framework changes?
 - Which updates require Express/Handlebars compatibility review?
-- Should Node 20 become the documented required baseline because Docker and CI use Node 20?
+- Which native Linux musl AMD64 environment will run the final Node 24 deployment-candidate gate?
 - Should CI fail on high/critical audit findings later instead of tolerating audit failures?
 - Should dependency remediation be split into runtime versus dev-only commits?
 - Does `sanitize-html` require attention because it brings production-installed `postcss`?

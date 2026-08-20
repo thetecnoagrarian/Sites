@@ -1,6 +1,6 @@
 # Dependency Security Remediation Plan
 
-> **Current-use note:** The first targeted patch pass is complete. Use `Documents/DEPENDENCY_REMEDIATION_LOG.md` for completed changes and current remaining risk; this document remains the staged plan for unresolved dependency families.
+> **Current-use note (2026-08-20):** The first targeted patch pass and the Node 24 runtime migration are complete locally. Use `Documents/DEPENDENCY_REMEDIATION_LOG.md` for completed changes and current remaining risk; this document remains the staged plan for unresolved dependency families.
 
 ## 1. Purpose
 
@@ -37,10 +37,10 @@ Confirmed from safe manifests and Docker/CI files:
 - `blog-core` owns most shared runtime web dependencies.
 - Both site packages depend on `@ffg/blog-core`.
 - Both site packages also depend directly on `sanitize-html`.
-- Production Docker builds use `npm ci --omit=dev`.
-- CI uses Node 20.
-- The production Dockerfile uses a Node 20 Alpine image.
-- Root package engines allow Node `>=18.0.0`.
+- Production Docker builds use `npm ci --omit=dev --include=optional`.
+- CI uses exact Node `24.19.0`.
+- The production Dockerfile uses the immutable official Node `24.19.0` Alpine 3.23 multi-architecture image reference.
+- Active package engines require Node `>=24.0.0 <25`.
 
 Runtime dependencies matter more urgently than dev-only dependencies because production images omit dev dependencies.
 
@@ -258,20 +258,20 @@ Direct `blog-core` runtime dependency and central app framework. Affects routing
 
 ### `sharp`
 
-Direct `blog-core` runtime dependency and used in shared and site image processing code. Docker/native Alpine behavior is important because production rebuilds Sharp for Linux musl.
+Direct `blog-core` runtime dependency and used in shared and site image processing code. Docker/native Alpine behavior is important because production installs Sharp's platform-specific optional packages for Linux musl.
 
 ### `better-sqlite3`
 
 Direct `blog-core` runtime dependency and used in shared/site database code. Native build/runtime behavior needs extra caution in Docker.
 
-Current validated state as of 2026-08-19:
+Current validated state as of 2026-08-20:
 
 - Upgraded from `11.10.0` to published stable `12.11.1`; the proposed `12.12.0` target was not published.
 - Bundled SQLite moved from `3.49.2` to `3.53.2`; `better-sqlite3-session-store@0.1.0` did not change.
 - Local lifecycle, transaction rollback, session-store lifecycle, and disposable `11.10.0` -> `12.11.1` -> `11.10.0` forward/rollback compatibility gates passed.
-- Both Node `20.20.2` Linux musl ARM64 Mode B images compiled the native addon from source, loaded it, passed authenticated database/session/post flows across container restart, and retained clean integrity and foreign-key checks.
+- Under Node `24.19.0` ABI `137`, both Linux musl ARM64 Mode B images selected the published `better-sqlite3@12.11.1` prebuilt, loaded it, passed authenticated database/session/post flows across container restart, and retained clean integrity and foreign-key checks.
+- Preliminary QEMU/emulated Linux musl AMD64 builds selected the x64 prebuilt; both site images loaded the addon, completed database read/write, and started successfully. Final native AMD64 validation remains required before production deployment.
 - Unchanged Multer and Sharp authenticated regressions passed. `better-sqlite3` remains absent from full and production npm audit findings.
-- Node 24 is still a separate migration gate requiring Linux musl ARM64 prebuilt and Linux musl AMD64 native/prebuilt validation.
 
 ## 8. Recommended Remediation Sequence
 
@@ -386,9 +386,9 @@ Dependency remediation can break both sites.
 Specific risks:
 
 - Shared `blog-core` dependency changes may require both sites to be rebuilt.
-- Production Docker builds use Node 20 even though package engines allow Node `>=18.0.0`.
+- Active Docker, CI, and package-engine declarations are aligned on Node 24; native dependencies still require platform-specific validation.
 - Docker/native packages may behave differently than local Node.
-- `sharp` is rebuilt for Alpine compatibility in the production Dockerfile.
+- `sharp` relies on npm's platform-specific optional packages in the production Dockerfile.
 - `better-sqlite3` and image-processing dependencies can fail differently in Docker than on macOS.
 - CI currently tolerates some audit/test failures, so CI success should not be treated as proof of safety.
 
@@ -417,7 +417,7 @@ Depending on the approved scope, additional targeted commands may be needed for 
 
 ## 12. Open Questions
 
-- Should Node 20 become the documented baseline because Docker and CI use Node 20?
+- Which native Linux musl AMD64 environment will run the final Node 24 deployment-candidate gate?
 - Which vulnerabilities remain in production install after `npm ci --omit=dev`?
 - Which vulnerabilities are dev-only?
 - Are current CI audit steps too tolerant?

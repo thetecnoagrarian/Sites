@@ -1,5 +1,38 @@
 # Dependency Remediation Log
 
+## Runtime Migration: Node 24.19.0
+
+### Scope
+
+The active runtime baseline was migrated locally on 2026-08-20 without changing dependency versions.
+
+- Active production and development Dockerfiles now use the immutable official `node:24.19.0-alpine3.23@sha256:244cc2b53f46f9e876304391d17682b0ddae9ac33491f4857e25e35a36ba7995` multi-architecture image.
+- Root, shared-core, and both site manifests require Node `>=24.0.0 <25`; the authoritative root lockfile records the same workspace engine policy.
+- CI uses exact Node `24.19.0`.
+- Alpine remains on the 3.23 line, the builder remains pinned to npm `11.19.0`, and `npm ci --omit=dev --include=optional`, Sharp configuration, build tooling, and runtime packages remain unchanged.
+
+### Native Runtime Validation
+
+- Local macOS ARM64 used Node `24.12.0`, ABI `137`; the published `better-sqlite3@12.11.1` Darwin ARM64 prebuilt loaded, reported bundled SQLite `3.53.2`, and passed the unchanged compatibility suite. Sharp `0.35.3` loaded with libvips `8.18.3` and completed a real transformation.
+- Fresh no-cache Linux ARM64 Mode B builds used Node `24.19.0`, ABI `137`, Alpine `3.23.5`, musl `1.2.5-r23`, and builder npm `11.19.0`. The better-sqlite build tree contained only the published prebuilt addon, and the expected Sharp `linuxmusl-arm64` packages were present.
+- Both ARM64 applications became healthy, fixture jobs exited `0`, authenticated sessions survived service restart, synthetic post create/read/update/delete passed, integrity checks returned `ok`, and foreign-key checks returned no rows.
+- Preliminary QEMU/emulated Linux musl AMD64 builds completed for both sites. Both images used Node `24.19.0` ABI `137`, selected the better-sqlite x64 prebuilt and Sharp `linuxmusl-x64` packages, completed database read/write and Sharp WebP transformation, started, and returned `200` for home and health routes.
+- Emulation is preliminary evidence only. A final native Linux musl AMD64 deployment-candidate validation remains required before production deployment.
+
+### Regression and Audit Result
+
+- Shared-core: 5 passed. better-sqlite compatibility: 3 passed. Morgan: 1 passed. sanitize-html: 3 passed. Authenticated Multer: 3 passed. Authenticated Sharp: 3 passed. Targeted Chromium authenticated lifecycle: 2 passed.
+- Fresh full audit remained 9 vulnerabilities: 1 low, 0 moderate, 7 high, 1 critical.
+- Fresh production audit remained 8 vulnerabilities: 1 low, 0 moderate, 6 high, 1 critical.
+- `sanitize-html` remains at `2.17.5`; its `2.17.7` follow-up is a separate dependency batch now that Node 24 removes the prior runtime-engine obstacle.
+- The npm `allowScripts` warning remains a separate supply-chain policy follow-up; this migration did not change script policy.
+
+### Validation Status
+
+`NODE24_MIGRATION_VALIDATED`
+
+- No schema migration, production access, deployment, staging, commit, or push occurred.
+
 ## Pass 6: better-sqlite3 12.11.1
 
 ### Scope

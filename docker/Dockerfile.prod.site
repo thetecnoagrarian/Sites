@@ -1,6 +1,6 @@
 # Multi-stage production Dockerfile for blog sites
 # Stage 1: Build dependencies and prepare application
-FROM node:20-alpine AS builder
+FROM node:24.19.0-alpine3.23@sha256:244cc2b53f46f9e876304391d17682b0ddae9ac33491f4857e25e35a36ba7995 AS builder
 
 # Build arguments
 ARG SITE_DIR_NAME
@@ -13,7 +13,7 @@ RUN apk add --no-cache \
     g++ \
     && rm -rf /var/cache/apk/*
 
-# Install a Node 20-compatible npm version deterministically
+# Install a Node 24-compatible npm version deterministically
 RUN npm install -g npm@11.19.0
 
 # Set working directory
@@ -35,7 +35,7 @@ COPY blog-core/src/index.js ./blog-core/src/index.js
 COPY ${SITE_DIR_NAME}/src ./${SITE_DIR_NAME}/src
 
 # Stage 2: Production image (minimal size)
-FROM node:20-alpine
+FROM node:24.19.0-alpine3.23@sha256:244cc2b53f46f9e876304391d17682b0ddae9ac33491f4857e25e35a36ba7995
 
 # Build arguments (needed for runtime)
 ARG SITE_DIR_NAME

@@ -36,8 +36,14 @@ Root scripts visible from the non-sensitive manifest:
 
 Runtime requirements from the root manifest:
 
-- Node.js `>=18.0.0`
+- Node.js `>=24.0.0 <25`
 - npm `>=9.0.0`
+
+Active runtime policy:
+
+- Shared production and active development Dockerfiles use the immutable official Node `24.19.0` Alpine 3.23 multi-architecture image reference.
+- CI uses exact Node `24.19.0`.
+- The production builder pins npm to `11.19.0`.
 
 ## 3. Shared Code Areas
 

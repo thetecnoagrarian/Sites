@@ -405,11 +405,10 @@ Rules:
 
 Known context:
 
-- Root package engines allow Node `>=18.0.0`.
-- CI uses Node 20.
-- Production Dockerfile uses Node 20.
-
-Needs Review: decide whether Node 20 should become the documented baseline.
+- Active package engines require Node `>=24.0.0 <25`.
+- CI uses exact Node `24.19.0`.
+- The active production Dockerfile uses the immutable Node `24.19.0` Alpine 3.23 multi-architecture image reference.
+- Final native Linux musl AMD64 validation remains a deployment gate even though local ARM64 and emulated AMD64 validation passed.
 
 ## 13. Deployment Boundary
 
@@ -471,7 +470,7 @@ Dependency/security remediation should remain separate from documentation migrat
 - Which root or site-level Compose files are canonical for each workflow?
 - Should `UPLOAD_PATH` be standardized to `UPLOADS_PATH`?
 - Should `DATABASE_URL` examples be replaced with `DATABASE_PATH`?
-- Should Node 20 be documented as the baseline because Docker and CI use it?
+- What native Linux musl AMD64 host or CI runner will perform the final Node 24 deployment-candidate gate?
 - Which reviewed-safe operational docs are current versus historical?
 - Should generated/runtime folders be cleaned or only ignored?
 - Should CI failure tolerance be tightened after documentation migration?

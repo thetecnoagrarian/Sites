@@ -115,17 +115,17 @@ Purpose:
 - Shared parameterized multi-stage production Dockerfile.
 - Uses build args `SITE_DIR_NAME` and `SITE_PORT`.
 - Installs production workspace dependencies.
-- Rebuilds Sharp for Alpine compatibility.
+- Installs production dependencies with optional native packages enabled so npm selects the matching Sharp package for the build platform.
 - Copies `blog-core/src` and selected site `src`.
 - Creates runtime directories for data, uploads, logs, backups, and scripts.
 - Runs the selected site app as a non-root user.
 
 Runtime note:
 
-- Docker uses Node 20.
-- The production-style builder pins npm to `11.19.0`, whose declared Node support includes Node 20. Do not replace the pin with `npm@latest`; a moving npm major can become incompatible with the pinned Node runtime before `npm ci` runs. Reassess the npm pin together with any future Node runtime migration.
-- Package engines allow Node `>=18.0.0`.
-- Needs Review: confirm whether Node 20 is the intended production baseline.
+- Docker build and runtime stages use the official immutable `node:24.19.0-alpine3.23@sha256:244cc2b53f46f9e876304391d17682b0ddae9ac33491f4857e25e35a36ba7995` multi-architecture image.
+- The production-style builder pins npm to `11.19.0`, whose declared Node support includes Node 24. Do not replace the pin with `npm@latest`; reassess the exact npm pin together with future Node runtime migrations.
+- Active package engines require Node `>=24.0.0 <25`.
+- Local Linux musl ARM64 Mode B validation passed. Emulated Linux musl AMD64 builds, native-addon probes, image transforms, and application startup also passed, but final validation on native AMD64 hardware remains required before production deployment.
 
 ### `nginx/blog.conf`
 
@@ -540,7 +540,7 @@ Explicit-approval rollback actions:
 Confirmed from `.github/workflows/ci-cd.yml`:
 
 - CI runs on push and pull request to `main`.
-- CI uses Node 20.
+- CI uses exact Node `24.19.0`.
 - CI installs dependencies.
 - CI attempts linting for `@ffg/blog-core`, tolerating a missing lint script.
 - CI installs Chromium for Playwright.
@@ -558,7 +558,8 @@ Do not overstate CI guarantees. Passing CI does not equal deployment approval, e
 - Do site-level Docker/Compose files remain current, or are root-level Compose files authoritative?
 - Should `UPLOAD_PATH` in `docker-compose.yml` be changed to `UPLOADS_PATH`?
 - Should site examples using `DATABASE_URL` be aligned with `DATABASE_PATH`?
-- Docker uses Node 20, while package engines allow Node `>=18.0.0`; confirm intended runtime baseline.
+- Node `24.19.0` is aligned across active Docker and CI paths, while package engines enforce `>=24.0.0 <25`.
+- Complete final Linux musl AMD64 validation on native hardware before deploying the Node 24 image; local QEMU validation is preliminary evidence, not the production gate.
 - Dependency audit remediation should likely wait until documentation migration is complete unless a high-risk vulnerability is confirmed and approved for action.
 - CI tolerates some test/audit failures; decide whether that is intentional.
 - Trusted-IP/default-origin behavior should be environment-driven and placeholder-documented.
