@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target_revision:
-        description: Full 40-character commit SHA to validate
+        description: "Target application SHA. Node 24 candidate: 63298610611fa0612987241e91a5e001fcc74362; do not enter the workflow revision."
         required: true
         type: string
 
@@ -57,8 +57,9 @@ jobs:
           {
             echo "# Native AMD64 deployment-candidate validation"
             echo
-            echo "- Exact application revision: \`$resolved_revision\`"
-            echo "- Workflow revision: \`$GITHUB_SHA\`"
+            echo "- Target application/deployment-candidate revision checked out and tested: \`$resolved_revision\`"
+            echo "- Workflow machinery revision executing from main: \`$GITHUB_SHA\`"
+            echo "- These revisions may differ; the target application revision above is the deployment candidate."
             echo "- Trigger: manual \`workflow_dispatch\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -330,6 +331,25 @@ jobs:
             --entrypoint node \
             "$FFG_IMAGE" --test tests/sanitize-html-security.test.js \
             2>&1 | tee "$RUNNER_TEMP/sanitize-html-tests.log"
+
+          append_node_test_summary() {
+            local result="$1"
+            local summary
+
+            summary="$(awk '
+              ($1 == "#" || $1 == "ℹ") &&
+              $2 ~ /^(tests|suites|pass|fail|cancelled|skipped|todo|duration_ms)$/ {
+                print
+              }
+            ' "$result" || true)"
+
+            if [[ -n "$summary" ]]; then
+              printf '%s\n' "$summary"
+            else
+              echo "Summary unavailable; authoritative test command succeeded. See the test output above."
+            fi
+          }
+
           {
             echo
             echo "## Focused native regression tests"
@@ -341,10 +361,11 @@ jobs:
               echo
               echo "### $(basename "$result" .log)"
               echo '```text'
-              grep -E '^# (tests|suites|pass|fail|cancelled|skipped|todo|duration_ms) ' "$result"
+              append_node_test_summary "$result"
               echo '```'
             done
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$GITHUB_STEP_SUMMARY" || \
+            echo "::warning::Focused test commands passed, but their informational job summary could not be written"
 
       - name: Start isolated Mode B stack
         shell: bash
