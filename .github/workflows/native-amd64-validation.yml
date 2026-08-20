@@ -1,0 +1,659 @@
+name: Native AMD64 Deployment Candidate Validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_revision:
+        description: Full 40-character commit SHA to validate
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-amd64-validation-${{ inputs.target_revision }}
+  cancel-in-progress: false
+
+jobs:
+  validate-native-amd64:
+    name: Validate native Linux musl AMD64 candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      COMPOSE_PROJECT_NAME: sites-local-test
+      COMPOSE_FILE: docker-compose.test.yml
+      DOCKER_BIN: /usr/bin/docker
+      TARGET_REVISION: ${{ inputs.target_revision }}
+
+    steps:
+      - name: Validate requested revision format
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$TARGET_REVISION" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::target_revision must be a full 40-character commit SHA"
+            exit 1
+          fi
+
+      - name: Checkout exact deployment candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_revision }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Resolve and report exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          resolved_revision="$(git rev-parse HEAD)"
+          requested_revision="$(printf '%s' "$TARGET_REVISION" | tr '[:upper:]' '[:lower:]')"
+          if [[ "$resolved_revision" != "$requested_revision" ]]; then
+            echo "::error::Resolved revision $resolved_revision does not match requested revision $requested_revision"
+            exit 1
+          fi
+          echo "VALIDATED_REVISION=$resolved_revision" >> "$GITHUB_ENV"
+          {
+            echo "# Native AMD64 deployment-candidate validation"
+            echo
+            echo "- Exact application revision: \`$resolved_revision\`"
+            echo "- Workflow revision: \`$GITHUB_SHA\`"
+            echo "- Trigger: manual \`workflow_dispatch\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Prove native AMD64 runner and Docker server
+        shell: bash
+        run: |
+          set -euo pipefail
+          kernel_arch="$(uname -m)"
+          docker_arch="$(docker version --format '{{.Server.Arch}}')"
+          runner_arch='${{ runner.arch }}'
+
+          [[ "$runner_arch" == "X64" ]]
+          [[ "$kernel_arch" == "x86_64" ]]
+          [[ "$docker_arch" == "amd64" || "$docker_arch" == "x86_64" ]]
+
+          docker version
+          docker compose version
+          {
+            echo
+            echo "## Native environment"
+            echo
+            echo "- GitHub runner architecture: \`$runner_arch\`"
+            echo "- Kernel architecture: \`$kernel_arch\`"
+            echo "- Docker server architecture: \`$docker_arch\`"
+            echo "- Docker: \`$(docker version --format '{{.Server.Version}}')\`"
+            echo "- Docker Compose: \`$(docker compose version --short)\`"
+            echo "- QEMU/binfmt installation: not configured by this workflow"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup host Node for repository-supported Playwright tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+
+      - name: Install host test dependencies and Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Validate isolated Compose configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose -p sites-local-test -f docker-compose.test.yml config --quiet
+
+      - name: Build fresh production-style candidates
+        shell: bash
+        env:
+          DOCKER_BUILDKIT: "1"
+          BUILDKIT_PROGRESS: plain
+        run: |
+          set -euo pipefail
+          docker compose -p sites-local-test -f docker-compose.test.yml build \
+            --no-cache --pull \
+            fruitionforestgarden thetecnoagrarian \
+            2>&1 | tee "$RUNNER_TEMP/native-amd64-build.log"
+
+          # Fixture images use the same freshly built site stages and may reuse
+          # those local layers; the two application candidates above remain no-cache builds.
+          docker compose -p sites-local-test -f docker-compose.test.yml build \
+            ffg-test-fixture tta-test-fixture
+
+          docker build \
+            --file docker/Dockerfile.prod.site \
+            --target builder \
+            --build-arg SITE_DIR_NAME=fruitionforestgarden \
+            --build-arg SITE_PORT=4000 \
+            --tag "native-amd64-ffg-builder:$GITHUB_RUN_ID" \
+            .
+          docker build \
+            --file docker/Dockerfile.prod.site \
+            --target builder \
+            --build-arg SITE_DIR_NAME=thetecnoagrarian \
+            --build-arg SITE_PORT=4002 \
+            --tag "native-amd64-tta-builder:$GITHUB_RUN_ID" \
+            .
+
+          ffg_image="$(docker compose -p sites-local-test -f docker-compose.test.yml images -q fruitionforestgarden | head -n 1)"
+          tta_image="$(docker compose -p sites-local-test -f docker-compose.test.yml images -q thetecnoagrarian | head -n 1)"
+          [[ -n "$ffg_image" && -n "$tta_image" ]]
+          echo "FFG_IMAGE=$ffg_image" >> "$GITHUB_ENV"
+          echo "TTA_IMAGE=$tta_image" >> "$GITHUB_ENV"
+
+      - name: Probe native runtime and dependency identity
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          probe_image() {
+            local site_key="$1"
+            local image_id="$2"
+            local builder_tag="$3"
+            local builder_npm
+            local raw_output="$RUNNER_TEMP/runtime-${site_key}-raw.json"
+            local final_output="$RUNNER_TEMP/runtime-${site_key}.json"
+
+            builder_npm="$(docker run --rm --entrypoint npm "$builder_tag" --version)"
+            [[ "$builder_npm" == "11.19.0" ]]
+
+            docker run --rm --entrypoint node "$image_id" --input-type=module -e '
+              import assert from "node:assert/strict";
+              import { spawnSync } from "node:child_process";
+              import { existsSync, readFileSync } from "node:fs";
+              import { rm } from "node:fs/promises";
+              import Database from "better-sqlite3";
+              import sharp from "sharp";
+
+              const readPackage = (path) => JSON.parse(readFileSync(path, "utf8"));
+              const betterPath = "/app/node_modules/better-sqlite3";
+              const sharpPath = "/app/node_modules/sharp";
+              const sharpNativePath = "/app/node_modules/@img/sharp-linuxmusl-x64";
+              const libvipsNativePath = "/app/node_modules/@img/sharp-libvips-linuxmusl-x64";
+              const sourceBuildMarkers = [
+                `${betterPath}/build/Makefile`,
+                `${betterPath}/build/config.gypi`,
+                `${betterPath}/build/Release/obj.target`
+              ].filter(existsSync);
+
+              assert.equal(process.version, "v24.19.0");
+              assert.equal(process.versions.modules, "137");
+              assert.equal(process.arch, "x64");
+              assert.equal(readFileSync("/etc/alpine-release", "utf8").trim().startsWith("3.23."), true);
+              assert.equal(readPackage(`${betterPath}/package.json`).version, "12.11.1");
+              assert.equal(existsSync(`${betterPath}/build/Release/better_sqlite3.node`), true);
+              assert.deepEqual(sourceBuildMarkers, []);
+              assert.equal(readPackage(`${sharpPath}/package.json`).version, "0.35.3");
+              assert.equal(existsSync(sharpNativePath), true);
+              assert.equal(existsSync(libvipsNativePath), true);
+              assert.equal(sharp.versions.vips, "8.18.3");
+
+              const dbPath = `/tmp/native-amd64-${process.pid}.db`;
+              let db = new Database(dbPath);
+              db.exec("CREATE TABLE probe (id INTEGER PRIMARY KEY, value TEXT NOT NULL)");
+              db.prepare("INSERT INTO probe (value) VALUES (?)").run("synthetic-native-amd64-record");
+              assert.equal(db.prepare("SELECT value FROM probe WHERE id = 1").get().value, "synthetic-native-amd64-record");
+              const sqliteVersion = db.prepare("SELECT sqlite_version() AS version").get().version;
+              assert.equal(sqliteVersion, "3.53.2");
+              db.close();
+              db = new Database(dbPath);
+              assert.equal(db.prepare("SELECT COUNT(*) AS count FROM probe").get().count, 1);
+              assert.deepEqual(db.pragma("integrity_check"), [{ integrity_check: "ok" }]);
+              db.close();
+
+              const webpPath = `/tmp/native-amd64-${process.pid}.webp`;
+              await sharp({
+                create: {
+                  width: 32,
+                  height: 16,
+                  channels: 3,
+                  background: { r: 42, g: 116, b: 76 }
+                }
+              }).webp().toFile(webpPath);
+              const metadata = await sharp(webpPath).metadata();
+              assert.deepEqual(
+                { format: metadata.format, width: metadata.width, height: metadata.height },
+                { format: "webp", width: 32, height: 16 }
+              );
+
+              const musl = spawnSync("ldd", ["--version"], { encoding: "utf8" });
+              const uname = spawnSync("uname", ["-m"], { encoding: "utf8" });
+              assert.equal(uname.stdout.trim(), "x86_64");
+
+              console.log(JSON.stringify({
+                node: process.version,
+                abi: process.versions.modules,
+                processArch: process.arch,
+                kernelArch: uname.stdout.trim(),
+                alpine: readFileSync("/etc/alpine-release", "utf8").trim(),
+                musl: `${musl.stdout}${musl.stderr}`.trim().split("\n").slice(0, 2).join("; "),
+                betterSqlite3: readPackage(`${betterPath}/package.json`).version,
+                betterSqliteNativePath: `${betterPath}/build/Release/better_sqlite3.node`,
+                sourceBuildMarkers,
+                sqlite: sqliteVersion,
+                sharp: readPackage(`${sharpPath}/package.json`).version,
+                sharpNativePackage: readPackage(`${sharpNativePath}/package.json`).name,
+                libvipsNativePackage: readPackage(`${libvipsNativePath}/package.json`).name,
+                libvips: sharp.versions.vips,
+                sharpTransformation: { format: metadata.format, width: metadata.width, height: metadata.height }
+              }));
+
+              await rm(dbPath, { force: true });
+              await rm(webpPath, { force: true });
+            ' > "$raw_output"
+
+            jq --arg npmBuilder "$builder_npm" '. + {npmBuilder: $npmBuilder}' \
+              "$raw_output" > "$final_output"
+            jq . "$final_output"
+          }
+
+          probe_image ffg "$FFG_IMAGE" "native-amd64-ffg-builder:$GITHUB_RUN_ID"
+          probe_image tta "$TTA_IMAGE" "native-amd64-tta-builder:$GITHUB_RUN_ID"
+
+          {
+            echo
+            echo "## Native image identity"
+            echo
+            echo '```json'
+            jq -s '{ffg: .[0], tta: .[1]}' \
+              "$RUNNER_TEMP/runtime-ffg.json" "$RUNNER_TEMP/runtime-tta.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run shared and focused native-package tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --workdir /app \
+            --volume "$GITHUB_WORKSPACE/blog-core/test:/app/blog-core/test:ro" \
+            --entrypoint /bin/sh \
+            "$FFG_IMAGE" -lc 'node --test blog-core/test/*.test.js' \
+            2>&1 | tee "$RUNNER_TEMP/shared-core-tests.log"
+          docker run --rm \
+            --workdir /app \
+            --volume "$GITHUB_WORKSPACE/blog-core/test:/app/blog-core/test:ro" \
+            --entrypoint node \
+            "$FFG_IMAGE" --test blog-core/test/better-sqlite3-compatibility.test.js \
+            2>&1 | tee "$RUNNER_TEMP/better-sqlite3-tests.log"
+          docker run --rm \
+            --workdir /app \
+            --volume "$GITHUB_WORKSPACE/blog-core/test:/app/blog-core/test:ro" \
+            --entrypoint node \
+            "$FFG_IMAGE" --test blog-core/test/morgan-security.test.js \
+            2>&1 | tee "$RUNNER_TEMP/morgan-tests.log"
+          docker run --rm \
+            --workdir /app \
+            --volume "$GITHUB_WORKSPACE/tests/sanitize-html-security.test.js:/app/tests/sanitize-html-security.test.js:ro" \
+            --entrypoint node \
+            "$FFG_IMAGE" --test tests/sanitize-html-security.test.js \
+            2>&1 | tee "$RUNNER_TEMP/sanitize-html-tests.log"
+          {
+            echo
+            echo "## Focused native regression tests"
+            for result in \
+              "$RUNNER_TEMP/shared-core-tests.log" \
+              "$RUNNER_TEMP/better-sqlite3-tests.log" \
+              "$RUNNER_TEMP/morgan-tests.log" \
+              "$RUNNER_TEMP/sanitize-html-tests.log"; do
+              echo
+              echo "### $(basename "$result" .log)"
+              echo '```text'
+              grep -E '^# (tests|suites|pass|fail|cancelled|skipped|todo|duration_ms) ' "$result"
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Start isolated Mode B stack
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          wait_for_health() {
+            local service="$1"
+            local container_id
+            local status
+            for _ in $(seq 1 90); do
+              container_id="$(docker compose -p sites-local-test -f docker-compose.test.yml ps -q "$service")"
+              if [[ -n "$container_id" ]]; then
+                status="$(docker inspect --format '{{.State.Health.Status}}' "$container_id")"
+                [[ "$status" == "healthy" ]] && return 0
+                [[ "$status" == "unhealthy" ]] && break
+              fi
+              sleep 2
+            done
+            docker compose -p sites-local-test -f docker-compose.test.yml ps --all
+            return 1
+          }
+
+          wait_for_fixture() {
+            local service="$1"
+            local container_id
+            local state
+            for _ in $(seq 1 90); do
+              container_id="$(docker compose -p sites-local-test -f docker-compose.test.yml ps -q "$service")"
+              if [[ -n "$container_id" ]]; then
+                state="$(docker inspect --format '{{.State.Status}}:{{.State.ExitCode}}' "$container_id")"
+                [[ "$state" == "exited:0" ]] && return 0
+                [[ "$state" == exited:* && "$state" != "exited:0" ]] && break
+              fi
+              sleep 2
+            done
+            docker compose -p sites-local-test -f docker-compose.test.yml ps --all
+            return 1
+          }
+
+          docker compose -p sites-local-test -f docker-compose.test.yml up -d --no-build
+          wait_for_health fruitionforestgarden
+          wait_for_health thetecnoagrarian
+          wait_for_fixture ffg-test-fixture
+          wait_for_fixture tta-test-fixture
+
+          [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:4000/)" == "200" ]]
+          [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:4000/health)" == "200" ]]
+          [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:4002/)" == "200" ]]
+          [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:4002/health)" == "200" ]]
+
+          docker compose -p sites-local-test -f docker-compose.test.yml ps --all
+          {
+            echo
+            echo "## Mode B startup"
+            echo
+            echo "- FFG application: healthy; home 200; health 200"
+            echo "- TTA application: healthy; home 200; health 200"
+            echo "- FFG fixture: exited 0"
+            echo "- TTA fixture: exited 0"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate targeted Chromium lifecycle check
+        shell: bash
+        run: |
+          cat > tests/native-amd64-lifecycle.spec.js <<'EOF'
+          import { test, expect } from '@playwright/test';
+          import { execFileSync } from 'node:child_process';
+
+          const DOCKER_BIN = process.env.DOCKER_BIN || '/usr/bin/docker';
+          const COMPOSE_ARGS = ['compose', '-p', 'sites-local-test', '-f', 'docker-compose.test.yml'];
+          const TEST_ADMIN = {
+            username: 'mode-b-multer-admin',
+            password: 'ModeB-Multer-Synthetic-Only-2026'
+          };
+          const RUN_ID = process.env.GITHUB_RUN_ID || Date.now().toString();
+          const sites = [
+            { key: 'ffg', name: 'Fruition Forest Garden', baseURL: 'http://127.0.0.1:4000', service: 'fruitionforestgarden' },
+            { key: 'tta', name: 'The Tecnoagrarian', baseURL: 'http://127.0.0.1:4002', service: 'thetecnoagrarian' }
+          ];
+
+          const compose = (...args) => execFileSync(DOCKER_BIN, [...COMPOSE_ARGS, ...args], {
+            encoding: 'utf8',
+            env: process.env
+          });
+
+          const waitForHealth = async (service) => {
+            for (let attempt = 0; attempt < 90; attempt += 1) {
+              const containerId = compose('ps', '-q', service).trim();
+              if (containerId) {
+                const status = execFileSync(DOCKER_BIN, [
+                  'inspect', '--format', '{{.State.Health.Status}}', containerId
+                ], { encoding: 'utf8' }).trim();
+                if (status === 'healthy') return;
+                if (status === 'unhealthy') throw new Error(`${service} became unhealthy`);
+              }
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+            }
+            throw new Error(`${service} did not become healthy`);
+          };
+
+          const loginNormally = async (page, site) => {
+            await page.goto(`${site.baseURL}/login`);
+            await expect(page.locator('input[name="_csrf"]')).toHaveValue(/.+/);
+            await page.getByLabel('Username').fill(TEST_ADMIN.username);
+            await page.getByLabel('Password').fill(TEST_ADMIN.password);
+            await Promise.all([
+              page.waitForURL(/\/admin(?:\/dashboard)?\/?$/),
+              page.getByRole('button', { name: 'Login' }).click()
+            ]);
+          };
+
+          test.describe.configure({ mode: 'serial' });
+
+          for (const site of sites) {
+            test(`${site.name} authenticated CRUD, restart, and session persistence`, async ({ page }) => {
+              const title = `Native AMD64 ${site.key} Lifecycle ${RUN_ID}`;
+              const updatedTitle = `${title} Updated`;
+              const originalSlug = `native-amd64-${site.key}-lifecycle-${RUN_ID}`;
+              const updatedSlug = `${originalSlug}-updated`;
+
+              await expect((await page.request.get(`${site.baseURL}/`)).status()).toBe(200);
+              await loginNormally(page, site);
+              await page.goto(`${site.baseURL}/admin/dashboard`);
+              await expect(page).toHaveURL(`${site.baseURL}/admin/dashboard`);
+
+              await page.goto(`${site.baseURL}/admin/posts/new`);
+              await page.locator('input[name="title"]').fill(title);
+              await page.locator('textarea[name="body"]').fill('Synthetic native AMD64 lifecycle body.');
+              await page.locator('input[name="created_at"]').fill('2026-08-20');
+              await Promise.all([
+                page.waitForNavigation(),
+                page.locator('form.post-form').evaluate((form) => form.requestSubmit())
+              ]);
+              await expect(page).toHaveURL(`${site.baseURL}/admin/dashboard`);
+              await expect(page.locator('tr', { hasText: title })).toHaveCount(1);
+              await expect((await page.request.get(`${site.baseURL}/post/${originalSlug}`)).status()).toBe(200);
+
+              const row = page.locator('tr', { hasText: title });
+              const editPath = await row.locator('sl-button[href*="/edit"]').getAttribute('href');
+              expect(editPath).toBeTruthy();
+              await page.goto(`${site.baseURL}${editPath}`);
+              await page.locator('input[name="title"]').fill(updatedTitle);
+              await page.locator('textarea[name="body"]').fill('Updated synthetic native AMD64 lifecycle body.');
+              await Promise.all([
+                page.waitForNavigation(),
+                page.locator('form.post-form').evaluate((form) => form.requestSubmit())
+              ]);
+              await expect(page).toHaveURL(`${site.baseURL}/admin/dashboard`);
+              await expect(page.locator('tr', { hasText: updatedTitle })).toHaveCount(1);
+              await expect((await page.request.get(`${site.baseURL}/post/${updatedSlug}`)).status()).toBe(200);
+
+              compose('up', '-d', '--no-build', '--force-recreate', '--no-deps', site.service);
+              await waitForHealth(site.service);
+              await page.goto(`${site.baseURL}/admin/dashboard`);
+              await expect(page).toHaveURL(`${site.baseURL}/admin/dashboard`);
+              await expect(page.locator('tr', { hasText: updatedTitle })).toHaveCount(1);
+
+              const updatedRow = page.locator('tr', { hasText: updatedTitle });
+              await Promise.all([
+                page.waitForNavigation(),
+                updatedRow.locator('form[action*="/delete"]').evaluate((form) => form.requestSubmit())
+              ]);
+              await expect(page).toHaveURL(`${site.baseURL}/admin/dashboard`);
+              await expect(page.locator('tr', { hasText: updatedTitle })).toHaveCount(0);
+              await expect((await page.request.get(`${site.baseURL}/post/${updatedSlug}`)).status()).toBe(404);
+              await expect((await page.request.get(`${site.baseURL}/health`)).status()).toBe(200);
+            });
+          }
+          EOF
+
+      - name: Run targeted Chromium lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          CI=1 FORCE_COLOR=0 npx playwright test tests/native-amd64-lifecycle.spec.js \
+            --project=chromium --reporter=line \
+            2>&1 | tee "$RUNNER_TEMP/chromium-lifecycle.log"
+          {
+            echo
+            echo "## Targeted Chromium lifecycle"
+            echo '```text'
+            grep -E '[0-9]+ (passed|failed|skipped)' "$RUNNER_TEMP/chromium-lifecycle.log" | tail -n 1
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run authenticated Multer regression with test-only limit
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          wait_for_health() {
+            local service="$1"
+            for _ in $(seq 1 90); do
+              local container_id="$(docker compose -p sites-local-test -f docker-compose.test.yml ps -q "$service")"
+              if [[ -n "$container_id" && "$(docker inspect --format '{{.State.Health.Status}}' "$container_id")" == "healthy" ]]; then
+                return 0
+              fi
+              sleep 2
+            done
+            return 1
+          }
+
+          MODE_B_NODE_ENV=test MODE_B_MAX_FILE_SIZE=1024 \
+            docker compose -p sites-local-test -f docker-compose.test.yml up \
+            -d --no-build --force-recreate --no-deps fruitionforestgarden thetecnoagrarian
+          wait_for_health fruitionforestgarden
+          wait_for_health thetecnoagrarian
+          CI=1 FORCE_COLOR=0 npx playwright test tests/multer-authenticated.spec.js \
+            --project=chromium --reporter=line \
+            2>&1 | tee "$RUNNER_TEMP/multer-authenticated.log"
+          {
+            echo
+            echo "## Authenticated Multer regression"
+            echo '```text'
+            grep -E '[0-9]+ (passed|failed|skipped)' "$RUNNER_TEMP/multer-authenticated.log" | tail -n 1
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Restore production-mode harness and run authenticated Sharp regression
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          wait_for_health() {
+            local service="$1"
+            for _ in $(seq 1 90); do
+              local container_id="$(docker compose -p sites-local-test -f docker-compose.test.yml ps -q "$service")"
+              if [[ -n "$container_id" && "$(docker inspect --format '{{.State.Health.Status}}' "$container_id")" == "healthy" ]]; then
+                return 0
+              fi
+              sleep 2
+            done
+            return 1
+          }
+
+          MODE_B_NODE_ENV=production MODE_B_MAX_FILE_SIZE=52428800 \
+            docker compose -p sites-local-test -f docker-compose.test.yml up \
+            -d --no-build --force-recreate --no-deps fruitionforestgarden thetecnoagrarian
+          wait_for_health fruitionforestgarden
+          wait_for_health thetecnoagrarian
+          CI=1 FORCE_COLOR=0 npx playwright test tests/sharp-authenticated.spec.js \
+            --project=chromium --reporter=line \
+            2>&1 | tee "$RUNNER_TEMP/sharp-authenticated.log"
+          {
+            echo
+            echo "## Authenticated Sharp regression"
+            echo '```text'
+            grep -E '[0-9]+ (passed|failed|skipped)' "$RUNNER_TEMP/sharp-authenticated.log" | tail -n 1
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify final database integrity and journal mode
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          verify_database() {
+            local service="$1"
+            local output="$RUNNER_TEMP/database-${service}.json"
+            docker compose -p sites-local-test -f docker-compose.test.yml exec -T "$service" \
+              node --input-type=module -e '
+                import assert from "node:assert/strict";
+                import Database from "better-sqlite3";
+                const db = new Database("/app/data/blog.db");
+                const integrity = db.pragma("integrity_check");
+                const foreignKeys = db.pragma("foreign_key_check");
+                const journalMode = db.pragma("journal_mode", { simple: true });
+                assert.deepEqual(integrity, [{ integrity_check: "ok" }]);
+                assert.deepEqual(foreignKeys, []);
+                console.log(JSON.stringify({ integrity, foreignKeys, journalMode }));
+                db.close();
+              ' > "$output"
+            jq . "$output"
+          }
+
+          verify_database fruitionforestgarden
+          verify_database thetecnoagrarian
+          {
+            echo
+            echo "## Final database checks"
+            echo
+            echo '```json'
+            jq -s '{ffg: .[0], tta: .[1]}' \
+              "$RUNNER_TEMP/database-fruitionforestgarden.json" \
+              "$RUNNER_TEMP/database-thetecnoagrarian.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Review native failure signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          log_file="$RUNNER_TEMP/sites-local-test.log"
+          docker compose -p sites-local-test -f docker-compose.test.yml logs --no-color > "$log_file"
+
+          hard_failure_pattern='illegal instruction|segmentation fault|ERR_DLOPEN_FAILED|NODE_MODULE_VERSION|Module did not self-register|wrong ELF class|Error loading shared library|database disk image is malformed|SQLITE_CORRUPT|SQLITE_NOTADB|SQLITE_BUSY|SQLITE_LOCKED|ERR_OSSL|UnhandledPromiseRejection|uncaught exception|session[^[:alnum:]]+(store[^[:alnum:]]+)?(error|fail)'
+          if grep -Eiq "$hard_failure_pattern" "$log_file"; then
+            match_count="$(grep -Eic "$hard_failure_pattern" "$log_file")"
+            echo "::error::$match_count native failure signature(s) found in isolated application logs"
+            exit 1
+          fi
+
+          allow_scripts_count="$(grep -Eic 'allowScripts|allow scripts' "$RUNNER_TEMP/native-amd64-build.log" || true)"
+          {
+            echo
+            echo "## Failure-signature review"
+            echo
+            echo "- Native addon, ABI, musl, SQLite, session-store, startup, fatal, and unhandled failure signatures: none"
+            echo "- npm allowScripts warning matches: $allow_scripts_count (informational unless build behavior changes)"
+            echo "- Expected corrupt-image rejection messages were not classified as native failures"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tear down isolated validation resources
+        if: always()
+        shell: bash
+        run: |
+          cleanup_status=0
+          if [[ -f docker-compose.test.yml ]]; then
+            docker compose -p sites-local-test -f docker-compose.test.yml down \
+              --volumes --remove-orphans || cleanup_status=$?
+          fi
+          rm -f tests/native-amd64-lifecycle.spec.js
+          exit "$cleanup_status"
+
+      - name: Record successful technical gate
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo
+            echo "## Technical gate verdict"
+            echo
+            echo "\`NODE24_NATIVE_AMD64_VALIDATED\`"
+            echo
+            echo "This technical result does not authorize production deployment."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record unsuccessful technical gate
+        if: failure()
+        shell: bash
+        run: |
+          {
+            echo
+            echo "## Technical gate verdict"
+            echo
+            echo "\`NODE24_NATIVE_AMD64_NEEDS_REVIEW\`"
+            echo
+            echo "Production deployment remains blocked."
+          } >> "$GITHUB_STEP_SUMMARY"

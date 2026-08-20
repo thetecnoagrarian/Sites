@@ -127,6 +127,14 @@ Runtime note:
 - Active package engines require Node `>=24.0.0 <25`.
 - Local Linux musl ARM64 Mode B validation passed. Emulated Linux musl AMD64 builds, native-addon probes, image transforms, and application startup also passed, but final validation on native AMD64 hardware remains required before production deployment.
 
+### Native AMD64 Deployment-Candidate Gate
+
+`.github/workflows/native-amd64-validation.yml` is the permanent native Linux AMD64 technical gate for runtime migrations and other deployment candidates that affect native dependencies. It runs only through manual `workflow_dispatch` on an explicit full 40-character application commit SHA. The workflow definition may live at a newer revision while its checkout and revision assertion validate the exact requested candidate.
+
+The gate uses a standard GitHub-hosted Ubuntu x64 runner, read-only repository contents permission, the isolated `sites-local-test` project, and `docker-compose.test.yml`. It performs fresh production-style builds, proves native AMD64 runtime and package selection, exercises better-sqlite3 and Sharp directly, starts both Mode B sites with synthetic fixtures, runs authenticated regressions and targeted Chromium lifecycle coverage, checks database integrity, reviews native failure signatures, and always removes its disposable Compose resources.
+
+The workflow does not use production Compose, production secrets, production data, deployment permissions, or a deployment step. A passing result is technical evidence that the selected commit cleared the native AMD64 deployment-candidate gate. It does not authorize or perform production deployment; owner approval and the normal deployment workflow remain separately required.
+
 ### `nginx/blog.conf`
 
 Purpose:
