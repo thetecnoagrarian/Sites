@@ -391,18 +391,45 @@ jobs:
 
           wait_for_fixture() {
             local service="$1"
-            local container_id
-            local state
+            local container_ids=""
+            local container_id=""
+            local state="not-created"
+            local missing_attempts=0
             for _ in $(seq 1 90); do
-              container_id="$(docker compose -p sites-local-test -f docker-compose.test.yml ps -q "$service")"
-              if [[ -n "$container_id" ]]; then
+              container_ids="$(docker compose -p sites-local-test -f docker-compose.test.yml ps --all --quiet "$service")"
+              if [[ -z "$container_ids" ]]; then
+                missing_attempts=$((missing_attempts + 1))
+                if (( missing_attempts >= 10 )); then
+                  echo "::error::Fixture service $service did not create a container within 20 seconds"
+                  break
+                fi
+              else
+                if [[ "$container_ids" == *$'\n'* ]]; then
+                  echo "::error::Fixture service $service resolved to multiple containers; expected exactly one"
+                  break
+                fi
+                container_id="$container_ids"
                 state="$(docker inspect --format '{{.State.Status}}:{{.State.ExitCode}}' "$container_id")"
-                [[ "$state" == "exited:0" ]] && return 0
-                [[ "$state" == exited:* && "$state" != "exited:0" ]] && break
+                case "$state" in
+                  exited:0)
+                    echo "Fixture service $service completed successfully (container $container_id, exited:0)"
+                    return 0
+                    ;;
+                  exited:*|dead:*)
+                    echo "::error::Fixture service $service failed (container $container_id, $state)"
+                    break
+                    ;;
+                esac
               fi
               sleep 2
             done
-            docker compose -p sites-local-test -f docker-compose.test.yml ps --all
+
+            echo "::error::Fixture service $service did not reach exited:0 (last state: $state)"
+            if [[ -n "$container_id" ]]; then
+              docker inspect --format 'container={{.Name}} status={{.State.Status}} exit_code={{.State.ExitCode}}' "$container_id" || true
+            fi
+            docker compose -p sites-local-test -f docker-compose.test.yml ps --all || true
+            docker compose -p sites-local-test -f docker-compose.test.yml logs --no-color --tail=100 "$service" || true
             return 1
           }
 
