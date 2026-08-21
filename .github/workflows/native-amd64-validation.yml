@@ -458,6 +458,21 @@ jobs:
       - name: Generate targeted Chromium lifecycle check
         shell: bash
         run: |
+          cat > native-amd64-playwright.config.js <<'EOF'
+          import baseConfig from './playwright.config.js';
+
+          export default {
+            ...baseConfig,
+            use: {
+              ...baseConfig.use,
+              extraHTTPHeaders: {
+                ...baseConfig.use?.extraHTTPHeaders,
+                'x-forwarded-proto': 'https'
+              }
+            }
+          };
+          EOF
+
           cat > tests/native-amd64-lifecycle.spec.js <<'EOF'
           import { test, expect } from '@playwright/test';
           import { execFileSync } from 'node:child_process';
@@ -499,10 +514,30 @@ jobs:
             await expect(page.locator('input[name="_csrf"]')).toHaveValue(/.+/);
             await page.getByLabel('Username').fill(TEST_ADMIN.username);
             await page.getByLabel('Password').fill(TEST_ADMIN.password);
-            await Promise.all([
-              page.waitForURL(/\/admin(?:\/dashboard)?\/?$/),
-              page.getByRole('button', { name: 'Login' }).click()
-            ]);
+            const loginResponsePromise = page.waitForResponse((response) =>
+              response.url() === `${site.baseURL}/login` && response.request().method() === 'POST'
+            );
+            try {
+              await Promise.all([
+                loginResponsePromise,
+                page.waitForURL(/\/admin(?:\/dashboard)?\/?$/),
+                page.getByRole('button', { name: 'Login' }).click()
+              ]);
+            } catch (error) {
+              const [loginResponse, loginErrors, cookies] = await Promise.all([
+                loginResponsePromise.catch(() => null),
+                page.locator('.error-message').allTextContents().catch(() => []),
+                page.context().cookies().catch(() => [])
+              ]);
+              console.error('Native authenticated login failed', {
+                site: site.key,
+                currentUrl: page.url(),
+                loginStatus: loginResponse?.status() ?? null,
+                loginError: loginErrors.join(' ').trim() || null,
+                hasSessionCookie: cookies.some((cookie) => cookie.name === 'blog.sid')
+              });
+              throw error;
+            }
           };
 
           test.describe.configure({ mode: 'serial' });
@@ -568,7 +603,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          CI=1 FORCE_COLOR=0 npx playwright test tests/native-amd64-lifecycle.spec.js \
+          CI=1 FORCE_COLOR=0 npx playwright test \
+            --config=native-amd64-playwright.config.js tests/native-amd64-lifecycle.spec.js \
             --project=chromium --reporter=line \
             2>&1 | tee "$RUNNER_TEMP/chromium-lifecycle.log"
           {
@@ -634,7 +670,8 @@ jobs:
             -d --no-build --force-recreate --no-deps fruitionforestgarden thetecnoagrarian
           wait_for_health fruitionforestgarden
           wait_for_health thetecnoagrarian
-          CI=1 FORCE_COLOR=0 npx playwright test tests/sharp-authenticated.spec.js \
+          CI=1 FORCE_COLOR=0 npx playwright test \
+            --config=native-amd64-playwright.config.js tests/sharp-authenticated.spec.js \
             --project=chromium --reporter=line \
             2>&1 | tee "$RUNNER_TEMP/sharp-authenticated.log"
           {
@@ -715,7 +752,7 @@ jobs:
             docker compose -p sites-local-test -f docker-compose.test.yml down \
               --volumes --remove-orphans || cleanup_status=$?
           fi
-          rm -f tests/native-amd64-lifecycle.spec.js
+          rm -f native-amd64-playwright.config.js tests/native-amd64-lifecycle.spec.js
           exit "$cleanup_status"
 
       - name: Record successful technical gate
