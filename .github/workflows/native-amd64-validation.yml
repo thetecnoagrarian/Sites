@@ -543,13 +543,14 @@ jobs:
           test.describe.configure({ mode: 'serial' });
 
           for (const site of sites) {
-            test(`${site.name} authenticated CRUD, restart, and session persistence`, async ({ page }) => {
-              const title = `Native AMD64 ${site.key} Lifecycle ${RUN_ID}`;
+            test(`${site.name} authenticated CRUD, restart, and session persistence`, async ({ page, request }, testInfo) => {
+              const attempt = `Attempt ${testInfo.retry}`;
+              const title = `Native AMD64 ${site.key} Lifecycle ${RUN_ID} ${attempt}`;
               const updatedTitle = `${title} Updated`;
-              const originalSlug = `native-amd64-${site.key}-lifecycle-${RUN_ID}`;
+              const originalSlug = `native-amd64-${site.key}-lifecycle-${RUN_ID}-attempt-${testInfo.retry}`;
               const updatedSlug = `${originalSlug}-updated`;
 
-              await expect((await page.request.get(`${site.baseURL}/`)).status()).toBe(200);
+              await expect((await request.get(`${site.baseURL}/`)).status()).toBe(200);
               await loginNormally(page, site);
               await page.goto(`${site.baseURL}/admin/dashboard`);
               await expect(page).toHaveURL(`${site.baseURL}/admin/dashboard`);
@@ -564,13 +565,32 @@ jobs:
               ]);
               await expect(page).toHaveURL(`${site.baseURL}/admin/dashboard`);
               await expect(page.locator('tr', { hasText: title })).toHaveCount(1);
-              await expect((await page.request.get(`${site.baseURL}/post/${originalSlug}`)).status()).toBe(200);
+              await expect((await request.get(`${site.baseURL}/post/${originalSlug}`)).status()).toBe(200);
 
               const row = page.locator('tr', { hasText: title });
               const editPath = await row.locator('sl-button[href*="/edit"]').getAttribute('href');
               expect(editPath).toBeTruthy();
-              await page.goto(`${site.baseURL}${editPath}`);
-              await page.locator('input[name="title"]').fill(updatedTitle);
+              const editURL = new URL(editPath, site.baseURL).href;
+              let editResponse;
+              try {
+                editResponse = await page.goto(editURL);
+                await expect(page).toHaveURL(editURL);
+                await page.locator('form.post-form input[name="title"]').fill(updatedTitle);
+              } catch (error) {
+                console.error('Native authenticated edit failed', {
+                  site: site.key,
+                  editPath,
+                  editURL,
+                  currentURL: page.url(),
+                  editStatus: editResponse?.status() ?? null,
+                  pageTitle: await page.title().catch(() => null),
+                  visibleHeading: await page.locator('h1, h2').first().textContent().catch(() => null),
+                  postFormCount: await page.locator('form.post-form').count().catch(() => null),
+                  titleInputCount: await page.locator('input[name="title"]').count().catch(() => null),
+                  titleCustomElementCount: await page.locator('sl-input[name="title"]').count().catch(() => null)
+                });
+                throw error;
+              }
               await page.locator('textarea[name="body"]').fill('Updated synthetic native AMD64 lifecycle body.');
               await Promise.all([
                 page.waitForNavigation(),
@@ -578,7 +598,7 @@ jobs:
               ]);
               await expect(page).toHaveURL(`${site.baseURL}/admin/dashboard`);
               await expect(page.locator('tr', { hasText: updatedTitle })).toHaveCount(1);
-              await expect((await page.request.get(`${site.baseURL}/post/${updatedSlug}`)).status()).toBe(200);
+              await expect((await request.get(`${site.baseURL}/post/${updatedSlug}`)).status()).toBe(200);
 
               compose('up', '-d', '--no-build', '--force-recreate', '--no-deps', site.service);
               await waitForHealth(site.service);
@@ -593,8 +613,8 @@ jobs:
               ]);
               await expect(page).toHaveURL(`${site.baseURL}/admin/dashboard`);
               await expect(page.locator('tr', { hasText: updatedTitle })).toHaveCount(0);
-              await expect((await page.request.get(`${site.baseURL}/post/${updatedSlug}`)).status()).toBe(404);
-              await expect((await page.request.get(`${site.baseURL}/health`)).status()).toBe(200);
+              await expect((await request.get(`${site.baseURL}/post/${updatedSlug}`)).status()).toBe(404);
+              await expect((await request.get(`${site.baseURL}/health`)).status()).toBe(200);
             });
           }
           EOF
