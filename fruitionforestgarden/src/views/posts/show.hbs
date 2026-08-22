@@ -71,18 +71,18 @@
             updateCaption(0);
         });
         </script>
-    {{else if post.images.medium}}
+    {{else if post.imageList.[0].medium}}
         <!-- Single image -->
         <div class="post-image-container">
-            <img src="{{post.images.medium}}" 
+            <img src="{{post.imageList.[0].medium}}"
                  alt="{{post.title}}" 
                  class="lightbox-trigger post-image"
-                 data-full-img="{{post.images.large}}"
-                 data-caption="{{post.images.caption}}"
+                 data-full-img="{{post.imageList.[0].large}}"
+                 data-caption="{{post.imageList.[0].caption}}"
                  loading="lazy">
         </div>
-        {{#if post.images.caption}}
-        <div class="carousel-caption" style="margin-top: 1em;">{{post.images.caption}}</div>
+        {{#if post.imageList.[0].caption}}
+        <div class="carousel-caption" style="margin-top: 1em;">{{post.imageList.[0].caption}}</div>
         {{/if}}
     {{/if}}
 
@@ -272,4 +272,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-{{/layouts/main}} 
+{{/layouts/main}}
