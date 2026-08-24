@@ -221,9 +221,9 @@ CI caution:
 
 ### Relevant Scripts
 
-- `scripts/backup.sh` - container-side database/uploads backup and retention cleanup.
-- `scripts/backup-host.sh` - host-side backup orchestration for both containers and host backup copies.
-- `scripts/setup-backups.sh` - backup setup helper that involves SSH/SCP/cron concepts. Approval required before execution.
+- `scripts/backup.sh` - creates one verified database/uploads set in an explicit temporary staging directory; it does not retain or delete backup history.
+- `scripts/backup-host.sh` - host-side orchestration for both containers, exact-set transfer and verification, temporary staging cleanup after successful copy, and retention of the new host-managed set layout.
+- `scripts/setup-backups.sh` - legacy backup setup helper that involves SSH/SCP/cron concepts. It is not part of the new-flow rollout and must not be rerun without separate review and approval.
 - `scripts/sync-local-prod.sh` - local production-like Docker sync helper. Approval required before execution because it stops/builds/starts containers.
 - `scripts/cleanup-disk-space.sh` - server disk cleanup helper. High risk; approval required before execution.
 - `scripts/cleanup-analytics-container.js` - analytics retention cleanup script that modifies database rows. High risk; approval required before execution.
@@ -394,7 +394,7 @@ Confirmed runtime paths inside containers:
 - Database path is represented by `[DATABASE_PATH]`.
 - Uploads path is represented by `[UPLOADS_PATH]`.
 - Logs live under a container log path mounted to a Docker volume.
-- Backups are generated under a container backup path when backup scripts run.
+- The currently deployed backup flow generates retained files under a container backup path. The repository target described below replaces that behavior, but it is not live until a separately approved production rollout succeeds.
 
 nginx relationship:
 
@@ -423,13 +423,52 @@ Needs Review: confirm whether nginx config in this repo is deployed as-is or use
 
 ## 7. Backup and Restore Concepts
 
-Confirmed backup concepts:
+Current production finding as of 2026-08-24:
+
+- FFG and TTA use the same scheduled container/host backup architecture.
+- The weekly host job runs at 02:00 on Sunday.
+- The deployed container script retains database and uploads artifacts under an unmounted `/app/backups` path.
+- The deployed host script copies the entire retained container backup tree rather than only the new set.
+- Host copy failure is not a reliable failure gate in the deployed script.
+- FFG accumulated approximately 950 MB in its writable layer; backup artifacts accounted for 99.96% of that layer.
+- No implemented off-host or secondary-copy job is established by current repository evidence. The existing host destination is durable across container recreation, but remains on the production host and is therefore only the canonical local copy.
+
+Repository target architecture, implemented locally but not yet deployed:
 
 - Runtime databases and uploads are the main backup targets.
 - Source code is expected to live in Git and is not part of backup output.
-- Container-side backup script backs up database and uploads into a backup directory.
-- Host-side backup script runs container backups, copies backup output to a host backup location, and applies retention cleanup.
-- Backup setup docs/scripts mention cron-based scheduling.
+- The host scheduler takes one atomic lock under the host backup root, streams the tracked container backup script into each container, and reserves one fixed temporary staging directory per container.
+- The container script creates exactly `blog.db` and `uploads.tar.gz`, uses SQLite's backup operation, verifies database integrity, and verifies the upload archive.
+- The host script copies only those two artifacts into a host staging directory, verifies nonzero output, archive readability, and matching container/host checksums, then atomically promotes one `backup-set-<RUN_ID>` directory.
+- Only after host promotion succeeds does the host script delete the two temporary container artifacts and remove the empty staging directory.
+- Copy, checksum, archive, or cleanup failure returns nonzero, preserves staging for review, skips retention, and prevents another set from accumulating at the same container path.
+- Retention is host-owned, defaults to 28 days, and applies only to the new `backup-set-*` layout. Age uses the managed directory modification time in complete 24-hour periods; `find -mtime +28` selects a set only after its completed age bucket exceeds 28. Existing legacy backups are deliberately excluded until a separate cleanup is explicitly approved.
+- A dedicated `/app/backups` volume is not part of the target. It would move bytes out of the writable layer but preserve same-host duplication, whole-tree copying, and split retention ownership.
+
+Fail-closed operator recovery:
+
+1. Stop or pause any scheduled invocation and confirm no backup-host process is still active.
+2. Inspect the host lock at `/opt/Sites/backups/.backup-run.lock`, any per-site `.staging-backup-set-<RUN_ID>` directory, and the fixed container staging directory without deleting them.
+3. Reconcile or preserve any staged artifacts before cleanup. An ordinary script failure releases the host lock but intentionally leaves staging to block the next run.
+4. If an abrupt kill left only a stale, empty host lock, remove that exact lock with `rmdir /opt/Sites/backups/.backup-run.lock` only after confirming no run is active. Do not use a recursive removal command for the lock.
+5. Treat removal of container or host staging artifacts as a separate backup-deletion decision. Do not resume the schedule until the failed set is understood and staging has been deliberately reconciled.
+
+Pending production rollout gate:
+
+1. Preserve all existing container and host backup artifacts.
+2. Update the production checkout only after the exact commit and script diff are approved.
+3. Do not rebuild or recreate either application solely for this change. The host orchestrator streams the tracked `scripts/backup.sh` into the existing container for each run.
+4. Run one explicitly approved manual host-orchestrated backup and require success for both sites.
+5. Confirm one complete host set per site, matching transfer checksums, absent temporary staging, unchanged application health/restart counts, and no writable-layer increase.
+6. Allow the next scheduled run only after the manual gate passes; verify the same conditions afterward.
+7. Treat existing `/app/backups` contents as preserved legacy backups until the new flow and host copies are independently verified. Their removal remains a separate destructive action requiring explicit approval.
+
+Rollback concept:
+
+- If the new flow fails before host promotion, keep the staged artifacts and host staging directory for diagnosis; do not run retention or delete prior backups.
+- Suspend the scheduled job before reverting scripts so the old accumulating flow is not silently re-enabled.
+- Restore the previously known script revision only as an operator-approved temporary fallback, then reverify backup output, container growth, and application health.
+- Never delete a successfully promoted new-layout set merely because the script rollout is rolled back.
 
 Runtime state that must not be committed:
 
@@ -453,16 +492,25 @@ Approval-required backup example:
 
 ```bash
 # Approval required. Placeholder-only example.
-ssh [SSH_USER]@[SERVER_IP] "docker exec [CONTAINER_NAME] /app/scripts/backup.sh"
+ssh [SSH_USER]@[SERVER_IP] "[REPOSITORY_ROOT]/scripts/backup-host.sh"
 ```
 
 Approval-required restore concept:
 
 ```text
-Restore requires selecting a backup, stopping or isolating affected services if needed,
-copying database/upload data into the runtime volume, fixing ownership/permissions if needed,
-restarting affected services, and verifying application behavior.
+Restore requires selecting one complete host-managed backup set, verifying it before use,
+stopping or isolating affected services if needed, copying database/upload data into the
+runtime volume, fixing ownership/permissions if needed, restarting affected services, and
+verifying application behavior.
 ```
+
+The restore source of record is the verified host-managed set, not retained `/app/backups`
+contents inside a container. A production restore procedure and off-host copy remain separate
+approval-required workstreams.
+
+Database integrity, archive readability, and transfer checksum verification are not equivalent
+to a completed restore test. Off-host replication and an actual isolated restore test remain
+separate required workstreams.
 
 Do not convert this concept into a live restore procedure until the user explicitly approves a restore-planning task.
 

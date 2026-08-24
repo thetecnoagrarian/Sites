@@ -1,90 +1,89 @@
 #!/bin/bash
-# Automated Backup Script for Blog Platform
-# This script backs up database and uploads, with automatic cleanup
+# Create exactly one database/uploads backup set in an operator-provided staging directory.
 
-# Configuration
-DATE=$(date +"%Y-%m-%d_%H-%M")
-BACKUP_DIR="/app/backups"
-DATA_DIR="/app/data"
-RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-28}
+set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+BACKUP_DIR=${BACKUP_DIR:-}
+DATA_DIR=${DATA_DIR:-/app/data}
 
-# Logging function
 log() {
-    echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1"
+    printf '[backup] %s\n' "$1"
 }
 
 error() {
-    echo -e "${RED}[$(date +'%Y-%m-%d %H:%M:%S')] ERROR:${NC} $1" >&2
+    printf '[backup] ERROR: %s\n' "$1" >&2
 }
 
-warning() {
-    echo -e "${YELLOW}[$(date +'%Y-%m-%d %H:%M:%S')] WARNING:${NC} $1"
+file_size() {
+    if stat -c %s "$1" >/dev/null 2>&1; then
+        stat -c %s "$1"
+    else
+        stat -f %z "$1"
+    fi
 }
 
-# Create backup directory if it doesn't exist
-if [ ! -d "$BACKUP_DIR" ]; then
-    log "Creating backup directory: $BACKUP_DIR"
-    mkdir -p "$BACKUP_DIR"
+if [ -z "$BACKUP_DIR" ]; then
+    error "BACKUP_DIR must identify an empty, temporary staging directory"
+    exit 2
 fi
 
-# Check if data directory exists
+case "$BACKUP_DIR" in
+    *"'"*|*$'\n'*)
+        error "BACKUP_DIR contains unsupported characters"
+        exit 2
+        ;;
+esac
+
 if [ ! -d "$DATA_DIR" ]; then
-    error "Data directory not found: $DATA_DIR"
-    exit 1
+    error "Data directory is unavailable"
+    exit 3
 fi
 
-log "Starting backup process..."
+if [ ! -f "$DATA_DIR/blog.db" ]; then
+    error "Database source is unavailable"
+    exit 3
+fi
 
-# Backup database
-if [ -f "$DATA_DIR/blog.db" ]; then
-    log "Backing up database..."
-    cp "$DATA_DIR/blog.db" "$BACKUP_DIR/blog_$DATE.db"
-    if [ $? -eq 0 ]; then
-        log "Database backup completed: blog_$DATE.db"
-    else
-        error "Database backup failed"
-        exit 1
+if [ ! -d "$DATA_DIR/uploads" ]; then
+    error "Uploads source is unavailable"
+    exit 3
+fi
+
+mkdir -p "$BACKUP_DIR"
+
+for staged_entry in "$BACKUP_DIR"/.[!.]* "$BACKUP_DIR"/..?* "$BACKUP_DIR"/*; do
+    if [ -e "$staged_entry" ]; then
+        error "Backup staging directory is not empty"
+        exit 4
     fi
-else
-    warning "Database file not found: $DATA_DIR/blog.db"
+done
+
+database_backup="$BACKUP_DIR/blog.db"
+uploads_backup="$BACKUP_DIR/uploads.tar.gz"
+
+log "Creating a consistent SQLite backup in temporary staging"
+sqlite3 "$DATA_DIR/blog.db" ".backup '$database_backup'"
+
+integrity_result=$(sqlite3 -readonly "$database_backup" 'PRAGMA integrity_check;')
+if [ "$integrity_result" != "ok" ]; then
+    error "Staged database failed integrity verification"
+    exit 5
 fi
 
-# Backup uploads directory
-if [ -d "$DATA_DIR/uploads" ]; then
-    log "Backing up uploads directory..."
-    tar -czf "$BACKUP_DIR/uploads_$DATE.tar.gz" -C "$DATA_DIR" uploads/
-    if [ $? -eq 0 ]; then
-        log "Uploads backup completed: uploads_$DATE.tar.gz"
-    else
-        error "Uploads backup failed"
-        exit 1
-    fi
-else
-    warning "Uploads directory not found: $DATA_DIR/uploads"
+log "Creating an uploads archive in temporary staging"
+tar -czf "$uploads_backup" -C "$DATA_DIR" uploads/
+gzip -t "$uploads_backup"
+tar -tzf "$uploads_backup" >/dev/null
+
+database_bytes=$(file_size "$database_backup")
+uploads_bytes=$(file_size "$uploads_backup")
+
+if [ "$database_bytes" -le 0 ] || [ "$uploads_bytes" -le 0 ]; then
+    error "One or more staged backup artifacts are empty"
+    exit 6
 fi
 
-# Clean up old backups
-log "Cleaning up backups older than $RETENTION_DAYS days..."
-find "$BACKUP_DIR" -type f -mtime +$RETENTION_DAYS -delete
-if [ $? -eq 0 ]; then
-    log "Old backup cleanup completed"
-else
-    warning "Backup cleanup had issues"
-fi
+chmod 600 "$database_backup" "$uploads_backup"
 
-# Show backup summary
-log "Backup completed successfully!"
-log "Backup files created:"
-ls -lh "$BACKUP_DIR" | grep "$DATE"
-
-# Show disk usage
-log "Backup directory disk usage:"
-du -sh "$BACKUP_DIR"
-
-log "Backup process finished at $(date)"
+printf 'BACKUP_STAGE_READY|database_bytes=%s|uploads_bytes=%s\n' \
+    "$database_bytes" "$uploads_bytes"

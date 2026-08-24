@@ -398,6 +398,34 @@ Both services:
 - Join a production network.
 - Define HTTP health checks.
 
+### Backup Orchestration
+
+FFG and TTA share the same backup scripts and scheduler. Production currently
+retains backup artifacts under unmounted `/app/backups` before copying the
+entire retained tree to a host path. This is the confirmed source of FFG's
+approximately 950 MB writable layer. The local repository now contains a
+replacement architecture that is not active until an approved production
+rollout:
+
+- `scripts/backup.sh` creates one verified set in an explicit temporary
+  staging directory and owns no retention policy.
+- `scripts/backup-host.sh` runs that tracked script in each container, copies
+  only `blog.db` and `uploads.tar.gz`, verifies the transfer, atomically
+  finalizes one host-managed set, and removes only the temporary container set.
+- One atomic host lock serializes the full two-site workflow. An ordinary
+  failure releases the lock but preserves staging; an abrupt process kill can
+  leave a stale lock that deliberately blocks later runs pending review.
+- A failed run preserves one staging set, returns nonzero, and blocks repeated
+  accumulation.
+- The host owns 28-day retention for the new managed layout; legacy backup
+  layouts are excluded from automatic cleanup.
+- The host location is durable across container replacement but remains on the
+  production host. No implemented secondary/off-host copy was found.
+
+No `/app/backups` volume is added. A volume would move the bytes outside the
+writable layer without resolving duplicate retention, whole-tree copies, or
+single-host durability.
+
 ### Local Development Compose
 
 Confirmed: `docker-compose.yml` defines two development-oriented services with site-specific development Dockerfiles, bind mounts for shared/site code, local database/upload bind mounts, local log volumes, and development-oriented ports.

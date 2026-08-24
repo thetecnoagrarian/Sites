@@ -178,6 +178,49 @@ Recommended concepts:
 
 Do not document real storage endpoints or account details in this file.
 
+### Repository Target Architecture
+
+The repository-side target implemented on 2026-08-24 is pending a separately
+approved production rollout. It applies equally to Fruition Forest Garden and
+The Tecnoagrarian:
+
+- Container storage is temporary staging only; it is not a retention location.
+- One run creates exactly one SQLite backup and one uploads archive.
+- The SQLite backup uses the database backup operation and must pass an
+  integrity check before transfer.
+- The host copies only the two artifacts created by that run.
+- An atomic host lock serializes the complete FFG/TTA run so two schedulers or
+  operators cannot interleave site backups.
+- The host verifies nonzero files, archive readability, and matching
+  container/host checksums before promoting the set into retained storage.
+- Container staging is deleted only after the host set is verified and
+  finalized.
+- A failed transfer or verification preserves one staging set for diagnosis,
+  returns a failure, skips retention, and blocks the next run from creating
+  another set at the same path.
+- Retention belongs to the canonical local host location and applies only to
+  the new managed backup-set layout. Legacy backups remain outside automated
+  cleanup until separately reviewed and approved.
+- With the 28-day default, age is evaluated from each managed set directory's
+  modification time in complete 24-hour periods. `find -mtime +28` does not
+  select a set until its completed age bucket exceeds 28, so a newly promoted
+  set cannot be selected by the same run.
+
+This removes retained backup data from the container writable layer without
+granting the container write access to the retained host archive. A dedicated
+Docker volume or bind mount for `/app/backups` is therefore not the selected
+design: it would relocate the growth but would not eliminate duplicate local
+retention or whole-tree transfers.
+
+The host location remains on the production machine. That is sufficient as the
+canonical local copy and survives container recreation, but it is not an
+offsite backup. No implemented off-host job is established by current
+repository evidence. Off-host durability and restore-test evidence remain
+separate open requirements.
+
+These creation-time integrity, archive, and checksum checks establish transfer
+integrity only. They are not evidence of a completed restore test.
+
 ## 10. Restore-Test Planning
 
 Restore testing should happen in a safe target, never directly over production

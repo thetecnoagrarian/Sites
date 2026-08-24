@@ -19,6 +19,9 @@ npm run test:e2e:debug
 
 # View test report
 npm run test:e2e:report
+
+# Run synthetic backup orchestration tests
+npm run test:backup
 ```
 
 ## Test Files
@@ -26,6 +29,7 @@ npm run test:e2e:report
 - **categories-modal.spec.js** - Tests for the categories dropdown/modal on mobile and desktop
 - **homepage.spec.js** - Basic homepage functionality tests
 - **responsive.spec.js** - Responsive design and viewport tests
+- **backup-scripts.test.js** - Synthetic container staging, exact-set transfer, atomic promotion, concurrency locking, checksum, retention, and failure-boundary tests
 
 ## Configuration
 
@@ -63,4 +67,3 @@ Screenshots are automatically saved to `tests/screenshots/` when tests fail or w
 - **Cross-Browser**: Test in multiple browsers automatically
 - **Mobile Testing**: Verify mobile experience without a physical device
 - **Better Debugging**: Get detailed error messages, screenshots, and traces when tests fail
-
