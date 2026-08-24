@@ -1,6 +1,6 @@
 # Dependency Audit Results
 
-> **Current-use note (2026-08-20):** The Node 24 follow-up below is the current runtime and audit baseline. better-sqlite3 is validated at `12.11.1`, sanitize-html at `2.17.5`, Morgan at `1.11.0`, Sharp at `0.35.3`, and Multer at `2.2.0`; earlier captures remain below as historical evidence.
+> **Current-use note (2026-08-24):** The Node 24 follow-up below is the current runtime and audit baseline, now complete through native AMD64 and production verification. better-sqlite3 is validated at `12.11.1`, sanitize-html at `2.17.5`, Morgan at `1.11.0`, Sharp at `0.35.3`, and Multer at `2.2.0`; earlier captures remain below as historical evidence.
 
 ## 2026-08-20 Node 24 Runtime Follow-up
 
@@ -10,10 +10,10 @@
 - Both ARM64 applications became healthy, fixture jobs exited `0`, home and health routes returned `200`, normal login and CSRF-bearing flows passed, sessions survived service restart, synthetic post CRUD passed, and post-activity integrity and foreign-key checks were clean.
 - Unchanged focused suites passed: shared-core 5/5, better-sqlite 3/3, Morgan 1/1, sanitize-html 3/3, authenticated Multer 3/3, authenticated Sharp 3/3, and targeted Chromium lifecycle 2/2.
 - Preliminary QEMU/emulated Linux musl AMD64 builds completed for both sites. Both images used ABI `137`, selected the better-sqlite x64 prebuilt and expected Sharp `linuxmusl-x64` packages, loaded native addons, completed database read/write and Sharp transformation, started successfully, and returned `200` for home and health routes.
-- Final native Linux musl AMD64 validation remains required before production deployment; emulation is not treated as native production proof.
+- The permanent native Linux AMD64 deployment-candidate workflow passed after the preliminary emulated checks. Both sites subsequently completed production deployment and live Node, native-addon, health, database, rendering, and sanitized-log verification.
 - Fresh full audit is unchanged at 9 vulnerabilities: 1 low, 0 moderate, 7 high, 1 critical. Fresh production audit is unchanged at 8: 1 low, 0 moderate, 6 high, 1 critical.
 - `sanitize-html` remains at `2.17.5`. Node 24 removes the prior engine obstacle to a separate `2.17.7` remediation batch, but no sanitizer dependency or source-level route wiring changed here.
-- No schema migration, production access, or deployment occurred.
+- No schema migration was required. Production closure completed at Git SHA `c4fdb37e3762e3f4835b155a68e0fd0ca319e6bf`, followed by successful automated verification and owner-reported authenticated CRUD verification.
 
 ## 2026-08-19 better-sqlite3 Follow-up
 
@@ -31,7 +31,7 @@
 - Both Mode B applications became healthy and both fixture jobs exited `0`. Normal authenticated and CSRF-bearing flows passed session reuse, synthetic post create/read/update/delete, container restart/database reopen, and session persistence after restart on both sites.
 - Post-activity integrity checks returned `ok`, zero foreign-key violations, and `delete` journal mode for both site databases.
 - The unchanged authenticated Chromium Multer and Sharp suites each passed 3 of 3 tests. Scoped logs contained no SQLite, native-addon, database-locking, session-store, permission, startup, unhandled, or fatal errors.
-- Node 24 migration remains pending, including Linux musl ARM64 prebuilt and Linux musl AMD64 native/prebuilt validation. No production access or deployment occurred.
+- Historical note: This better-sqlite3 follow-up predates the Node 24 migration, which has since completed through native AMD64 and production verification.
 - Remaining full-workspace audit families are `body-parser`, `brace-expansion`, `glob`, `handlebars`, `minimatch`, `nanoid`, `path-to-regexp`, `picomatch`, and `postcss`.
 
 ## 2026-08-19 sanitize-html Follow-up
@@ -231,9 +231,8 @@ The following appeared in `npm audit --omit=dev --workspaces` and should be trea
 
 ### Priority 4: Cleanup/Modernization After Security Work
 
-1. Complete final native Linux musl AMD64 validation for the Node 24 deployment candidate.
-2. Review major upgrades separately, especially Express 5, `express-handlebars` 9, Sharp 0.34, Helmet 8, and `better-sqlite3` 12.
-3. Decide whether CI audit should eventually fail on high/critical findings instead of using `continue-on-error`.
+1. Review major upgrades separately, especially Express 5, `express-handlebars` 9, Sharp 0.34, Helmet 8, and `better-sqlite3` 12.
+2. Decide whether CI audit should eventually fail on high/critical findings instead of using `continue-on-error`.
 
 ## Update Strategy
 
@@ -278,7 +277,6 @@ Use this checklist after a future approved dependency remediation:
 - Why do some `npm ls` installed versions differ from inspected `package-lock.json` entries?
 - Which updates can be patch/minor without major framework changes?
 - Which updates require Express/Handlebars compatibility review?
-- Which native Linux musl AMD64 environment will run the final Node 24 deployment-candidate gate?
 - Should CI fail on high/critical audit findings later instead of tolerating audit failures?
 - Should dependency remediation be split into runtime versus dev-only commits?
 - Does `sanitize-html` require attention because it brings production-installed `postcss`?

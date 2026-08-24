@@ -377,7 +377,7 @@ Rules:
 - Use small commits grouped by dependency or risk category.
 - Update documentation if dependency remediation changes runtime assumptions.
 
-For this monorepo, active package engines require Node `>=24.0.0 <25`, while active Docker and CI paths use exact Node `24.19.0`; Docker remains on Alpine 3.23. Local ARM64 and emulated AMD64 gates passed, but an agent must keep final native Linux musl AMD64 validation as an explicit pre-deployment gate.
+For this monorepo, active package engines require Node `>=24.0.0 <25`, while active Docker and CI paths use exact Node `24.19.0`; Docker remains on Alpine 3.23. The Node 24 migration passed local ARM64, emulated AMD64, permanent native Linux AMD64, and production verification. Future runtime or native-dependency changes must rerun the permanent native AMD64 deployment-candidate gate before production deployment.
 
 ## 12. Deployment Operator Checklist Policy
 

@@ -4,7 +4,7 @@
 
 ### Scope
 
-The active runtime baseline was migrated locally on 2026-08-20 without changing dependency versions.
+The active runtime baseline was migrated locally on 2026-08-20 without changing dependency versions. Native AMD64 and production closure completed on 2026-08-24.
 
 - Active production and development Dockerfiles now use the immutable official `node:24.19.0-alpine3.23@sha256:244cc2b53f46f9e876304391d17682b0ddae9ac33491f4857e25e35a36ba7995` multi-architecture image.
 - Root, shared-core, and both site manifests require Node `>=24.0.0 <25`; the authoritative root lockfile records the same workspace engine policy.
@@ -17,7 +17,19 @@ The active runtime baseline was migrated locally on 2026-08-20 without changing 
 - Fresh no-cache Linux ARM64 Mode B builds used Node `24.19.0`, ABI `137`, Alpine `3.23.5`, musl `1.2.5-r23`, and builder npm `11.19.0`. The better-sqlite build tree contained only the published prebuilt addon, and the expected Sharp `linuxmusl-arm64` packages were present.
 - Both ARM64 applications became healthy, fixture jobs exited `0`, authenticated sessions survived service restart, synthetic post create/read/update/delete passed, integrity checks returned `ok`, and foreign-key checks returned no rows.
 - Preliminary QEMU/emulated Linux musl AMD64 builds completed for both sites. Both images used Node `24.19.0` ABI `137`, selected the better-sqlite x64 prebuilt and Sharp `linuxmusl-x64` packages, completed database read/write and Sharp WebP transformation, started, and returned `200` for home and health routes.
-- Emulation is preliminary evidence only. A final native Linux musl AMD64 deployment-candidate validation remains required before production deployment.
+- The permanent native Linux AMD64 deployment-candidate workflow subsequently passed for the exact application candidate. It validated the x64 better-sqlite3 prebuilt, Sharp's Linux musl x64 packages, authenticated lifecycle coverage, fixture completion, database integrity, image transformation, and both site applications without production access.
+
+### Production Closure
+
+- Final production Git SHA: `c4fdb37e3762e3f4835b155a68e0fd0ca319e6bf`.
+- Fruition Forest Garden image: `sha256:f7eb6f613bdecdbed169bed22bdc8110edae0e21027ec915297fc530a547b0d9`.
+- The Tecnoagrarian image: `sha256:26303c47ffaac3881f361b582240dd7c98aba53948dc063cbe2f766a51dde883`.
+- Live Linux x64 runtime verification reported Node `24.19.0`, ABI `137`, Alpine `3.23.5`, `better-sqlite3@12.11.1`, SQLite `3.53.2`, Sharp `0.35.3`, and libvips `8.18.3`.
+- Both sites completed automated health and runtime verification. The Tecnoagrarian also passed read-only database integrity and schema checks, single- and multi-image rendering checks, sampled image-asset checks, and sanitized post-recreation log review.
+- The owner subsequently reported successful authenticated create/read/update/delete verification.
+- The Fruition Forest Garden and The Tecnoagrarian single-image defects fixed in `fc112a4` and `c4fdb37` were latent site-local template defects, not Node 24 regressions. Cardinality-specific regression coverage now protects zero-, one-, and multi-image rendering.
+- The validated Codex deployment path uses the local 1Password SSH agent, a non-sensitive production host alias with agent forwarding, and forwarded GitHub repository authorization. No host addresses, key paths, passphrases, tokens, or credential contents are recorded.
+- The TTA Node 20 rollback image and both final site images remained present at closure. No image pruning, backup deletion, database mutation, or cleanup was performed by the closure audit.
 
 ### Regression and Audit Result
 
@@ -29,9 +41,10 @@ The active runtime baseline was migrated locally on 2026-08-20 without changing 
 
 ### Validation Status
 
-`NODE24_MIGRATION_VALIDATED`
+`NODE24_MIGRATION_COMPLETE_PRODUCTION_VERIFIED`
 
-- No schema migration, production access, deployment, staging, commit, or push occurred.
+- Automated production verification passed, and owner-authenticated CRUD verification was reported complete.
+- Deferred security, dependency, OS-maintenance, backup/restore, and cleanup work remains separate.
 
 ## Pass 6: better-sqlite3 12.11.1
 
@@ -74,7 +87,7 @@ This was a single-family shared-runtime remediation validated on 2026-08-19.
 
 ### Remaining Runtime Work
 
-Node 24 migration remains a separate future workstream. It still requires Linux musl ARM64 prebuilt validation and Linux musl AMD64 native/prebuilt validation before the runtime baseline changes. The npm `allowScripts` policy warning also remains a separate reproducibility and supply-chain follow-up.
+Historical planning note: Node 24 remained a future workstream when the better-sqlite3 batch closed. That migration has since completed through native AMD64 and production verification; see the current runtime-migration section above. The npm `allowScripts` policy warning remains a separate reproducibility and supply-chain follow-up.
 
 ### Validation Status
 

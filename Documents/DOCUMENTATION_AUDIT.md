@@ -439,7 +439,6 @@ Available guidance:
 
 Unresolved questions that may affect remediation:
 
-- Which native Linux musl AMD64 environment will perform the final Node 24 deployment-candidate validation?
 - Which workspace owns each dependency risk?
 - Which audit warnings are direct dependency issues versus transitive dependency issues?
 - Which tests are meaningful before and after dependency updates?
@@ -540,7 +539,6 @@ Sensitive paths may be listed when needed, but contents must not be opened or re
 - Which docs are truly active source-of-truth?
 - Which operational docs are current versus historical?
 - Which Compose workflow is canonical?
-- When and where will the final native Linux musl AMD64 Node 24 gate run before deployment?
 - Should generated/runtime cleanup happen before or after dependency remediation?
 - How should actual website review findings be folded into docs?
 - Should older operational docs be redacted before being kept long-term?

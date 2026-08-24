@@ -1,6 +1,6 @@
 # Dependency Security Remediation Plan
 
-> **Current-use note (2026-08-20):** The first targeted patch pass and the Node 24 runtime migration are complete locally. Use `Documents/DEPENDENCY_REMEDIATION_LOG.md` for completed changes and current remaining risk; this document remains the staged plan for unresolved dependency families.
+> **Current-use note (2026-08-24):** The first targeted patch pass and the Node 24 runtime migration are complete through production verification. Use `Documents/DEPENDENCY_REMEDIATION_LOG.md` for completed changes and current remaining risk; this document remains the staged plan for unresolved dependency families.
 
 ## 1. Purpose
 
@@ -264,13 +264,13 @@ Direct `blog-core` runtime dependency and used in shared and site image processi
 
 Direct `blog-core` runtime dependency and used in shared/site database code. Native build/runtime behavior needs extra caution in Docker.
 
-Current validated state as of 2026-08-20:
+Current validated state as of 2026-08-24:
 
 - Upgraded from `11.10.0` to published stable `12.11.1`; the proposed `12.12.0` target was not published.
 - Bundled SQLite moved from `3.49.2` to `3.53.2`; `better-sqlite3-session-store@0.1.0` did not change.
 - Local lifecycle, transaction rollback, session-store lifecycle, and disposable `11.10.0` -> `12.11.1` -> `11.10.0` forward/rollback compatibility gates passed.
 - Under Node `24.19.0` ABI `137`, both Linux musl ARM64 Mode B images selected the published `better-sqlite3@12.11.1` prebuilt, loaded it, passed authenticated database/session/post flows across container restart, and retained clean integrity and foreign-key checks.
-- Preliminary QEMU/emulated Linux musl AMD64 builds selected the x64 prebuilt; both site images loaded the addon, completed database read/write, and started successfully. Final native AMD64 validation remains required before production deployment.
+- QEMU/emulated and permanent native Linux musl AMD64 gates selected and loaded the x64 prebuilt. The final production services subsequently loaded `better-sqlite3@12.11.1`, reported SQLite `3.53.2`, and retained clean integrity and foreign-key checks under Node `24.19.0` ABI `137`.
 - Unchanged Multer and Sharp authenticated regressions passed. `better-sqlite3` remains absent from full and production npm audit findings.
 
 ## 8. Recommended Remediation Sequence
@@ -417,7 +417,6 @@ Depending on the approved scope, additional targeted commands may be needed for 
 
 ## 12. Open Questions
 
-- Which native Linux musl AMD64 environment will run the final Node 24 deployment-candidate gate?
 - Which vulnerabilities remain in production install after `npm ci --omit=dev`?
 - Which vulnerabilities are dev-only?
 - Are current CI audit steps too tolerant?

@@ -54,7 +54,7 @@ Canonical change workflow:
 
 GitHub is source control plus advisory CI. Pushing to GitHub does not deploy production; deployment remains manual and operator-controlled.
 
-Needs Review: the exact canonical production deployment path and final service names must be confirmed before use.
+Live production use was verified on 2026-08-24 at `/opt/Sites` with the root `docker-compose.prod.yml` and the standalone `docker-compose` command. Service names must still be taken from the checked-in Compose file and confirmed for each approved deployment.
 
 ## 3. Canonical Deployment Files
 
@@ -70,10 +70,11 @@ Purpose:
 - Defines named data and log volumes.
 - Defines service health checks.
 
-Needs Review:
+Live production use:
 
-- Confirm whether this is the only canonical production Compose file.
-- Confirm exact production service names before use.
+- The root file is the verified production Compose file as of 2026-08-24.
+- The standalone `docker-compose` command is installed on the production host.
+- Confirm the exact target service from this file before every deployment.
 
 ### `docker-compose.local-prod.yml`
 
@@ -125,7 +126,7 @@ Runtime note:
 - Docker build and runtime stages use the official immutable `node:24.19.0-alpine3.23@sha256:244cc2b53f46f9e876304391d17682b0ddae9ac33491f4857e25e35a36ba7995` multi-architecture image.
 - The production-style builder pins npm to `11.19.0`, whose declared Node support includes Node 24. Do not replace the pin with `npm@latest`; reassess the exact npm pin together with future Node runtime migrations.
 - Active package engines require Node `>=24.0.0 <25`.
-- Local Linux musl ARM64 Mode B validation passed. Emulated Linux musl AMD64 builds, native-addon probes, image transforms, and application startup also passed, but final validation on native AMD64 hardware remains required before production deployment.
+- Local Linux musl ARM64 Mode B, emulated Linux musl AMD64, and the permanent native Linux AMD64 deployment-candidate gate passed. Both production services subsequently passed live Node 24 runtime, native-addon, database, health, rendering, and log verification.
 
 ### Native AMD64 Deployment-Candidate Gate
 
@@ -134,6 +135,30 @@ Runtime note:
 The gate uses a standard GitHub-hosted Ubuntu x64 runner, read-only repository contents permission, the isolated `sites-local-test` project, and `docker-compose.test.yml`. It performs fresh production-style builds, proves native AMD64 runtime and package selection, exercises better-sqlite3 and Sharp directly, starts both Mode B sites with synthetic fixtures, runs authenticated regressions and targeted Chromium lifecycle coverage, checks database integrity, reviews native failure signatures, and always removes its disposable Compose resources.
 
 The workflow does not use production Compose, production secrets, production data, deployment permissions, or a deployment step. A passing result is technical evidence that the selected commit cleared the native AMD64 deployment-candidate gate. It does not authorize or perform production deployment; owner approval and the normal deployment workflow remain separately required.
+
+### Node 24 Production Migration Closure
+
+Verified on 2026-08-24:
+
+- Final production Git SHA: `c4fdb37e3762e3f4835b155a68e0fd0ca319e6bf`.
+- Fruition Forest Garden image: `sha256:f7eb6f613bdecdbed169bed22bdc8110edae0e21027ec915297fc530a547b0d9`.
+- The Tecnoagrarian image: `sha256:26303c47ffaac3881f361b582240dd7c98aba53948dc063cbe2f766a51dde883`.
+- Both production services run Node `24.19.0` on Linux x64 with ABI `137` and Alpine `3.23.5`.
+- The Tecnoagrarian closure audit loaded `better-sqlite3@12.11.1` with SQLite `3.53.2` and Sharp `0.35.3` with libvips `8.18.3`; real in-memory SQLite and Sharp transformation probes passed.
+- Both services were healthy with zero restarts. Public health checks passed, and The Tecnoagrarian homepage, single-image detail rendering, multi-image carousel rendering, and sampled image assets returned successful results.
+- The Tecnoagrarian database returned `ok` from `PRAGMA integrity_check`, no rows from `PRAGMA foreign_key_check`, `posts.body` remained `TEXT`, and the legacy `posts.content` column remained absent.
+- Automated deployment verification passed. The owner subsequently confirmed authenticated create/read/update/delete behavior manually.
+- The rollback images listed in Section 10 remained present. No image pruning, backup deletion, schema migration, or production-data repair was part of the rollout.
+
+Two latent application-template defects were discovered during the staged rollout:
+
+- Fruition Forest Garden's single-image detail branch incorrectly treated the normalized image array as a single object. Commit `fc112a478e0e0db349729fa717ff647d37a7d721` corrected the branch and added zero-, one-, and multi-image regression coverage.
+- The Tecnoagrarian had the same site-local defect. Commit `c4fdb37e3762e3f4835b155a68e0fd0ca319e6bf` applied the corresponding fix and regression coverage.
+- Both were application rendering defects, not Node 24 runtime regressions. Healthy containers, native dependency probes, and database checks could not detect them; the site-by-site canary rollout plus rendered-page and owner verification did.
+
+The validated access chain is high level by design: Codex reaches the local 1Password SSH agent, connects through a non-sensitive SSH host alias with agent forwarding, and uses the forwarded GitHub identity for read-only repository authorization before an explicitly approved deployment. Real host addresses, usernames, key paths, fingerprints, passphrases, tokens, and SSH configuration contents must not be recorded here.
+
+Deferred security, dependency, OS-maintenance, backup/restore, and cleanup work remains in its existing workstreams. None is part of the completed Node 24 migration.
 
 ### `nginx/blog.conf`
 
@@ -380,18 +405,21 @@ nginx relationship:
 Approval-required production deployment example:
 
 ```bash
-# Approval required. Placeholder-only example.
-ssh [SSH_USER]@[SERVER_IP] "cd [DEPLOY_PATH] && docker compose -f docker-compose.prod.yml up --build -d [SERVICE_NAME]"
+# Approval required. Placeholder-only examples using the live-verified command shape.
+ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.prod.yml build [SERVICE_NAME]"
+ssh [SSH_USER]@[SERVER_IP] "cd /opt/Sites && docker-compose -f docker-compose.prod.yml up -d --no-deps --force-recreate --no-build [SERVICE_NAME]"
 ```
 
 Do not run this command unless the user explicitly approves the exact deployment action.
 
-Needs Review:
+Live-verified operator facts:
 
-- Confirm `[DEPLOY_PATH]`.
-- Confirm `[SERVICE_NAME]`.
-- Confirm whether `docker compose` or `docker-compose` is canonical on the target host.
-- Confirm whether nginx config in this repo is deployed as-is or used as a reference.
+- Production checkout: `/opt/Sites`.
+- Production Compose file: root `docker-compose.prod.yml`.
+- Production Compose implementation: standalone `docker-compose`.
+- Build and recreation remain separate, site-specific, approval-required steps.
+
+Needs Review: confirm whether nginx config in this repo is deployed as-is or used as a reference.
 
 ## 7. Backup and Restore Concepts
 
@@ -533,6 +561,14 @@ Inferred rollback components:
 
 Do not invent an exact rollback procedure from this file alone.
 
+Node 24 migration image anchors verified present on 2026-08-24:
+
+- The Tecnoagrarian Node 20 rollback image: `sha256:5d822f8ccb0e5df8934dfaa3d080b426504ccb030297d3306b69032d7c8167a7`.
+- Fruition Forest Garden preserved production image: `sha256:f7eb6f613bdecdbed169bed22bdc8110edae0e21027ec915297fc530a547b0d9`.
+- The Tecnoagrarian Node 24 production image: `sha256:26303c47ffaac3881f361b582240dd7c98aba53948dc063cbe2f766a51dde883`.
+
+Image presence is point-in-time evidence, not a permanent retention guarantee. Reverify every required rollback anchor before future production work.
+
 Explicit-approval rollback actions:
 
 - Database restore.
@@ -567,13 +603,10 @@ Do not overstate CI guarantees. Passing CI does not equal deployment approval, e
 - Should `UPLOAD_PATH` in `docker-compose.yml` be changed to `UPLOADS_PATH`?
 - Should site examples using `DATABASE_URL` be aligned with `DATABASE_PATH`?
 - Node `24.19.0` is aligned across active Docker and CI paths, while package engines enforce `>=24.0.0 <25`.
-- Complete final Linux musl AMD64 validation on native hardware before deploying the Node 24 image; local QEMU validation is preliminary evidence, not the production gate.
 - Dependency audit remediation should likely wait until documentation migration is complete unless a high-risk vulnerability is confirmed and approved for action.
 - CI tolerates some test/audit failures; decide whether that is intentional.
 - Trusted-IP/default-origin behavior should be environment-driven and placeholder-documented.
 - Backup and restore need a separate verified restore procedure before use.
-- Exact production deploy path must be confirmed before use.
-- Exact service/container names must be confirmed before use.
 - Confirm whether `.dockerignore` exclusions match current deployment expectations.
 - Confirm whether nginx config in this repo is source of truth or historical/reference config.
 
