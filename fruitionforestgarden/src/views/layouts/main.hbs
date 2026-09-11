@@ -7,6 +7,9 @@
     {{#if canonicalUrl}}
     <link rel="canonical" href="{{canonicalUrl}}">
     {{/if}}
+    {{#if robotsDirective}}
+    <meta name="robots" content="{{robotsDirective}}">
+    {{/if}}
     {{{ogTags}}}
     <!-- Open Graph Meta Tags for Social Sharing -->
     <!-- Removed static OG tags: these are now injected dynamically per page -->

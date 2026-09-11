@@ -63,7 +63,16 @@ class Category {
             captions: JSON.parse(post.captions || '[]')
         }));
     }
+
+    static countPosts(categoryId) {
+        const db = getDatabase();
+        const stmt = db.prepare(`
+            SELECT COUNT(*) AS count
+            FROM post_categories
+            WHERE category_id = ?
+        `);
+        return stmt.get(categoryId).count;
+    }
 }
 
 export default Category;
-

@@ -21,6 +21,11 @@ VALUES ('Local Test Category', 'local-test-category')
 ON CONFLICT(slug) DO UPDATE SET
     name = excluded.name;
 
+INSERT INTO categories (name, slug)
+VALUES ('Local Empty Category', 'local-empty-category')
+ON CONFLICT(slug) DO UPDATE SET
+    name = excluded.name;
+
 INSERT INTO posts (
     title,
     slug,

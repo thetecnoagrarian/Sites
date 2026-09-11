@@ -95,10 +95,12 @@ router.get('/category/:slug', async (req, res) => {
 
         // Use Category.getPosts() instead of Post.findByCategory()
         const posts = Category.getPosts(category.id, limit, offset) || [];
+        const postCount = Category.countPosts(category.id);
         res.render('category', {
             title: category.name,
             category,
             posts,
+            robotsDirective: postCount === 0 ? 'noindex,follow' : null,
             canonicalUrl: getCanonicalUrl(res, `/category/${category.slug}`)
         });
     } catch (error) {

@@ -31,7 +31,7 @@ The sitemap response:
 - uses the sitemap namespace `http://www.sitemaps.org/schemas/sitemap/0.9`
 - includes the homepage
 - includes `/about`
-- includes public category URLs
+- includes public category URLs that have at least one publicly exposed post
 - includes public post URLs
 - includes `lastmod` for posts when `updated_at` or `created_at` is available
 
@@ -45,6 +45,7 @@ The sitemap excludes:
 - static asset files
 - runtime upload file URLs
 - search-result URLs
+- empty category URLs
 
 Search pages are intentionally excluded from sitemap output because search result URLs vary by query and are lower-value crawl targets than canonical posts/categories.
 
@@ -88,6 +89,23 @@ Canonical coverage:
 - search page: `/search`
 
 Search pages use the clean `/search` canonical URL and intentionally drop query-string noise.
+
+## Empty Category Policy
+
+The repository implementation keeps configured empty categories available to
+people and linked from normal category navigation. An empty category remains a
+valid `200` route with its self-referencing canonical URL, but emits
+`noindex,follow` and is excluded from `sitemap.xml` until it contains at least
+one publicly exposed post.
+
+This preserves intentional future taxonomy without presenting an empty listing
+as indexable search content. Populated categories remain indexable and
+sitemap-listed. `robots.txt` continues allowing category crawling so crawlers
+can observe the robots directive and follow normal site links.
+
+As of 2026-09-11, this behavior is implemented in the repository but has not
+been deployed. Production remains unchanged until a separately approved
+deployment.
 
 ## Redirect Cleanup
 

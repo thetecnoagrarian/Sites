@@ -381,7 +381,11 @@ export function createBlogApp(config) {
         try {
             const categories = Category.findAll() || [];
             categories
-                .filter(category => category && category.slug)
+                .filter(category => (
+                    category
+                    && category.slug
+                    && Category.countPosts(category.id) > 0
+                ))
                 .forEach(category => {
                     urls.push({ loc: `${canonicalBaseUrl}/category/${encodeURIComponent(category.slug)}` });
                 });
