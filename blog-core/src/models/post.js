@@ -262,20 +262,36 @@ class Post {
         return stmt.all(postId);
     }
 
-    static search(query) {
+    static search(query, limit = null, offset = 0) {
         const db = getDatabase();
+        const paginationClause = limit === null ? '' : 'LIMIT ? OFFSET ?';
         const stmt = db.prepare(`
             SELECT * FROM posts 
             WHERE title LIKE ? OR body LIKE ? OR description LIKE ?
             ORDER BY created_at DESC
+            ${paginationClause}
         `);
         const searchPattern = `%${query}%`;
-        const posts = stmt.all(searchPattern, searchPattern, searchPattern);
+        const parameters = [searchPattern, searchPattern, searchPattern];
+        if (limit !== null) {
+            parameters.push(limit, offset);
+        }
+        const posts = stmt.all(...parameters);
         return posts.map(post => ({
             ...post,
             images: JSON.parse(post.images || '[]'),
             captions: JSON.parse(post.captions || '[]')
         }));
+    }
+
+    static countSearch(query) {
+        const db = getDatabase();
+        const stmt = db.prepare(`
+            SELECT COUNT(*) AS count FROM posts
+            WHERE title LIKE ? OR body LIKE ? OR description LIKE ?
+        `);
+        const searchPattern = `%${query}%`;
+        return stmt.get(searchPattern, searchPattern, searchPattern).count;
     }
 
     // Add an instance destroy method for backward compatibility
@@ -285,4 +301,3 @@ class Post {
 }
 
 export default Post;
-

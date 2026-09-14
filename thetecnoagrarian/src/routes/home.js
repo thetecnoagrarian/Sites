@@ -1,9 +1,15 @@
 import express from 'express';
+import { buildPagination, parsePageNumber } from '@ffg/blog-core';
 import buildOgTags from '../middleware/ogTags.js';
 
 const router = express.Router();
 
 const getCanonicalUrl = (res, pathname) => `${res.locals.siteBaseUrl}${pathname}`;
+
+const renderPageNotFound = (res) => res.status(404).render('error', {
+    title: 'Not Found',
+    message: 'Page not found'
+});
 
 // Health check endpoint for Docker/Kubernetes
 router.get('/health', (req, res) => {
@@ -31,22 +37,38 @@ router.use(async (req, res, next) => {
 router.get('/', async (req, res) => {
     try {
         const { Post } = await import('@ffg/blog-core');
-        const page = parseInt(req.query.page) || 1;
+        const page = parsePageNumber(req.query.page);
+        if (page === null) {
+            return renderPageNotFound(res);
+        }
         const limit = 6;
-        const offset = (page - 1) * limit;
 
         let posts = [];
         let totalCount = 0;
         try {
-            posts = Post.findAll(limit, offset) || [];
-            totalCount = typeof Post.count === 'number' ? Post.count : 0;
+            const count = Post.count;
+            totalCount = typeof count === 'number' ? count : 0;
         } catch (err) {
-            console.error('Error fetching posts or count:', err);
-            posts = [];
+            console.error('Error fetching post count:', err);
             totalCount = 0;
         }
 
-        const totalPages = Math.ceil(totalCount / limit) || 1;
+        const pagination = buildPagination({
+            currentPage: page,
+            totalItems: totalCount,
+            limit,
+            basePath: '/'
+        });
+        if (!pagination) {
+            return renderPageNotFound(res);
+        }
+
+        try {
+            posts = Post.findAll(limit, (page - 1) * limit) || [];
+        } catch (err) {
+            console.error('Error fetching posts:', err);
+            posts = [];
+        }
 
         // Add default OG tags for home page
         const ogTags = buildOgTags(null);
@@ -54,10 +76,9 @@ router.get('/', async (req, res) => {
         res.render('home', {
             title: 'Home',
             posts,
-            currentPage: page,
-            pages: Array.from({ length: totalPages }, (_, i) => i + 1),
+            pagination,
             ogTags,
-            canonicalUrl: getCanonicalUrl(res, '/')
+            canonicalUrl: getCanonicalUrl(res, pagination.currentUrl)
         });
     } catch (error) {
         console.error('Error loading home page:', error);
@@ -82,9 +103,11 @@ router.get('/about', (req, res) => {
 router.get('/category/:slug', async (req, res) => {
     try {
         const { Category } = await import('@ffg/blog-core');
-        const page = parseInt(req.query.page) || 1;
+        const page = parsePageNumber(req.query.page);
+        if (page === null) {
+            return renderPageNotFound(res);
+        }
         const limit = 6;
-        const offset = (page - 1) * limit;
         const category = Category.findBySlug(req.params.slug);
         if (!category) {
             return res.status(404).render('error', {
@@ -93,15 +116,26 @@ router.get('/category/:slug', async (req, res) => {
             });
         }
 
-        // Use Category.getPosts() instead of Post.findByCategory()
-        const posts = Category.getPosts(category.id, limit, offset) || [];
         const postCount = Category.countPosts(category.id);
+        const basePath = `/category/${category.slug}`;
+        const pagination = buildPagination({
+            currentPage: page,
+            totalItems: postCount,
+            limit,
+            basePath
+        });
+        if (!pagination) {
+            return renderPageNotFound(res);
+        }
+
+        const posts = Category.getPosts(category.id, limit, (page - 1) * limit) || [];
         res.render('category', {
             title: category.name,
             category,
             posts,
+            pagination,
             robotsDirective: postCount === 0 ? 'noindex,follow' : null,
-            canonicalUrl: getCanonicalUrl(res, `/category/${category.slug}`)
+            canonicalUrl: getCanonicalUrl(res, pagination.currentUrl)
         });
     } catch (error) {
         console.error('Error loading category:', error);
@@ -116,24 +150,42 @@ router.get('/category/:slug', async (req, res) => {
 router.get('/search', async (req, res) => {
     try {
         const { Post } = await import('@ffg/blog-core');
-        const query = req.query.q;
-        const page = parseInt(req.query.page) || 1;
+        const query = typeof req.query.q === 'string' ? req.query.q : '';
+        const page = parsePageNumber(req.query.page);
+        if (page === null) {
+            return renderPageNotFound(res);
+        }
         const limit = 6;
-        const offset = (page - 1) * limit;
+        const totalCount = query ? Post.countSearch(query) : 0;
+        const pagination = buildPagination({
+            currentPage: page,
+            totalItems: totalCount,
+            limit,
+            basePath: '/search',
+            query: query ? { q: query } : {}
+        });
+        if (!pagination) {
+            return renderPageNotFound(res);
+        }
+
         if (!query) {
             return res.render('search', {
                 title: 'Search',
                 posts: [],
-                canonicalUrl: getCanonicalUrl(res, '/search')
+                pagination,
+                robotsDirective: 'noindex,follow',
+                canonicalUrl: getCanonicalUrl(res, pagination.currentUrl)
             });
         }
 
-        const posts = Post.search(query, limit, offset);
+        const posts = Post.search(query, limit, (page - 1) * limit);
         res.render('search', {
             title: 'Search Results',
             query,
             posts,
-            canonicalUrl: getCanonicalUrl(res, '/search')
+            pagination,
+            robotsDirective: 'noindex,follow',
+            canonicalUrl: getCanonicalUrl(res, pagination.currentUrl)
         });
     } catch (error) {
         console.error('Error searching:', error);

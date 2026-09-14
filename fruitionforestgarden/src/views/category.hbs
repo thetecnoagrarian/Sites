@@ -23,8 +23,21 @@
                 </a>
             {{/each}}
         </div>
+        {{#if pagination.hasMultiplePages}}
+            <nav class="pagination" aria-label="Category pages">
+                {{#if pagination.previousUrl}}
+                    <a href="{{pagination.previousUrl}}" class="page-link">Previous</a>
+                {{/if}}
+                {{#each pagination.pages}}
+                    <a href="{{this.url}}" class="page-link {{#if this.isCurrent}}active{{/if}}" {{#if this.isCurrent}}aria-current="page"{{/if}}>{{this.number}}</a>
+                {{/each}}
+                {{#if pagination.nextUrl}}
+                    <a href="{{pagination.nextUrl}}" class="page-link">Next</a>
+                {{/if}}
+            </nav>
+        {{/if}}
     {{else}}
         <p class="no-posts">No posts found in this category.</p>
     {{/if}}
 </section>
-{{/layouts/main}} 
+{{/layouts/main}}

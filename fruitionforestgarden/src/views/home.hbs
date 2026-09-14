@@ -35,14 +35,20 @@
             {{/each}}
         </div>
 
-        {{#if pages.length}}
-            <div class="pagination">
-                {{#each pages}}
-                    <a href="/?page={{this}}" class="page-link {{#if (eq this ../currentPage)}}active{{/if}}">{{this}}</a>
+        {{#if pagination.hasMultiplePages}}
+            <nav class="pagination" aria-label="Post pages">
+                {{#if pagination.previousUrl}}
+                    <a href="{{pagination.previousUrl}}" class="page-link">Previous</a>
+                {{/if}}
+                {{#each pagination.pages}}
+                    <a href="{{this.url}}" class="page-link {{#if this.isCurrent}}active{{/if}}" {{#if this.isCurrent}}aria-current="page"{{/if}}>{{this.number}}</a>
                 {{/each}}
-            </div>
+                {{#if pagination.nextUrl}}
+                    <a href="{{pagination.nextUrl}}" class="page-link">Next</a>
+                {{/if}}
+            </nav>
         {{/if}}
     {{else}}
         <p class="no-posts">No posts yet. Check back soon!</p>
     {{/if}}
-</section> 
+</section>

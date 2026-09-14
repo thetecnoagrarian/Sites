@@ -82,13 +82,40 @@ Each site can override the public base URL with `BASE_URL`. Real `.env` files we
 
 Canonical coverage:
 
-- homepage: `/`
+- homepage page 1: `/`
+- homepage page 2 and later: self-canonical URL including `?page=N`
 - about page: `/about`
 - post pages: `/post/:slug`
-- category pages: `/category/:slug`
-- search page: `/search`
+- category page 1: `/category/:slug`
+- category page 2 and later: self-canonical URL including `?page=N`
+- search pages: the current `/search?q=...` result URL, including `page=N` after page 1
 
-Search pages use the clean `/search` canonical URL and intentionally drop query-string noise.
+Search pages emit `noindex,follow`. Their query and page parameters are retained
+in canonical and pagination URLs so people can move through distinct result
+sets without creating misleading duplicate pages for crawlers.
+
+## Pagination Policy
+
+Homepage, category, and search listings use six posts per page. Page numbers
+must be positive decimal integers without alternate forms such as `0`, `01`,
+negative values, decimals, or nonnumeric text. Invalid page values and pages
+beyond the available result count return `404`.
+
+`/?page=1` remains a compatible `200` response canonicalized to `/`. Templates
+link page 1 directly to the clean base route. Valid homepage and category pages
+from page 2 onward return `200`, show distinct offset results, use a
+self-referencing canonical that includes `?page=N`, and expose crawlable
+Previous, numbered-page, and Next links. Search pagination follows the same
+result and navigation rules but remains `noindex,follow` and excluded from the
+sitemap.
+
+Paginated homepage, category, and search URLs are not added to `sitemap.xml`.
+Their base indexable pages and post URLs continue using the existing sitemap
+policy.
+
+As of 2026-09-14, this pagination policy is implemented in the repository for
+review but has not been deployed. Production retains the prior behavior until
+a separately approved deployment.
 
 ## Empty Category Policy
 
