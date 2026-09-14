@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+export const SITE_DESCRIPTION = 'A blog about our adventure building our homestead on a undeveloped 20 acres in Michigan\'s Upper Peninsula.';
+
 // Get base URL from request or environment, fallback to production domain
 function getBaseUrl(req) {
   if (req) {
@@ -56,7 +58,7 @@ async function getHeroOgImagePath() {
 async function buildOgTags(post, req = null) {
   const baseUrl = getBaseUrl(req);
   const title = post?.title || 'Fruition Forest Garden';
-  const desc = post?.description || (post?.body ? post.body.substring(0, 160) + '...' : 'A blog about our adventure building our homestead on a undeveloped 20 acres in Michigan\'s Upper Peninsula.');
+  const desc = post?.description || (post?.body ? post.body.substring(0, 160) + '...' : SITE_DESCRIPTION);
   const url = post ? `${baseUrl}/post/${post.slug || ''}` : `${baseUrl}/`;
   
   // Debug log for images

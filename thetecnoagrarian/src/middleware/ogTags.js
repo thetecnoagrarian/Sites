@@ -1,15 +1,17 @@
+export const SITE_DESCRIPTION = 'Exploring the intersection of technology and horticulture';
+
 // Default OG tags for the site
 const defaultOGTags = `
 <meta property="og:url" content="https://www.thetecnoagrarian.com/" />
 <meta property="og:image" content="https://www.thetecnoagrarian.com/images/Hero.png" />
 <meta property="og:image:alt" content="The Tecnoagrarian Logo" />
 <meta property="og:title" content="The Tecnoagrarian" />
-<meta property="og:description" content="Exploring the intersection of technology and horticulture" />
+<meta property="og:description" content="${SITE_DESCRIPTION}" />
 <meta property="og:type" content="website" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:site" content="@thetecnoagrarian" />
 <meta name="twitter:title" content="The Tecnoagrarian" />
-<meta name="twitter:description" content="Exploring the intersection of technology and horticulture" />
+<meta name="twitter:description" content="${SITE_DESCRIPTION}" />
 <meta name="twitter:image" content="https://www.thetecnoagrarian.com/images/Hero.png" />
 `;
 
@@ -18,7 +20,7 @@ function buildOgTags(post) {
     if (!post) return defaultOGTags;
     
     const title = post.title || 'The Tecnoagrarian';
-    const desc = post.description || (post.body ? post.body.substring(0, 160).replace(/<[^>]*>/g, '') + '...' : 'Exploring the intersection of technology and horticulture');
+    const desc = post.description || (post.body ? post.body.substring(0, 160).replace(/<[^>]*>/g, '') + '...' : SITE_DESCRIPTION);
     const url = `https://www.thetecnoagrarian.com/post/${post.slug || ''}`;
     
     // Default image
@@ -49,4 +51,4 @@ function buildOgTags(post) {
     `;
 }
 
-export default buildOgTags; 
+export default buildOgTags;

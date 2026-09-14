@@ -117,6 +117,29 @@ As of 2026-09-14, this pagination policy is implemented in the repository for
 review but has not been deployed. Production retains the prior behavior until
 a separately approved deployment.
 
+## Conventional Meta Description Policy
+
+The repository emits one conventional HTML meta description on homepage,
+About, and individual post pages for both sites. Homepage descriptions reuse
+each site's existing Open Graph site description; paginated homepage results
+add their page number so indexable pages do not receive identical descriptions.
+About pages use concise page-specific copy.
+
+Post descriptions use the existing editorial `description` field, with
+`excerpt` and sanitized post body text as fallbacks. Output is whitespace
+normalized, stripped of HTML, limited to 160 characters, and escaped by the
+page template. No new database or editor field is required.
+
+Category records have no editorial description field. Category pages therefore
+omit conventional meta descriptions instead of emitting repetitive generated
+boilerplate. Empty categories retain `noindex,follow`; search pages remain
+`noindex,follow`; and login/admin pages remain outside public description
+coverage. Canonical, robots, sitemap, Open Graph, and Twitter policies are not
+changed by this description policy.
+
+As of 2026-09-14, this policy is implemented in the repository for review but
+has not been deployed.
+
 ## Empty Category Policy
 
 The repository implementation keeps configured empty categories available to

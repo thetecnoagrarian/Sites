@@ -1,9 +1,16 @@
 import express from 'express';
-import { buildPagination, parsePageNumber } from '@ffg/blog-core';
-import buildOgTags from '../middleware/ogTags.js';
+import {
+    buildPagination,
+    getPagedMetaDescription,
+    getPostMetaDescription,
+    parsePageNumber
+} from '@ffg/blog-core';
+import buildOgTags, { SITE_DESCRIPTION } from '../middleware/ogTags.js';
 import { getHeroImagePath } from '../utils/heroImageProcessor.js';
 
 const router = express.Router();
+
+const ABOUT_DESCRIPTION = 'Meet Mike and Lou and follow their off-grid homestead, forest garden, DIY systems, and self-reliant life in Michigan’s Upper Peninsula.';
 
 const getCanonicalUrl = (res, pathname) => `${res.locals.siteBaseUrl}${pathname}`;
 
@@ -83,6 +90,7 @@ router.get('/', async (req, res) => {
             pagination,
             heroImagePath,
             ogTags,
+            metaDescription: getPagedMetaDescription(SITE_DESCRIPTION, page),
             canonicalUrl: getCanonicalUrl(res, pagination.currentUrl)
         });
     } catch (error) {
@@ -100,6 +108,7 @@ router.get('/about', async (req, res) => {
     res.render('about', {
         title: 'About',
         ogTags,
+        metaDescription: ABOUT_DESCRIPTION,
         canonicalUrl: getCanonicalUrl(res, '/about')
     });
 });
@@ -253,6 +262,7 @@ router.get('/post/:slug', async (req, res) => {
             title: post.title,
             post,
             ogTags,
+            metaDescription: getPostMetaDescription(post),
             canonicalUrl: getCanonicalUrl(res, `/post/${post.slug}`)
         });
     } catch (error) {

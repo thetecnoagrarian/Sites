@@ -17,6 +17,9 @@
 
 
     <title>{{title}} - The Tecnoagrarian</title>
+    {{#if metaDescription}}
+    <meta name="description" content="{{metaDescription}}">
+    {{/if}}
     {{#if canonicalUrl}}
     <link rel="canonical" href="{{canonicalUrl}}">
     {{/if}}

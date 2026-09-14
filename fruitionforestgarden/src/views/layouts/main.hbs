@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{title}} - Fruition Forest Garden</title>
+    {{#if metaDescription}}
+    <meta name="description" content="{{metaDescription}}">
+    {{/if}}
     {{#if canonicalUrl}}
     <link rel="canonical" href="{{canonicalUrl}}">
     {{/if}}
