@@ -7,6 +7,12 @@ const __dirname = path.dirname(__filename);
 
 export const SITE_DESCRIPTION = 'A blog about our adventure building our homestead on a undeveloped 20 acres in Michigan\'s Upper Peninsula.';
 
+const escapePageAttribute = (value) => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/"/g, '&quot;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;');
+
 // Get base URL from request or environment, fallback to production domain
 function getBaseUrl(req) {
   if (req) {
@@ -55,11 +61,14 @@ async function getHeroOgImagePath() {
   }
 }
 
-async function buildOgTags(post, req = null) {
+async function buildOgTags(post, req = null, pageMetadata = null) {
   const baseUrl = getBaseUrl(req);
-  const title = post?.title || 'Fruition Forest Garden';
-  const desc = post?.description || (post?.body ? post.body.substring(0, 160) + '...' : SITE_DESCRIPTION);
-  const url = post ? `${baseUrl}/post/${post.slug || ''}` : `${baseUrl}/`;
+  const title = pageMetadata?.title || post?.title || 'Fruition Forest Garden';
+  const desc = pageMetadata?.description || post?.description || (post?.body ? post.body.substring(0, 160) + '...' : SITE_DESCRIPTION);
+  const url = pageMetadata?.url || (post ? `${baseUrl}/post/${post.slug || ''}` : `${baseUrl}/`);
+  const renderAttribute = pageMetadata
+    ? escapePageAttribute
+    : (value) => value.replace(/"/g, '&quot;');
   
   // Debug log for images
   if (post) {
@@ -95,16 +104,16 @@ async function buildOgTags(post, req = null) {
   }
   
   return `
-    <meta property="og:title" content="${title.replace(/"/g, '&quot;')}" />
-    <meta property="og:description" content="${desc.replace(/"/g, '&quot;')}" />
-    <meta property="og:url" content="${url}" />
+    <meta property="og:title" content="${renderAttribute(title)}" />
+    <meta property="og:description" content="${renderAttribute(desc)}" />
+    <meta property="og:url" content="${renderAttribute(url)}" />
     <meta property="og:image" content="${image}" />
-    <meta property="og:image:alt" content="${imageAlt.replace(/"/g, '&quot;')}" />
+    <meta property="og:image:alt" content="${renderAttribute(imageAlt)}" />
     <meta property="og:type" content="${post ? 'article' : 'website'}" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@fruitionforestgarden" />
-    <meta name="twitter:title" content="${title.replace(/"/g, '&quot;')}" />
-    <meta name="twitter:description" content="${desc.replace(/"/g, '&quot;')}" />
+    <meta name="twitter:title" content="${renderAttribute(title)}" />
+    <meta name="twitter:description" content="${renderAttribute(desc)}" />
     <meta name="twitter:image" content="${image}" />
   `;
 }

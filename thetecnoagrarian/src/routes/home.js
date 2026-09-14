@@ -9,6 +9,7 @@ import buildOgTags, { SITE_DESCRIPTION } from '../middleware/ogTags.js';
 
 const router = express.Router();
 
+const ABOUT_TITLE = 'About The Tecnoagrarian';
 const ABOUT_DESCRIPTION = 'Learn how The Tecnoagrarian explores practical technology, sustainable growing, automation, and the future of food production.';
 
 const getCanonicalUrl = (res, pathname) => `${res.locals.siteBaseUrl}${pathname}`;
@@ -99,12 +100,17 @@ router.get('/', async (req, res) => {
 
 // About page
 router.get('/about', (req, res) => {
-    const ogTags = buildOgTags(null);
+    const canonicalUrl = getCanonicalUrl(res, '/about');
+    const ogTags = buildOgTags(null, {
+        title: ABOUT_TITLE,
+        description: ABOUT_DESCRIPTION,
+        url: canonicalUrl
+    });
     res.render('about', {
         title: 'About',
         ogTags,
         metaDescription: ABOUT_DESCRIPTION,
-        canonicalUrl: getCanonicalUrl(res, '/about')
+        canonicalUrl
     });
 });
 

@@ -10,6 +10,7 @@ import { getHeroImagePath } from '../utils/heroImageProcessor.js';
 
 const router = express.Router();
 
+const ABOUT_TITLE = 'About Fruition Forest Garden';
 const ABOUT_DESCRIPTION = 'Meet Mike and Lou and follow their off-grid homestead, forest garden, DIY systems, and self-reliant life in Michigan’s Upper Peninsula.';
 
 const getCanonicalUrl = (res, pathname) => `${res.locals.siteBaseUrl}${pathname}`;
@@ -104,12 +105,17 @@ router.get('/', async (req, res) => {
 
 // About page
 router.get('/about', async (req, res) => {
-    const ogTags = await buildOgTags(null, req);
+    const canonicalUrl = getCanonicalUrl(res, '/about');
+    const ogTags = await buildOgTags(null, req, {
+        title: ABOUT_TITLE,
+        description: ABOUT_DESCRIPTION,
+        url: canonicalUrl
+    });
     res.render('about', {
         title: 'About',
         ogTags,
         metaDescription: ABOUT_DESCRIPTION,
-        canonicalUrl: getCanonicalUrl(res, '/about')
+        canonicalUrl
     });
 });
 

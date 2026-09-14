@@ -140,6 +140,22 @@ changed by this description policy.
 As of 2026-09-14, this policy is implemented in the repository for review but
 has not been deployed.
 
+## About Open Graph Policy
+
+About pages provide route-specific Open Graph metadata for both sites. Their
+`og:url` matches the canonical `/about` URL, `og:title` identifies the About
+page, and `og:description` reuses the same route-level description as the
+conventional meta description. `og:type` remains `website`, and the existing
+site-default image and image-alt behavior remains in place.
+
+Homepage defaults and individual-post Open Graph behavior are unchanged.
+Category and search social metadata remain outside this policy. Route-specific
+static-page values are escaped before the Open Graph and matching Twitter
+metadata strings are inserted into the rendered head.
+
+As of 2026-09-14, this About Open Graph policy is implemented in the repository
+for review but has not been deployed.
+
 ## Empty Category Policy
 
 The repository implementation keeps configured empty categories available to
