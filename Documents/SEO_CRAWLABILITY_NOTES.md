@@ -17,7 +17,9 @@ Current confirmed state:
 - CSP `form-action` cleanup is deployed; production now relies on same-origin form submission.
 - `/index.html` now redirects to `/` on both sites.
 - Non-www HTTP and HTTPS variants now redirect to HTTPS `www` at the nginx edge for both sites.
-- Search Console validation has started for several affected rows.
+- The Tecnoagrarian domain-property sitemap was submitted on 2026-09-14 and
+  reported `Success` with 12 discovered pages. This confirms sitemap processing,
+  not indexing of every discovered URL.
 
 Do not claim that Search Console has fully cleared yet. The current position is that the known technical fixes are deployed and verified, and remaining Search Console rows should be evaluated after Google recrawls.
 
@@ -113,9 +115,8 @@ Paginated homepage, category, and search URLs are not added to `sitemap.xml`.
 Their base indexable pages and post URLs continue using the existing sitemap
 policy.
 
-As of 2026-09-14, this pagination policy is implemented in the repository for
-review but has not been deployed. Production retains the prior behavior until
-a separately approved deployment.
+As of 2026-09-14, this pagination policy is deployed and production-verified on
+both sites.
 
 ## Conventional Meta Description Policy
 
@@ -132,13 +133,13 @@ page template. No new database or editor field is required.
 
 Category records have no editorial description field. Category pages therefore
 omit conventional meta descriptions instead of emitting repetitive generated
-boilerplate. Empty categories retain `noindex,follow`; search pages remain
-`noindex,follow`; and login/admin pages remain outside public description
+boilerplate. Search pages also intentionally omit a conventional description
+where no editorial source exists and remain `noindex,follow`. Empty categories
+retain `noindex,follow`, and login/admin pages remain outside public description
 coverage. Canonical, robots, sitemap, Open Graph, and Twitter policies are not
 changed by this description policy.
 
-As of 2026-09-14, this policy is implemented in the repository for review but
-has not been deployed.
+As of 2026-09-14, this policy is deployed and production-verified on both sites.
 
 ## About Open Graph Policy
 
@@ -153,8 +154,19 @@ Category and search social metadata remain outside this policy. Route-specific
 static-page values are escaped before the Open Graph and matching Twitter
 metadata strings are inserted into the rendered head.
 
-As of 2026-09-14, this About Open Graph policy is implemented in the repository
-for review but has not been deployed.
+As of production commit `f3fe658c1989634fe1d3fba4b20c8928e42571a8`, this
+About Open Graph policy is deployed and verified. The production values are:
+
+- The Tecnoagrarian: `og:url` is
+  `https://www.thetecnoagrarian.com/about`, `og:title` is
+  `About The Tecnoagrarian`, and `og:description` reuses the existing About
+  description: `Learn how The Tecnoagrarian explores practical technology,
+  sustainable growing, automation, and the future of food production.`
+- Fruition Forest Garden: `og:url` is
+  `https://www.fruitionforestgarden.com/about`, `og:title` is
+  `About Fruition Forest Garden`, and `og:description` reuses the existing About
+  description: `Meet Mike and Lou and follow their off-grid homestead, forest
+  garden, DIY systems, and self-reliant life in Michigan’s Upper Peninsula.`
 
 ## Empty Category Policy
 
@@ -169,9 +181,22 @@ as indexable search content. Populated categories remain indexable and
 sitemap-listed. `robots.txt` continues allowing category crawling so crawlers
 can observe the robots directive and follow normal site links.
 
-As of 2026-09-11, this behavior is implemented in the repository but has not
-been deployed. Production remains unchanged until a separately approved
-deployment.
+As of 2026-09-11, this behavior is deployed and production-verified on both
+sites. Confirmed empty examples are The Tecnoagrarian `/category/esp32` and
+Fruition Forest Garden `/category/pigs`. Unknown category slugs continue to
+return `404`.
+
+## Historical Raspberry Pi URL
+
+The Tecnoagrarian URL
+`https://www.thetecnoagrarian.com/blog/raspberry-pi-unboxing` was a
+forward-looking link to a planned post that was never published. It was not a
+migrated historical article, and no one-to-one canonical replacement exists.
+
+The obsolete URL therefore correctly remains a genuine `404` with no redirect.
+The stale hyperlink was removed from the published "Launching the
+Tecnoagrarian — Rebuilding the Stack" post through the normal content-editing
+workflow. Do not redirect this URL to the homepage or an unrelated post.
 
 ## Redirect Cleanup
 
@@ -237,6 +262,57 @@ Safe source inspection did not find a clear published/draft state in the shared 
 
 Needs Review: if draft/private post state is added later, sitemap generation should filter to published public content only.
 
+## Structured Data Prerequisite: Public Author and Publication Model
+
+A JSON-LD audit stopped before implementation because the current data model
+does not provide sufficiently reliable public facts for post authorship,
+publisher identity, or publication history.
+
+Supported factual data currently includes:
+
+- site name and canonical site origin;
+- homepage and About descriptions;
+- post headline and canonical post URL;
+- normalized post description; and
+- an optional public post image.
+
+Those facts alone do not resolve the following identity and date requirements.
+
+- `post.author` is sourced from `users.username`; it is an authentication field,
+  not a modeled public author entity or approved public byline.
+- Fruition Forest Garden's public Mike-and-Lou identity is not a per-post author
+  assignment.
+- The Tecnoagrarian has no approved public author or publisher identity in the
+  current model.
+- Site names alone are not enough to assert an `Organization` publisher.
+- Social-profile links do not resolve these identity gaps.
+- `created_at` is used and displayed as **Event Date**, so it is not a reliable
+  publication date and cannot safely populate `datePublished`.
+- `updated_at` is reset on edits. It cannot recover immutable first-publication
+  history, and its current semantics are not sufficient to infer original
+  publication timing.
+- The model has no immutable `published_at` history or separately reliable
+  publication and modification semantics.
+
+The owner chose not to add a stripped-down `BlogPosting` object that would
+avoid those gaps. No JSON-LD is currently implemented. The next model phase is:
+
+1. audit the current user/post schema and admin flows;
+2. define approved public author identities and per-post assignment;
+3. define the publisher identity for each site;
+4. add an immutable `published_at` timestamp;
+5. define reliable modification-date semantics;
+6. plan and validate a factual backfill for existing posts;
+7. update editor workflows and test/migrate both sites safely; and
+8. revisit JSON-LD only after those prerequisites are complete.
+
+The provisional future policy is `WebSite` for homepages, `AboutPage` for About,
+and `BlogPosting` for posts. Category and search pages would remain without
+JSON-LD unless later evidence supports it. Any implementation must serialize
+structured data safely and escape closing script sequences, `<`, `>`, `&`, and
+Unicode line separators U+2028 and U+2029. Do not construct JSON-LD with unsafe
+string concatenation.
+
 ## Search Console Interpretation
 
 Google Search Console categories should be interpreted carefully:
@@ -248,9 +324,18 @@ Google Search Console categories should be interpreted carefully:
 
 Do not recommend extra app changes for known redirected URL variants when the redirect target is correct.
 
+For the Search Console domain property `thetecnoagrarian.com`, the sitemap
+`https://www.thetecnoagrarian.com/sitemap.xml` was submitted on 2026-09-14. Its
+recorded status was `Success`, with 12 discovered pages. That state does not
+guarantee that every page is indexed. Search Console actions, including
+validation, indexing requests, and sitemap changes, remain explicit
+owner-controlled operations rather than routine repository work.
+
 ## Deployment And Verification
 
-Known sitemap, canonical, `/index.html`, CSP form-action, and non-www redirect fixes are deployed and verified from prior production checks.
+Known sitemap, canonical, pagination, empty-category, conventional-description,
+About Open Graph, `/index.html`, CSP form-action, and non-www redirect fixes are
+deployed and verified from prior production checks.
 
 Representative public HTTP checks:
 
@@ -274,10 +359,10 @@ Expected:
 - public pages do not include `noindex` when indexing is intended
 - admin/private routes remain protected
 
-Submit or keep submitted these sitemaps in Google Search Console:
-
-- `https://www.fruitionforestgarden.com/sitemap.xml`
-- `https://www.thetecnoagrarian.com/sitemap.xml`
+The Tecnoagrarian sitemap is already submitted as recorded above. This document
+does not assert a current Fruition Forest Garden Search Console submission
+state. Submit, remove, or resubmit a sitemap only through a separately approved
+owner action.
 
 Use URL Inspection only for representative remaining examples after the known fixes have had time to recrawl.
 
@@ -287,6 +372,7 @@ Use URL Inspection only for representative remaining examples after the known fi
 - Do not click `Validate Fix` repeatedly. Recheck representative examples first.
 - Inspect only specific remaining bad URLs if Search Console continues reporting them after recrawl.
 - Add a sanitized nginx canonical redirect template to the repo later.
-- Add a formal sitemap/canonical test later if a test harness is selected.
 - Review whether canonical URL generation should be consolidated with Open Graph URL generation.
 - Add published/draft filtering to sitemap generation if the content model gains explicit publication state.
+- Complete the public author, publisher, and publication-history data model
+  before reconsidering JSON-LD.

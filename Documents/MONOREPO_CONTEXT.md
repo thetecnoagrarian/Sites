@@ -54,12 +54,11 @@ Inferred: shared behavior such as application wiring, rendering conventions, aut
 
 ### Visible Differences in Purpose or Status
 
-From safe documentation:
-
-- The Tecnoagrarian is described as a blog about technology and agriculture and is documented as production live.
-- Fruition Forest Garden is described as a separate blog site and is documented as preparing for launch, with a production-like/test workflow visible in the docs.
-
-Needs review: current launch status should be refreshed before making public-facing claims, because status documentation can drift.
+Both The Tecnoagrarian and Fruition Forest Garden are live production sites.
+They retain distinct identities and content, while shared behavior should be
+kept in `blog-core` when it genuinely applies to both. The current verified
+production source checkpoint is commit
+`f3fe658c1989634fe1d3fba4b20c8928e42571a8`.
 
 ## 3. Shared `blog-core` Role
 
@@ -111,7 +110,7 @@ The Docker model appears to have three layers:
 
 `docker/Dockerfile.prod.site` is a shared multi-stage production Dockerfile parameterized by site directory and site port. It installs production dependencies, copies shared and site source, creates runtime directories, configures a non-root user, and runs the selected site app.
 
-The active production and development Dockerfiles use the immutable official Node `24.19.0` Alpine 3.23 multi-architecture image reference. CI also uses Node `24.19.0`, and active package engines enforce the Node 24 major. Local ARM64 Mode B validation passed; emulated AMD64 build/startup validation is preliminary, so a native Linux musl AMD64 gate remains required before production deployment.
+The active production and development Dockerfiles use the immutable official Node `24.19.0` Alpine 3.23 multi-architecture image reference. CI also uses Node `24.19.0`, and active package engines enforce the Node 24 major. The Node 24 production migration and native Linux musl AMD64 validation gate were completed; the dormant one-time `multiarch` builder was later retired after confirming it had no current production or rollback dependency. The active production builder is `mybuilder`.
 
 Needs review: the canonical relationship among root-level and site-level Compose files should be documented in a future deployment runbook.
 
@@ -193,12 +192,34 @@ It preserves:
 
 Future Codex sessions should read this file early, after `AGENTS.md`, when working on architecture, documentation, deployment runbooks, environment mapping, or multi-site refactors.
 
-## 7. Open Questions
+## 7. Current Next Work
+
+The next planned cross-site SEO/data-model phase is **Structured Data
+Prerequisite: Public Author and Publication Model**. Before JSON-LD can be
+implemented accurately, both sites need approved public author identities,
+publisher identity, an immutable publication timestamp, reliable modification
+semantics, a factual existing-post backfill, and corresponding editor workflow.
+The detailed decision boundary is recorded in
+`Documents/SEO_CRAWLABILITY_NOTES.md`.
+
+This is model and product-definition work, not a markup-only task. No JSON-LD
+should be added until the owner approves those underlying facts and workflows.
+The planned sequence is:
+
+1. audit the current user/post schema and admin flows;
+2. design factual public-author representation;
+3. decide publisher representation per site;
+4. add immutable publication-date semantics;
+5. plan a factual historical backfill;
+6. update admin/editor workflows;
+7. test and migrate both sites safely; and
+8. implement JSON-LD only after those prerequisites are established.
+
+## 8. Open Questions
 
 - Which Compose file is canonical for each workflow: local development, local production-like testing, production deployment, and site-specific standalone operation?
 - Do the site-level Compose files remain current, or are root-level Compose files now authoritative?
 - Which operational scripts are safe for routine local use, and which are deployment, backup, reset, or server-affecting commands?
 - Which reviewed-safe operational docs should be treated as current source of truth versus historical notes?
-- Is Fruition Forest Garden still in the documented pre-launch/test state, or has that status changed?
 - Should dependency/security remediation be a later phase after documentation, architecture mapping, and workflow documentation are complete?
 - Should generated artifacts and runtime folders be cleaned, ignored, or archived outside the repo? Do not perform cleanup without explicit approval.

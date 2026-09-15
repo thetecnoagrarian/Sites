@@ -56,6 +56,35 @@ GitHub is source control plus advisory CI. Pushing to GitHub does not deploy pro
 
 Live production use was verified on 2026-08-24 at `/opt/Sites` with the root `docker-compose.prod.yml` and the standalone `docker-compose` command. Service names must still be taken from the checked-in Compose file and confirmed for each approved deployment.
 
+### Current Production And Capacity Checkpoint
+
+As of production commit `f3fe658c1989634fe1d3fba4b20c8928e42571a8`:
+
+- Production is on branch `main` at `/opt/Sites` and is reached operationally
+  through the established `sites-production` SSH alias. This records the alias
+  name only; SSH configuration details remain private.
+- Deployment is manual and operator-controlled through the standalone
+  `docker-compose` workflow. GitHub CI remains advisory and does not deploy.
+- The host is an Ubuntu 24.04 Linode with 2 GB RAM, 1 CPU, and 50 GB storage,
+  expanded from the previous 1 GB RAM, 1 CPU, and 25 GB storage plan.
+- The ext4 root filesystem is directly on `/dev/sda`, with no partition or LVM
+  layer. Swap remains on `/dev/sdb`.
+- The cold provider resize with Auto Resize Disk expanded both the block device
+  and filesystem successfully; no manual `resize2fs` action was required.
+- The post-resize checkpoint had approximately 26 GiB free, 44% filesystem
+  utilization, and 12% inode use. Routine production Docker builds are again
+  operationally safe at that capacity.
+- `mybuilder` is the active Buildx builder. Its cache is recomputable and should
+  not be pruned routinely merely because it exists.
+- The dormant `multiarch` builder and its dedicated state volume were retired
+  through normal builder removal after a read-only dependency audit found no
+  application, current-image, or rollback-image dependency. No global Docker
+  prune was used.
+
+Capacity cleanup created short-term headroom, but the plan expansion is the
+durable capacity correction. Repeated cache deletion is not a substitute for
+adequate storage.
+
 ## 3. Canonical Deployment Files
 
 ### `docker-compose.prod.yml`
@@ -394,7 +423,8 @@ Confirmed runtime paths inside containers:
 - Database path is represented by `[DATABASE_PATH]`.
 - Uploads path is represented by `[UPLOADS_PATH]`.
 - Logs live under a container log path mounted to a Docker volume.
-- The currently deployed backup flow generates retained files under a container backup path. The repository target described below replaces that behavior, but it is not live until a separately approved production rollout succeeds.
+- Container backup paths are temporary staging only. Retained managed backup
+  sets live under the host backup root described below.
 
 nginx relationship:
 
@@ -415,6 +445,8 @@ Do not run this command unless the user explicitly approves the exact deployment
 Live-verified operator facts:
 
 - Production checkout: `/opt/Sites`.
+- Production access alias: `sites-production` (alias name only; configuration is
+  intentionally not documented here).
 - Production Compose file: root `docker-compose.prod.yml`.
 - Production Compose implementation: standalone `docker-compose`.
 - Build and recreation remain separate, site-specific, approval-required steps.
@@ -423,17 +455,7 @@ Needs Review: confirm whether nginx config in this repo is deployed as-is or use
 
 ## 7. Backup and Restore Concepts
 
-Current production finding as of 2026-08-24:
-
-- FFG and TTA use the same scheduled container/host backup architecture.
-- The weekly host job runs at 02:00 on Sunday.
-- The deployed container script retains database and uploads artifacts under an unmounted `/app/backups` path.
-- The deployed host script copies the entire retained container backup tree rather than only the new set.
-- Host copy failure is not a reliable failure gate in the deployed script.
-- FFG accumulated approximately 950 MB in its writable layer; backup artifacts accounted for 99.96% of that layer.
-- No implemented off-host or secondary-copy job is established by current repository evidence. The existing host destination is durable across container recreation, but remains on the production host and is therefore only the canonical local copy.
-
-Repository target architecture, implemented locally but not yet deployed:
+Current production architecture:
 
 - Runtime databases and uploads are the main backup targets.
 - Source code is expected to live in Git and is not part of backup output.
@@ -444,6 +466,15 @@ Repository target architecture, implemented locally but not yet deployed:
 - Copy, checksum, archive, or cleanup failure returns nonzero, preserves staging for review, skips retention, and prevents another set from accumulating at the same container path.
 - Retention is host-owned, defaults to 28 days, and applies only to the new `backup-set-*` layout. Age uses the managed directory modification time in complete 24-hour periods; `find -mtime +28` selects a set only after its completed age bucket exceeds 28. Existing legacy backups are deliberately excluded until a separate cleanup is explicitly approved.
 - A dedicated `/app/backups` volume is not part of the target. It would move bytes out of the writable layer but preserve same-host duplication, whole-tree copying, and split retention ownership.
+- Managed sets are retained under `/opt/Sites/backups`; legacy backup material
+  remains preserved and outside automated cleanup.
+- No implemented off-host or secondary-copy job is established by current
+  repository evidence. Host-managed sets survive application-container
+  recreation but remain on the production host.
+- Linode provider backups are enabled, and a successful provider backup was
+  confirmed before the storage expansion. Provider backups provide a separate
+  host-level recovery layer; they do not replace application-aware backup sets,
+  an off-host copy, or a tested restore procedure.
 
 Fail-closed operator recovery:
 
@@ -453,15 +484,18 @@ Fail-closed operator recovery:
 4. If an abrupt kill left only a stale, empty host lock, remove that exact lock with `rmdir /opt/Sites/backups/.backup-run.lock` only after confirming no run is active. Do not use a recursive removal command for the lock.
 5. Treat removal of container or host staging artifacts as a separate backup-deletion decision. Do not resume the schedule until the failed set is understood and staging has been deliberately reconciled.
 
-Pending production rollout gate:
+Current verification boundary:
 
-1. Preserve all existing container and host backup artifacts.
-2. Update the production checkout only after the exact commit and script diff are approved.
-3. Do not rebuild or recreate either application solely for this change. The host orchestrator streams the tracked `scripts/backup.sh` into the existing container for each run.
-4. Run one explicitly approved manual host-orchestrated backup and require success for both sites.
-5. Confirm one complete host set per site, matching transfer checksums, absent temporary staging, unchanged application health/restart counts, and no writable-layer increase.
-6. Allow the next scheduled run only after the manual gate passes; verify the same conditions afterward.
-7. Treat existing `/app/backups` contents as preserved legacy backups until the new flow and host copies are independently verified. Their removal remains a separate destructive action requiring explicit approval.
+1. Preserve all existing managed and legacy backup artifacts.
+2. Do not infer a successful unattended scheduled run or a completed restore
+   drill unless explicit evidence is recorded; tracked documentation does not
+   currently establish either milestone.
+3. For any separately approved validation, require complete sets for both sites,
+   matching transfer checksums, absent temporary staging or lock anomalies,
+   unchanged application health/restart counts, and no writable-layer growth.
+4. Treat deletion of legacy material, managed sets, or staging artifacts as a
+   separate destructive action requiring explicit approval and reconciliation.
+5. Keep off-host replication and restore testing as separate future gates.
 
 Rollback concept:
 

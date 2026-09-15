@@ -180,9 +180,9 @@ Do not document real storage endpoints or account details in this file.
 
 ### Repository Target Architecture
 
-The repository-side target implemented on 2026-08-24 is pending a separately
-approved production rollout. It applies equally to Fruition Forest Garden and
-The Tecnoagrarian:
+The host-managed architecture applies equally to Fruition Forest Garden and The
+Tecnoagrarian and is the current production model. Managed sets are retained
+under `/opt/Sites/backups`:
 
 - Container storage is temporary staging only; it is not a retention location.
 - One run creates exactly one SQLite backup and one uploads archive.
@@ -220,6 +220,17 @@ separate open requirements.
 
 These creation-time integrity, archive, and checksum checks establish transfer
 integrity only. They are not evidence of a completed restore test.
+
+Legacy backup material remains preserved and outside automated cleanup. Do not
+delete it without a separate, explicitly approved restore-readiness and cleanup
+gate. Tracked documentation does not currently establish the first successful
+unattended scheduled validation or a completed restore drill, so neither status
+is asserted here.
+
+Linode provider backups are enabled, and a successful provider backup was
+confirmed before the 2026 storage expansion. That provider snapshot layer is
+useful for host-level recovery but does not replace these application-aware
+sets, a future off-host copy, or restore-test evidence.
 
 ## 10. Restore-Test Planning
 

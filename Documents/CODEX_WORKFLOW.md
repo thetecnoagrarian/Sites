@@ -408,7 +408,9 @@ Known context:
 - Active package engines require Node `>=24.0.0 <25`.
 - CI uses exact Node `24.19.0`.
 - The active production Dockerfile uses the immutable Node `24.19.0` Alpine 3.23 multi-architecture image reference.
-- Final native Linux musl AMD64 validation remains a deployment gate even though local ARM64 and emulated AMD64 validation passed.
+- The Node 24 native Linux musl AMD64 gate and production migration are complete.
+  Future runtime or native-dependency changes must rerun the permanent native
+  AMD64 deployment-candidate gate before production deployment.
 
 ## 13. Deployment Boundary
 
@@ -470,7 +472,6 @@ Dependency/security remediation should remain separate from documentation migrat
 - Which root or site-level Compose files are canonical for each workflow?
 - Should `UPLOAD_PATH` be standardized to `UPLOADS_PATH`?
 - Should `DATABASE_URL` examples be replaced with `DATABASE_PATH`?
-- What native Linux musl AMD64 host or CI runner will perform the final Node 24 deployment-candidate gate?
 - Which reviewed-safe operational docs are current versus historical?
 - Should generated/runtime folders be cleaned or only ignored?
 - Should CI failure tolerance be tightened after documentation migration?

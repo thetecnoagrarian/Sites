@@ -21,13 +21,19 @@ The goals are:
 
 This audit is the current classification record and archive log. It does not authorize future cleanup or operational changes beyond an explicitly approved task.
 
+> Current-state checkpoint (2026-09-15): use
+> `Documents/DEPLOYMENT_RUNBOOK.md` for production, capacity, and host-backup
+> state; `Documents/SEO_CRAWLABILITY_NOTES.md` for current SEO and structured-data
+> decisions; and `Documents/MONOREPO_CONTEXT.md` for the next project phase.
+> Dated audit batches below remain historical classification records.
+
 ## 2. Current Documentation Landscape
 
 | File path | Apparent role | Current status | Recommended future role | Risk level | Notes |
 |---|---|---|---|---|---|
 | `AGENTS.md` | Active source of truth | Active | Highest-priority repo instruction file | High importance, low content risk | Read first for every task. Contains safety, secret, Git, testing, deployment, and migration rules. |
 | `Documents/REPO_INVENTORY.md` | Inventory / orientation | Active | Keep as repo map and safe path inventory | Low | Useful for quick orientation and sensitive path-only listings. |
-| `Documents/MONOREPO_CONTEXT.md` | Orientation / context | Active | Keep as high-level project context | Low | Explains why both sites live together and how `blog-core` fits. Some site status claims may drift. |
+| `Documents/MONOREPO_CONTEXT.md` | Orientation / context | Active | Keep as high-level project context | Low | Explains why both live sites share the monorepo, how `blog-core` fits, and the current next-work checkpoint. |
 | `Documents/ARCHITECTURE_MAP.md` | Architecture map | Active | Keep as architecture source for future edits | Medium | Captures code/config structure and known mismatches. Should be refreshed after architecture changes. |
 | `Documents/ENVIRONMENT_AND_SECRETS_MAP.md` | Environment and secrets map | Active | Keep as secret-boundary source | High importance, medium content risk | Correctly avoids values and documents variable mismatches. Needs refresh after env template changes. |
 | `Documents/DEPLOYMENT_RUNBOOK.md` | Operational runbook | Active but cautious | Keep as active deployment planning doc | High | Safe placeholder-first runbook. Production actions still require explicit approval. |
@@ -37,7 +43,7 @@ This audit is the current classification record and archive log. It does not aut
 | `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` | Broad project history | Archived | Preserve as historical context only | High | Current guidance is distributed across focused docs; sensitive-adjacent and stale operational detail must not control current work. |
 | `Documents/archive/troubleshooting/LOCAL_SETUP_QUICKSTART.md` | Local production-like setup history | Archived | Preserve as historical setup context | Medium | Current local production-like and isolated testing guidance lives in the runbook. |
 | `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` | Local Docker workflow history | Archived | Preserve as historical setup context | High | Contains superseded direct Docker/deployment instructions and is not current authority. |
-| `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup planning guide | Active but cautious | Keep as placeholder-only planning reference | High | Tracked architecture still supports database-and-upload backup concepts. The guide does not establish live schedules or authorize backup/restore actions. |
+| `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup architecture and planning guide | Active but cautious | Keep as the application-backup architecture reference | High | Records the current host-managed model and future off-host/restore gates; it does not authorize backup, restore, or deletion actions. |
 | `Documents/GITHUB_AUTHENTICATION_SETUP.md` | GitHub auth reference | Needs Review | Sensitive-adjacent reference or historical setup note | High | Contains account, SSH, key path, and auth workflow details. Do not reproduce private details in future docs. |
 | `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md` | Cleanup/troubleshooting history | Archived | Preserve as migration-era cleanup context | High | Destructive cleanup instructions must not be treated as current operational guidance. |
 | `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Analytics cleanup planning guide | Active but cautious | Keep as placeholder-only planning reference | High | Tracked analytics models, middleware, routes, and cleanup script still exist. The guide does not authorize database mutation or claim live state. |

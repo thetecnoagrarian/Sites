@@ -182,11 +182,16 @@ If a shared code fix should apply to both sites, deploy the second site separate
 
 Rebuilding both sites may be heavier than needed and should be intentional.
 
-Recent confirmed pattern:
+Current confirmed pattern:
 
-- The Google indexing/crawler fix was deployed to Fruition Forest Garden first.
-- The Tecnoagrarian production container was not rebuilt during that deployment.
-- If the shared crawler fix is desired there too, deploy The Tecnoagrarian separately.
+- Both sites are live and use the same manual, operator-controlled production
+  deployment model.
+- Shared category/sitemap, pagination/indexability, conventional-description,
+  and About Open Graph changes were deliberately built, deployed, and verified
+  for both sites.
+- Site-specific changes may still be deployed independently when their scope is
+  truly isolated. Shared changes require an explicit decision about both sites,
+  followed by separate health and public-behavior verification for each.
 
 ## Verification Checklist
 
@@ -292,8 +297,6 @@ Keep those details in local-only private notes or secret-management systems.
 - Should the server use a dedicated GitHub deploy key instead of forwarded local agent?
 - Should SSH config aliases be standardized?
 - Should 1Password items be split into separate SSH-key and environment-secret items?
-- Should The Tecnoagrarian be deployed to pick up the shared crawler fix?
-- Should a sitemap/canonical URL policy be added?
 - Should dependency vulnerabilities found during Docker build be addressed separately?
 - Should CSP source values be reviewed later for cleaner environment-driven config?
 - Should a redacted operator checklist be created after the deployment process stabilizes?
@@ -303,6 +306,8 @@ Keep those details in local-only private notes or secret-management systems.
 1. Keep private deployment session notes local-only.
 2. Create a clean private key map.
 3. Later create a redacted operator checklist if useful.
-4. Deploy The Tecnoagrarian separately if the shared crawler fix is needed there.
-5. Use Google Search Console URL Inspection for Fruition Forest Garden.
+4. Use `Documents/SEO_CRAWLABILITY_NOTES.md` as the current sitemap, canonical,
+   pagination, metadata, and structured-data decision record.
+5. Keep Search Console actions separately owner-approved after live HTTP
+   verification.
 6. Plan dependency/security remediation separately.
