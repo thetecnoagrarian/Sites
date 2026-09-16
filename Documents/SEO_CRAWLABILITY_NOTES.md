@@ -295,7 +295,28 @@ Those facts alone do not resolve the following identity and date requirements.
   publication and modification semantics.
 
 The owner chose not to add a stripped-down `BlogPosting` object that would
-avoid those gaps. No JSON-LD is currently implemented. The next model phase is:
+avoid those gaps. No JSON-LD is currently implemented.
+
+Owner decisions for later model work: public authors are independent of login
+accounts; ordered multiple authors are supported; a newly published post needs
+at least one explicitly persisted approved author. Site defaults may preselect
+authors or publishers, but each post's final author and publisher assignments
+must be persisted so future default changes do not rewrite history. An approved
+Person may be a publisher; an Organization must not be inferred from a site
+name. Owner attestation and direct publishing records can support historical
+facts. Indirect timestamps and account links are investigation leads only.
+Historical review records verified, owner-attested, or reviewed/unavailable
+status. Publication precision is preserved as known: exact instant or calendar
+date. Future `modified_at` advances on real changes to title, body, public
+description/excerpt, images/captions/order, Event Date, public author/byline,
+or public category membership. A no-op save or evidence bookkeeping alone does
+not count. Admin-only immediate publishing and Event Date semantics remain.
+
+The first local implementation slice adds only a shared, versioned SQLite
+migration foundation. It does not add author, publisher, publication, or
+modification fields, change public rendering, or implement JSON-LD.
+
+The next model phase is:
 
 1. audit the current user/post schema and admin flows;
 2. define approved public author identities and per-post assignment;

@@ -629,6 +629,51 @@ docker compose -f docker-compose.local-prod.yml up --build -d
 - production restart commands
 - commands that reveal secret values
 
+### Shared SQLite Migration Foundation
+
+The explicit shared runner lives in `blog-core/src/database/migrations.js` and its
+command-line entry point is `blog-core/src/database/migrate-cli.js`. The current
+`0000_existing_schema` migration is a frozen recognition baseline, not a replay
+of a historical migration. `schema.sql` remains the empty-database initializer
+for this slice. A fresh database and a recognized existing database converge
+after the same explicit migration operation; ordinary application startup does
+not replay baseline schema, apply migrations, or create migration records on
+existing databases.
+
+Migration IDs are ordered, four-digit-prefixed SQL filenames. Each future file
+contains one SQL statement; a trigger definition counts as one statement. The
+runner rejects transaction-control SQL. Applied IDs and
+SHA-256 checksums are stored in each database's own `schema_migrations` table.
+Only the shared baseline schema is currently registered. Future SQL files must
+be appended in order; never edit a previously applied migration.
+
+Read-only inspection/planning command shapes, for a separately authorized
+database file:
+
+```text
+node blog-core/src/database/migrate-cli.js inspect --database [DATABASE_PATH]
+node blog-core/src/database/migrate-cli.js plan --database [DATABASE_PATH]
+```
+
+Explicit mutation command shape, requiring separate site-specific approval,
+backup/restore readiness, stopped writers, and a verified rollback plan:
+
+```text
+node blog-core/src/database/migrate-cli.js apply --database [DATABASE_PATH]
+```
+
+The runner opens inspection connections read-only and requires the database
+file to exist. Application startup also inspects existing schemas and fails on
+unsupported drift without applying migrations. The runner compares shared
+tables, triggers, and indexes to the frozen
+baseline or the expected applied-migration state, while allowing the known
+site-local analytics tables. Unknown or drifted shared schema, an invalid
+ledger, a changed checksum, and foreign-key violations fail closed. An apply
+rechecks under a SQLite immediate transaction before recording the baseline or
+running pending migrations. A failure rolls back the whole batch; a repeat run
+with nothing pending leaves schema unchanged. Inspection, test results, and
+source documentation do not authorize a production migration.
+
 ## 10. Rollback Concepts
 
 Rollback should be planned before deployment.

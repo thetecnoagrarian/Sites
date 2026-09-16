@@ -119,8 +119,12 @@ Exports the shared app factory, database initializer, models, middleware, and ut
 
 ### `blog-core/src/database/`
 
-- `init.js` creates parent directories, opens a SQLite database through `better-sqlite3`, and executes `schema.sql`.
+- `init.js` creates parent directories, opens a SQLite database through `better-sqlite3`, and executes `schema.sql` transactionally only when the database is empty. It does not replay the baseline over an existing schema.
 - `schema.sql` defines shared users, posts, categories, post-category relationships, sessions, and update triggers.
+- `migrations/0000_existing_schema.sql` is the frozen current baseline. It matches `schema.sql` at the migration-foundation checkpoint and is used only for recognition, never as an upgrade applied to an existing database.
+- `migrations.js` inspects the shared schema and runs explicitly requested, ordered SQL migrations with a persistent `schema_migrations` ledger. `migrate-cli.js` exposes read-only `inspect`/`plan` and explicit `apply` commands. Each site database has its own ledger.
+
+Application startup still initializes the current fresh schema; it inspects existing schemas and fails on unsupported drift, but does not run the migration command. Future schema changes should be added as ordered migration files and applied explicitly to both existing and freshly initialized databases before code that requires them is started. A database already carrying migrated schema is not overwritten by the fresh baseline on restart.
 
 Do not inspect SQLite database files. Schema files are source; database files are runtime state.
 
@@ -226,7 +230,7 @@ Common files:
 
 Confirmed: these are source schema/init files, not runtime database contents.
 
-Potential mismatch: site schema files define posts with `body`, while `blog-core/src/database/schema.sql` defines posts with `content`. The active models/routes inspected appear to use `body`. This should be reviewed before relying on the shared schema as canonical.
+The active shared schema and post model both use `posts.body`. The site-local schema files also use `body`, but their initializers are not used by the active app entry points. These older site-local files are not migration authority.
 
 Potential mismatch: site schema files define a user password column named `password`, while shared user model/auth code expects `password_hash`. This should be reviewed without inspecting runtime database files.
 
@@ -560,8 +564,7 @@ Requires explicit user approval:
 - Do site-level Docker/Compose files remain current, or are root-level Compose files authoritative?
 - Should `docker-compose.yml` use `UPLOADS_PATH` instead of `UPLOAD_PATH`, or is the current default-path behavior intentional?
 - Is `fruitionforestgarden/src/app.js` default port `3001` intentional when root local Compose maps the service to port `3000` through environment?
-- Which schema is canonical: `blog-core/src/database/schema.sql` or the site-level schema files?
-- Should the `posts` table use `content` or `body` across all source schema/model code?
+- Should the older site-local schema/initializer files be retired in a separate cleanup task after their remaining callers are verified?
 - Should the users table use `password_hash` or `password` across all schema/model/auth code?
 - Are `fruitionforestgarden/src/admin.js` and `thetecnoagrarian/src/admin.js` legacy files, or are they used by another entry point?
 - How much duplicated route/controller/model/middleware code should be moved into `blog-core`?

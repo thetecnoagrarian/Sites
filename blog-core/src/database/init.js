@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { readFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { createMigrationRunner } from './migrations.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -30,14 +31,27 @@ export function initializeDatabase(dbPath) {
     
     const db = new Database(dbPath);
     
-    // Read and execute schema
-    const schemaPath = join(__dirname, 'schema.sql');
-    const schema = readFileSync(schemaPath, 'utf8');
-    
-    // Execute the entire schema at once
-    db.exec(schema);
-    
-    return db;
+    try {
+        // Only a genuinely empty database receives the fresh baseline. Existing
+        // schemas are changed by the explicit migration runner, not app startup.
+        const hasSchema = db.prepare(`
+            SELECT 1 FROM sqlite_schema
+            WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'
+            LIMIT 1
+        `).get();
+        if (!hasSchema) {
+            const schemaPath = join(__dirname, 'schema.sql');
+            const schema = readFileSync(schemaPath, 'utf8');
+            db.transaction(() => db.exec(schema)).immediate();
+        } else {
+            // Reject unsupported existing schemas without applying migrations.
+            createMigrationRunner().inspect(dbPath);
+        }
+        return db;
+    } catch (error) {
+        db.close();
+        throw error;
+    }
 }
 
 /**

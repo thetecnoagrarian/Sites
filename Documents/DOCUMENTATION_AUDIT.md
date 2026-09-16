@@ -344,7 +344,7 @@ Known issues from safe docs/config inspection:
 - CI tolerance: workflow tolerates some missing/failing lint, unit, E2E, and audit steps, so CI passing should not be overstated.
 - Deployment/runbook uncertainty: exact production deploy path, service names, command style, and nginx relationship remain Needs Review.
 - Environment template variables: some variables appear stale, future-facing, or not directly referenced by inspected source/Compose.
-- Schema mismatch: `body` versus `content` is recorded in `ARCHITECTURE_MAP.md` and needs source/schema review before database-related changes.
+- The active shared schema and model use `posts.body`. Older site-local schema files are not the active initialization path; the shared migration foundation recognizes the current shared baseline and rejects unsupported drift. Actual runtime schemas still require separately authorized inspection before any migration.
 - User password schema mismatch: `password` versus `password_hash` is recorded in `ARCHITECTURE_MAP.md` and needs review without inspecting runtime database files.
 - Possible legacy `src/admin.js` files: architecture docs record that these may be legacy or unused because active app entry points mount route files.
 - Older docs contain direct operational command examples that conflict with newer "approval required" workflow boundaries.
