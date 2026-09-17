@@ -634,16 +634,30 @@ docker compose -f docker-compose.local-prod.yml up --build -d
 The explicit shared runner lives in `blog-core/src/database/migrations.js` and its
 command-line entry point is `blog-core/src/database/migrate-cli.js`. The current
 `0000_existing_schema` migration is a frozen recognition baseline, not a replay
-of a historical migration. `schema.sql` remains the empty-database initializer
-for this slice. A fresh database and a recognized existing database converge
-after the same explicit migration operation; ordinary application startup does
-not replay baseline schema, apply migrations, or create migration records on
-existing databases.
+of a historical migration. `schema.sql` remains the empty-database initializer.
+`schema-recognition.js` recognizes three supported starting states: canonical
+`0000`, verified TTA legacy with `categories.description`, and verified FFG
+legacy with `users.role` physically last. It compares SQLite column metadata,
+uniqueness/indexes, foreign keys, and normalized trigger SQL. It ignores SQL
+formatting and comments while rejecting unknown shared objects and material
+constraint or trigger changes. Known site analytics tables and their own objects
+remain outside the shared-schema comparison.
+
+Each database's `schema_migrations` ledger keeps ordered migration IDs and
+SHA-256 checksums. A separate single-row `schema_baseline` table records the
+recognized starting variant when `apply` is explicitly run. Recording `0000_existing_schema`
+for a legacy variant marks its place in the migration sequence; it does not
+assert that the historical database was literally created from the frozen file.
+Variant labels identify a supported schema class, not a complete creation history.
+Insert, update, and delete guards prevent later replacement of the recorded
+variant; inspection rejects missing or altered guards.
+An existing canonical ledger from the original foundation is readable without
+metadata and gains that record only on explicit `apply`. Ordinary startup,
+`inspect`, and `plan` do not create migration records or apply migrations.
 
 Migration IDs are ordered, four-digit-prefixed SQL filenames. Each future file
 contains one SQL statement; a trigger definition counts as one statement. The
-runner rejects transaction-control SQL. Applied IDs and
-SHA-256 checksums are stored in each database's own `schema_migrations` table.
+runner rejects transaction-control SQL.
 Only the shared baseline schema is currently registered. Future SQL files must
 be appended in order; never edit a previously applied migration.
 
@@ -663,16 +677,22 @@ node blog-core/src/database/migrate-cli.js apply --database [DATABASE_PATH]
 ```
 
 The runner opens inspection connections read-only and requires the database
-file to exist. Application startup also inspects existing schemas and fails on
-unsupported drift without applying migrations. The runner compares shared
-tables, triggers, and indexes to the frozen
-baseline or the expected applied-migration state, while allowing the known
-site-local analytics tables. Unknown or drifted shared schema, an invalid
-ledger, a changed checksum, and foreign-key violations fail closed. An apply
-rechecks under a SQLite immediate transaction before recording the baseline or
-running pending migrations. A failure rolls back the whole batch; a repeat run
-with nothing pending leaves schema unchanged. Inspection, test results, and
-source documentation do not authorize a production migration.
+file to exist. Application startup also inspects supported existing schemas and
+fails on unsupported drift without applying migrations. Unknown shared-schema
+drift, an invalid ledger or variant record, a changed checksum, and foreign-key
+violations fail closed. An apply rechecks under a SQLite immediate transaction
+before recording the baseline or running pending migrations. A failure rolls
+back the whole batch; a repeat run after variant metadata is recorded leaves
+schema unchanged. Inspection, test results, and source documentation do not
+authorize a production migration.
+
+The read-only production inventory on 2026-09-16 found both live databases
+outside the original exact-DDL matcher: TTA has a category description column
+and historical SQL formatting; FFG has a historically appended `users.role`
+column and historical session DDL. Production deployment remains blocked until
+the revised code is reviewed, committed, pushed, and separately verified against
+both sites with current backup and rollback readiness. Do not deploy the earlier migration-
+foundation commit alone.
 
 ## 10. Rollback Concepts
 

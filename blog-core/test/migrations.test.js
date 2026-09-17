@@ -9,6 +9,7 @@ import test from 'node:test';
 import Database from 'better-sqlite3';
 import { initializeDatabase } from '../src/database/init.js';
 import { createMigrationRunner, loadMigrations } from '../src/database/migrations.js';
+import { BASELINE_VARIANTS, expectedSignature } from '../src/database/schema-recognition.js';
 
 const runner = createMigrationRunner();
 const syntheticMigration = {
@@ -26,6 +27,28 @@ function freshDatabase(directory, name) {
     const path = join(directory, name);
     const db = initializeDatabase(path);
     db.close();
+    return path;
+}
+
+function legacyDatabase(directory, name, fixtureName) {
+    const path = join(directory, name);
+    const db = new Database(path);
+    try {
+        db.exec(readFileSync(join(import.meta.dirname, 'fixtures', fixtureName), 'utf8'));
+    } finally {
+        db.close();
+    }
+    return path;
+}
+
+function databaseFromSql(directory, name, sql) {
+    const path = join(directory, name);
+    const db = new Database(path);
+    try {
+        db.exec(sql);
+    } finally {
+        db.close();
+    }
     return path;
 }
 
@@ -73,12 +96,91 @@ test('recognized baseline is inspected and planned without creating or changing 
     const planned = runner.plan(path);
     assert.deepEqual(planned, {
         state: 'recognized-untracked-baseline',
+        baselineVariant: 'canonical_0000',
+        variantRecorded: false,
         applied: [],
         pending: ['0000_existing_schema']
     });
     assert.deepEqual(runner.inspect(path), planned);
     assert.equal(digest(path), before);
     assert.throws(() => runner.plan(join(tmpdir(), 'nonexistent-sites-migration.db')));
+});
+
+for (const [variant, fixtureName] of [
+    ['tta_legacy_production', 'tta-legacy-schema.sql'],
+    ['ffg_legacy_production', 'ffg-legacy-schema.sql']
+]) {
+    test(`${variant} is recognized, tracked with provenance, and supports later migrations`, (t) => {
+        const path = legacyDatabase(fixture(t), `${variant}.db`, fixtureName);
+        addFixtureData(path);
+        if (variant === 'tta_legacy_production') {
+            const db = new Database(path);
+            db.prepare('UPDATE categories SET description = ? WHERE slug = ?')
+                .run('Synthetic legacy category description', 'synthetic');
+            db.close();
+        }
+        const data = readFixtureData(path);
+        const before = digest(path);
+        for (const operation of [runner.inspect, runner.plan]) {
+            const result = operation(path);
+            assert.equal(result.baselineVariant, variant);
+            assert.equal(result.variantRecorded, false);
+            assert.deepEqual(result.pending, ['0000_existing_schema']);
+            assert.equal(digest(path), before);
+        }
+        initializeDatabase(path).close();
+        const first = runner.apply(path);
+        assert.deepEqual(first.appliedNow, ['0000_existing_schema']);
+        assert.equal(first.recordedVariantNow, true);
+        assert.equal(first.baselineVariant, variant);
+        assert.deepEqual(readFixtureData(path), data);
+        const db = new Database(path, { readonly: true });
+        try {
+            assert.deepEqual(db.prepare('SELECT singleton, variant FROM schema_baseline').all(),
+                [{ singleton: 1, variant }]);
+            if (variant === 'tta_legacy_production') {
+                assert.equal(db.prepare('SELECT description FROM categories WHERE slug = ?')
+                    .get('synthetic').description, 'Synthetic legacy category description');
+            }
+        } finally {
+            db.close();
+        }
+        initializeDatabase(path).close();
+        const after = digest(path);
+        assert.deepEqual(runner.apply(path).appliedNow, []);
+        assert.equal(digest(path), after);
+
+        const next = createMigrationRunner([...loadMigrations(), syntheticMigration]);
+        assert.deepEqual(next.plan(path).pending, ['0001_test_only_probe']);
+        assert.deepEqual(next.apply(path).appliedNow, ['0001_test_only_probe']);
+        assert.equal(next.inspect(path).baselineVariant, variant);
+        assert.deepEqual(readFixtureData(path), data);
+    });
+}
+
+test('previous canonical ledger gains variant metadata only on explicit apply', (t) => {
+    const path = freshDatabase(fixture(t), 'old-ledger.db');
+    const db = new Database(path);
+    const sql = loadMigrations()[0].sql;
+    db.exec(`CREATE TABLE schema_migrations (
+    id TEXT PRIMARY KEY,
+    checksum TEXT NOT NULL,
+    applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`);
+    db.prepare('INSERT INTO schema_migrations (id, checksum) VALUES (?, ?)')
+        .run('0000_existing_schema', createHash('sha256').update(sql).digest('hex'));
+    db.close();
+    const before = digest(path);
+    assert.equal(runner.inspect(path).variantRecorded, false);
+    assert.equal(digest(path), before);
+    const recorded = runner.apply(path);
+    assert.deepEqual(recorded.appliedNow, []);
+    assert.equal(recorded.recordedVariantNow, true);
+    assert.equal(runner.inspect(path).baselineVariant, 'canonical_0000');
+    assert.equal(runner.inspect(path).variantRecorded, true);
+    const after = digest(path);
+    assert.equal(runner.apply(path).recordedVariantNow, false);
+    assert.equal(digest(path), after);
 });
 
 test('unrecognized and drifted schemas are rejected without recording a baseline', (t) => {
@@ -99,6 +201,102 @@ test('unrecognized and drifted schemas are rejected without recording a baseline
     const driftedBefore = digest(drifted);
     assert.throws(() => runner.apply(drifted), /Unsupported or drifted/);
     assert.equal(digest(drifted), driftedBefore);
+});
+
+test('material shared-schema changes remain rejected by inspect, apply, and startup', (t) => {
+    const directory = fixture(t);
+    const baseline = loadMigrations()[0].sql;
+    const definitions = [
+        ['missing-column', baseline.replace('    description TEXT,\n', '')],
+        ['wrong-type', baseline.replace('body TEXT NOT NULL', 'body BLOB NOT NULL')],
+        ['not-null', baseline.replace('body TEXT NOT NULL', 'body TEXT')],
+        ['default', baseline.replace("role TEXT DEFAULT 'user'", "role TEXT DEFAULT 'owner'")],
+        ['foreign-key', baseline.replace('ON DELETE SET NULL', 'ON DELETE CASCADE')],
+        ['missing-foreign-key', baseline.replace(
+            ',\n    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL', '')],
+        ['uniqueness', baseline.replace('username TEXT UNIQUE NOT NULL', 'username TEXT NOT NULL')],
+        ['check-constraint', baseline.replace('title TEXT NOT NULL',
+            'title TEXT NOT NULL CHECK (length(title) > 0)')],
+        ['column-collation', baseline.replace('username TEXT UNIQUE NOT NULL',
+            'username TEXT UNIQUE NOT NULL COLLATE NOCASE')],
+        ['generated-column', baseline.replace('    description TEXT,',
+            '    description TEXT,\n    generated_title TEXT GENERATED ALWAYS AS (lower(title)) VIRTUAL,')]
+    ];
+    for (const [name, sql] of definitions) {
+        assert.notEqual(sql, baseline, `${name} fixture must actually change`);
+        const path = databaseFromSql(directory, `${name}.db`, sql);
+        const before = digest(path);
+        assert.throws(() => runner.inspect(path), /Unsupported/);
+        assert.throws(() => runner.apply(path), /Unsupported/);
+        assert.throws(() => initializeDatabase(path), /Unsupported/);
+        assert.equal(digest(path), before);
+    }
+
+    const mutations = [
+        ['extra-column', 'ALTER TABLE posts ADD COLUMN unexpected TEXT'],
+        ['missing-trigger', 'DROP TRIGGER posts_updated_at'],
+        ['changed-trigger', `DROP TRIGGER posts_updated_at;
+            CREATE TRIGGER posts_updated_at AFTER UPDATE ON posts BEGIN
+                UPDATE posts SET updated_at = '1900-01-01' WHERE id = NEW.id;
+            END;`],
+        ['unknown-table', 'CREATE TABLE unexpected_shared (id INTEGER)'],
+        ['explicit-index', 'CREATE INDEX unexpected_posts_title ON posts(title)'],
+        ['partial-index', 'CREATE INDEX unexpected_partial ON posts(title) WHERE title IS NOT NULL'],
+        ['expression-index', 'CREATE INDEX unexpected_expression ON posts(lower(title))']
+    ];
+    for (const [name, sql] of mutations) {
+        const path = databaseFromSql(directory, `${name}.db`, baseline);
+        const db = new Database(path);
+        db.exec(sql);
+        db.close();
+        const before = digest(path);
+        assert.throws(() => runner.plan(path), /Unsupported/);
+        assert.throws(() => runner.apply(path), /Unsupported/);
+        assert.throws(() => initializeDatabase(path), /Unsupported/);
+        assert.equal(digest(path), before);
+    }
+
+    const tta = legacyDatabase(directory, 'tta-wrong-description.db', 'tta-legacy-schema.sql');
+    const alteredTta = new Database(tta);
+    alteredTta.exec('ALTER TABLE categories ADD COLUMN unexpected TEXT');
+    alteredTta.close();
+    assert.throws(() => runner.inspect(tta), /Unsupported/);
+});
+
+test('supported baseline classes have one explicit classification', (t) => {
+    const migrations = loadMigrations();
+    const canonical = JSON.stringify(expectedSignature(migrations, 1, BASELINE_VARIANTS.CANONICAL));
+    const tta = JSON.stringify(expectedSignature(migrations, 1, BASELINE_VARIANTS.TTA));
+    const ffg = JSON.stringify(expectedSignature(migrations, 1, BASELINE_VARIANTS.FFG));
+    assert.notEqual(tta, canonical);
+    assert.equal(ffg, canonical);
+    const directory = fixture(t);
+    for (const [name, create] of [
+        [BASELINE_VARIANTS.CANONICAL, () => freshDatabase(directory, 'canonical.db')],
+        [BASELINE_VARIANTS.TTA, () => legacyDatabase(directory, 'tta.db', 'tta-legacy-schema.sql')],
+        [BASELINE_VARIANTS.FFG, () => legacyDatabase(directory, 'ffg.db', 'ffg-legacy-schema.sql')]
+    ]) {
+        assert.equal(runner.inspect(create()).baselineVariant, name);
+    }
+});
+
+test('formatting and comments are ignored without relaxing trigger behavior', (t) => {
+    const baseline = loadMigrations()[0].sql;
+    const formatted = baseline
+        .replace('CREATE TABLE IF NOT EXISTS users', 'CREATE   TABLE IF NOT EXISTS users')
+        .replace('UPDATE users SET', '-- harmless fixture comment\n    UPDATE users SET');
+    const path = databaseFromSql(fixture(t), 'formatting.db', formatted);
+    assert.equal(runner.inspect(path).baselineVariant, 'canonical_0000');
+});
+
+test('site analytics indexes and triggers do not redefine shared schema', (t) => {
+    const path = freshDatabase(fixture(t), 'analytics.db');
+    const db = new Database(path);
+    db.exec(`CREATE TABLE page_views (id INTEGER PRIMARY KEY, page_path TEXT);
+        CREATE INDEX analytics_path ON page_views(page_path);
+        CREATE TRIGGER analytics_insert AFTER INSERT ON page_views BEGIN SELECT 1; END;`);
+    db.close();
+    assert.equal(runner.inspect(path).baselineVariant, 'canonical_0000');
 });
 
 test('known site analytics tables coexist with the shared baseline', (t) => {
@@ -248,6 +446,8 @@ test('a failed migration rolls back its schema and all new migration records', (
                 WHERE name = 'temporary_probe'`).get().count, 0);
             assert.equal(db.prepare(`SELECT COUNT(*) AS count FROM sqlite_schema
                 WHERE name = 'schema_migrations'`).get().count, tracked ? 1 : 0);
+            assert.equal(db.prepare(`SELECT COUNT(*) AS count FROM sqlite_schema
+                WHERE name = 'schema_baseline'`).get().count, tracked ? 1 : 0);
             if (tracked) {
                 assert.deepEqual(db.prepare('SELECT id FROM schema_migrations').all(),
                     [{ id: '0000_existing_schema' }]);
@@ -267,6 +467,29 @@ test('changed migration checksums and ledger drift are rejected', (t) => {
     db.close();
     assert.throws(() => runner.plan(path), /changed migration/);
     assert.throws(() => runner.apply(path), /changed migration/);
+});
+
+test('recorded baseline variant cannot change after a later migration', (t) => {
+    const path = legacyDatabase(fixture(t), 'variant-drift.db', 'ffg-legacy-schema.sql');
+    const next = createMigrationRunner([...loadMigrations(), syntheticMigration]);
+    next.apply(path);
+    const db = new Database(path);
+    try {
+        assert.throws(() => db.prepare('UPDATE schema_baseline SET variant = ?')
+            .run('canonical_0000'), /immutable/);
+        assert.throws(() => db.prepare('DELETE FROM schema_baseline').run(), /immutable/);
+        assert.throws(() => db.prepare(`INSERT OR REPLACE INTO schema_baseline
+            (singleton, variant) VALUES (1, ?)`).run('canonical_0000'), /immutable/);
+    } finally {
+        db.close();
+    }
+    assert.equal(next.inspect(path).baselineVariant, BASELINE_VARIANTS.FFG);
+    assert.equal(next.apply(path).recordedVariantNow, false);
+
+    const altered = new Database(path);
+    altered.exec('DROP TRIGGER schema_baseline_no_update');
+    altered.close();
+    assert.throws(() => next.inspect(path), /Unsupported schema_baseline/);
 });
 
 test('fresh schema and frozen existing baseline have equivalent shared objects', (t) => {

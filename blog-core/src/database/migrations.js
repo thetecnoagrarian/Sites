@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { BASELINE_VARIANTS, expectedSignature, recognizeUntrackedVariant, schemaSignature } from './schema-recognition.js';
 
 const migrationDirectory = join(dirname(fileURLToPath(import.meta.url)), 'migrations');
 const baselineId = '0000_existing_schema';
@@ -11,11 +12,19 @@ const ledgerSql = `CREATE TABLE schema_migrations (
     checksum TEXT NOT NULL,
     applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 )`;
-
-// These are site-owned analytics tables, outside the shared blog schema.
-const ancillaryTables = new Set([
-    'page_views', 'unique_visitors', 'all_time_stats', 'all_time_top_pages'
-]);
+const baselineMetadataSql = `CREATE TABLE schema_baseline (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    variant TEXT NOT NULL
+)`;
+const baselineGuards = [
+    `CREATE TRIGGER schema_baseline_no_insert BEFORE INSERT ON schema_baseline
+    WHEN EXISTS (SELECT 1 FROM schema_baseline)
+    BEGIN SELECT RAISE(ABORT, 'Recorded baseline variant is immutable'); END`,
+    `CREATE TRIGGER schema_baseline_no_update BEFORE UPDATE ON schema_baseline
+    BEGIN SELECT RAISE(ABORT, 'Recorded baseline variant is immutable'); END`,
+    `CREATE TRIGGER schema_baseline_no_delete BEFORE DELETE ON schema_baseline
+    BEGIN SELECT RAISE(ABORT, 'Recorded baseline variant is immutable'); END`
+];
 
 const checksum = (sql) => createHash('sha256').update(sql).digest('hex');
 
@@ -52,40 +61,27 @@ function validateMigrations(migrations) {
     return migrations.map(migration => ({ ...migration, checksum: checksum(migration.sql) }));
 }
 
-function schemaObjects(db) {
-    return db.prepare(`
-        SELECT type, name, tbl_name AS tableName, sql
-        FROM sqlite_schema
-        WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'
-        ORDER BY type, name
-    `).all().filter(object => object.name !== 'schema_migrations'
-        && !(object.type === 'table' && ancillaryTables.has(object.tableName)));
-}
-
-function expectedObjects(migrations, appliedCount) {
-    const reference = new Database(':memory:');
-    try {
-        reference.exec(migrations[0].sql);
-        for (let index = 1; index < appliedCount; index += 1) {
-            reference.prepare(migrations[index].sql).run();
-        }
-        return schemaObjects(reference);
-    } finally {
-        reference.close();
+function hasExactMetadataTable(db, name, sql, relatedSql = []) {
+    const objects = db.prepare(`
+        SELECT type, sql FROM sqlite_schema WHERE name = ? OR tbl_name = ?
+    `).all(name, name).filter(object => object.sql !== null);
+    if (objects.length === 0) return false;
+    const expected = [sql, ...relatedSql];
+    if (objects.length !== expected.length
+        || objects.filter(object => object.type === 'table' && object.sql === sql).length !== 1
+        || relatedSql.some(statement => objects.filter(object => object.type === 'trigger'
+            && object.sql === statement).length !== 1)) {
+        throw new Error(`Unsupported ${name} table or related schema objects`);
     }
+    return true;
 }
 
 function inspectConnection(db, migrations) {
-    const ledgerObjects = db.prepare(`
-        SELECT type, sql FROM sqlite_schema WHERE name = 'schema_migrations'
-           OR tbl_name = 'schema_migrations'
-    `).all().filter(object => object.sql !== null);
-    if (ledgerObjects.length > 0 && (ledgerObjects.length !== 1
-        || ledgerObjects[0].type !== 'table' || ledgerObjects[0].sql !== ledgerSql)) {
-        throw new Error('Unsupported schema_migrations table or related schema objects');
+    const hasLedger = hasExactMetadataTable(db, 'schema_migrations', ledgerSql);
+    const hasBaselineMetadata = hasExactMetadataTable(db, 'schema_baseline', baselineMetadataSql, baselineGuards);
+    if (hasBaselineMetadata && !hasLedger) {
+        throw new Error('Baseline variant metadata exists without a migration ledger');
     }
-
-    const hasLedger = ledgerObjects.length === 1;
     const rows = hasLedger
         ? db.prepare('SELECT id, checksum FROM schema_migrations ORDER BY id').all()
         : [];
@@ -99,10 +95,31 @@ function inspectConnection(db, migrations) {
         }
     }
 
-    const expected = expectedObjects(migrations, Math.max(1, rows.length));
-    const actual = schemaObjects(db);
-    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    let baselineVariant;
+    if (hasBaselineMetadata) {
+        const variants = db.prepare('SELECT singleton, variant FROM schema_baseline').all();
+        if (variants.length !== 1 || variants[0].singleton !== 1
+            || !Object.values(BASELINE_VARIANTS).includes(variants[0].variant)) {
+            throw new Error('Invalid recorded baseline variant');
+        }
+        baselineVariant = variants[0].variant;
+    } else {
+        if (rows.length > 1) {
+            throw new Error('Tracked migrations require recorded baseline variant metadata');
+        }
+        baselineVariant = recognizeUntrackedVariant(db, migrations);
+        if (hasLedger && baselineVariant !== BASELINE_VARIANTS.CANONICAL) {
+            throw new Error('Legacy migration ledger requires the canonical baseline');
+        }
+    }
+
+    const expected = expectedSignature(migrations, Math.max(1, rows.length), baselineVariant);
+    if (JSON.stringify(schemaSignature(db)) !== JSON.stringify(expected)) {
         throw new Error('Unsupported or drifted shared database schema');
+    }
+    if (hasBaselineMetadata && rows.length === 1
+        && recognizeUntrackedVariant(db, migrations) !== baselineVariant) {
+        throw new Error('Recorded baseline variant does not match the unmigrated schema');
     }
     if (db.pragma('foreign_key_check').length > 0) {
         throw new Error('Database contains foreign-key violations');
@@ -110,6 +127,8 @@ function inspectConnection(db, migrations) {
 
     return {
         state: hasLedger ? 'tracked' : 'recognized-untracked-baseline',
+        baselineVariant,
+        variantRecorded: hasBaselineMetadata,
         applied: rows.map(row => row.id),
         pending: migrations.slice(rows.length).map(migration => migration.id)
     };
@@ -129,8 +148,8 @@ export function createMigrationRunner(migrationDefinitions = loadMigrations()) {
 
     function apply(databasePath) {
         const preliminary = inspect(databasePath);
-        if (preliminary.pending.length === 0) {
-            return { ...preliminary, appliedNow: [] };
+        if (preliminary.pending.length === 0 && preliminary.variantRecorded) {
+            return { ...preliminary, appliedNow: [], recordedVariantNow: false };
         }
 
         const db = new Database(databasePath, { fileMustExist: true });
@@ -145,6 +164,12 @@ export function createMigrationRunner(migrationDefinitions = loadMigrations()) {
                         .run(migrations[0].id, migrations[0].checksum);
                     appliedNow.push(migrations[0].id);
                 }
+                if (!current.variantRecorded) {
+                    db.exec(baselineMetadataSql);
+                    db.prepare('INSERT INTO schema_baseline (singleton, variant) VALUES (1, ?)')
+                        .run(current.baselineVariant);
+                    for (const guard of baselineGuards) db.exec(guard);
+                }
                 for (const migration of migrations.slice(Math.max(1, current.applied.length))) {
                     // prepare rejects a second statement before any SQL executes.
                     db.prepare(migration.sql).run();
@@ -153,7 +178,7 @@ export function createMigrationRunner(migrationDefinitions = loadMigrations()) {
                     appliedNow.push(migration.id);
                 }
                 const result = inspectConnection(db, migrations);
-                return { ...result, appliedNow };
+                return { ...result, appliedNow, recordedVariantNow: !current.variantRecorded };
             });
             return run.immediate();
         } finally {
