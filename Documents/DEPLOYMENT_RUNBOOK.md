@@ -487,15 +487,23 @@ Fail-closed operator recovery:
 Current verification boundary:
 
 1. Preserve all existing managed and legacy backup artifacts.
-2. Do not infer a successful unattended scheduled run or a completed restore
-   drill unless explicit evidence is recorded; tracked documentation does not
-   currently establish either milestone.
+2. The 2026-09-20 read-only census confirmed the Sunday 02:00 UTC schedule,
+   complete managed sets for both sites from that run, and a completion log
+   showing verification and retention success. Treat that as point-in-time
+   evidence and reverify it before future recovery work.
 3. For any separately approved validation, require complete sets for both sites,
    matching transfer checksums, absent temporary staging or lock anomalies,
    unchanged application health/restart counts, and no writable-layer growth.
 4. Treat deletion of legacy material, managed sets, or staging artifacts as a
    separate destructive action requiring explicit approval and reconciliation.
-5. Keep off-host replication and restore testing as separate future gates.
+5. Keep off-host replication and future restore-test cadence as separate work.
+
+Off-host application backup remains recommended. Its absence is not an
+independent Migration Gate B blocker only when the migration window has a fresh
+verified quiesced host-managed recovery set, the full application restore remains
+demonstrated, the provider backup is verified acceptably current and available,
+and the owner explicitly accepts correlated-host loss risk. If any condition is
+missing, abort the migration window.
 
 Rollback concept:
 
@@ -542,9 +550,9 @@ The restore source of record is the verified host-managed set, not retained `/ap
 contents inside a container. A production restore procedure and off-host copy remain separate
 approval-required workstreams.
 
-Database integrity, archive readability, and transfer checksum verification are not equivalent
-to a completed restore test. Off-host replication and an actual isolated restore test remain
-separate required workstreams.
+Database integrity, archive readability, and transfer checksum verification alone
+are not a restore test. The 2026-09-18 isolated application restore passed for
+both sites; off-host replication and a production-volume restore remain separate work.
 
 Do not convert this concept into a live restore procedure until the user explicitly approves a restore-planning task.
 
@@ -686,13 +694,92 @@ back the whole batch; a repeat run after variant metadata is recorded leaves
 schema unchanged. Inspection, test results, and source documentation do not
 authorize a production migration.
 
+Migration operations checkpoint (2026-09-20): Migration Gate B operational
+prerequisites are ready, but no production migration has run and readiness does
+not authorize one. Both current production images passed isolated restores, and
+the stopped-site recovery-point path passed against disposable data for both
+sites. The existing `backup-host.sh`/`backup.sh` contract worked through a
+controlled helper with the stopped source volume mounted read-only, separate
+writable staging, no network, and no ports. It produced the normal run-identity
+directory, two-file artifact contract, verification, atomic promotion, staging
+cleanup, lock release, and retention behavior. Restoring those outputs into a
+second location produced healthy applications and successful representative
+page/media checks. No backup code change was required.
+
+The privileged read-only production census found one open handle per live
+`blog.db`, each held read-write by its own Node application process with Linux
+flags `02500002`. A controlled read-only SQLite probe used `02500000`, confirming
+that the inode-based `/proc` check distinguishes access mode. Both live databases
+used SQLite `delete` journal mode and had no WAL, SHM, or rollback-journal sidecar.
+Only the matching application container mounted each site data volume. Both use
+`unless-stopped`; no auto-update or scheduler container was present. The only
+site-relevant schedule found was the non-root Sunday `0 2 * * 0`
+`backup-host.sh` job in UTC. Root crontab was absent; system cron directories,
+project-specific systemd units/timers, standard queued-at locations, and
+anacron contained no other site-relevant job. No active backup, analytics
+cleanup, reset/setup, or migration process was found; the backup lock and host
+staging directories were absent.
+
+For a future separately approved one-site migration, require this exact order:
+
+1. Work outside the Sunday 02:00 UTC backup window with enough margin to finish
+   before it. Confirm no backup process, host lock, host/container staging, or
+   maintenance/manual database command is active. Recheck root, deploy, system
+   cron, timers, and running containers if production configuration has changed.
+2. Record target container/image/health/restart state, read-only migration
+   inspection, schema classification, integrity and foreign-key results, and the
+   current rollback image. Do not let inspection overlap the final zero-handle
+   check.
+3. Stop only the target application. Expect that site's reverse proxy to return
+   an upstream error during the deliberate outage; the other site must remain
+   healthy. Require Docker state `running=false` and PID `0`, and continue
+   monitoring it so an unexpected restart is detected.
+4. Require no running container to mount the target data volume. Use a
+   root-capable, read-only `/proc` inode scan against `blog.db` and any existing
+   `-wal`, `-shm`, or `-journal` files. PASS requires zero total handles after
+   inspection tools exit. Any read-write, write-only, read-only, inaccessible,
+   or unclassified handle at this boundary is ABORT until explained and gone.
+5. Start a controlled one-shot helper from the approved target image with the
+   target volume read-only at `/app/data`, writable ephemeral staging, no ports,
+   and no network. Run the existing host orchestration for that target and a new
+   run identity. Require the normal final directory and exactly nonempty
+   `blog.db` and `uploads.tar.gz`; integrity `ok`, zero foreign-key violations,
+   expected schema/row counts, safe readable archive, matching transfer
+   checksums, atomic promotion, released lock, and absent staging.
+6. Remove the helper and repeat the stopped-state and handle checks in steps
+   3-4. This second zero-handle result proves the final quiesced recovery point
+   is closed before any write. Migration `apply` remains a separate explicit-
+   approval action.
+
+An unexplained writer or handle, inaccessible process state, backup overlap,
+unexpected target restart, incomplete recovery point, unavailable rollback
+evidence, or degradation of the other site is an unconditional ABORT.
+
+Do not edit cron merely to make the window look cleaner. Scheduling outside the
+weekly run plus process/lock/staging checks is less stateful and avoids a missed
+cron restoration. If the work cannot be guaranteed to finish before the next
+02:00 UTC Sunday boundary, pause/resume of that one crontab becomes a separately
+approved, recorded action with immediate restoration verification.
+
+Authoritative writer map: stopping the target application eliminates request-
+driven sessions and CSRF state, expired-session cleanup, analytics/page views,
+editor/admin writes, and request-triggered initialization. Separately exclude
+or finish the scheduled backup, manual user/password/reset/setup scripts,
+analytics cleanup or vacuum work, migration commands, privileged host tools,
+other volume-mounting containers, and any rebuild/restart action. Approved
+read-only `inspect`/`plan`, integrity, schema, and handle checks may run during
+preflight, but all of their handles must be closed before the final PASS. Treat
+unknown access conservatively as ABORT.
+
 The read-only production inventory on 2026-09-16 found both live databases
 outside the original exact-DDL matcher: TTA has a category description column
 and historical SQL formatting; FFG has a historically appended `users.role`
-column and historical session DDL. Production deployment remains blocked until
-the revised code is reviewed, committed, pushed, and separately verified against
-both sites with current backup and rollback readiness. Do not deploy the earlier migration-
-foundation commit alone.
+column and historical session DDL. The revised recognition code is present at
+the current production revision and identifies both variants without applying
+migration metadata. A production migration remains separately blocked until the
+owner authorizes one site's complete stop, recovery-point, apply, verify, and
+rollback sequence. Do not deploy or apply the earlier migration-foundation
+revision by itself.
 
 ## 10. Rollback Concepts
 
@@ -753,7 +840,7 @@ Do not overstate CI guarantees. Passing CI does not equal deployment approval, e
 - Dependency audit remediation should likely wait until documentation migration is complete unless a high-risk vulnerability is confirmed and approved for action.
 - CI tolerates some test/audit failures; decide whether that is intentional.
 - Trusted-IP/default-origin behavior should be environment-driven and placeholder-documented.
-- Backup and restore need a separate verified restore procedure before use.
+- Off-host replication and authenticated admin restore testing remain separate from the verified isolated and quiesced restore paths.
 - Confirm whether `.dockerignore` exclusions match current deployment expectations.
 - Confirm whether nginx config in this repo is source of truth or historical/reference config.
 

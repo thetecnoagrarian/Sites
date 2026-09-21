@@ -215,17 +215,24 @@ retention or whole-tree transfers.
 The host location remains on the production machine. That is sufficient as the
 canonical local copy and survives container recreation, but it is not an
 offsite backup. No implemented off-host job is established by current
-repository evidence. Off-host durability and restore-test evidence remain
-separate open requirements.
+repository evidence. Off-host durability remains an open requirement.
+Off-host application backup remains strongly recommended. Its absence is not a
+separate Migration Gate B blocker only when, at migration time, a fresh verified
+quiesced host-managed recovery set exists, a full application restore has been
+demonstrated, the provider backup is verified acceptably current and available,
+and the owner explicitly accepts the correlated-host loss risk. Otherwise,
+abort the migration window.
 
 These creation-time integrity, archive, and checksum checks establish transfer
 integrity only. They are not evidence of a completed restore test.
 
 Legacy backup material remains preserved and outside automated cleanup. Do not
 delete it without a separate, explicitly approved restore-readiness and cleanup
-gate. Tracked documentation does not currently establish the first successful
-unattended scheduled validation or a completed restore drill, so neither status
-is asserted here.
+gate. A read-only production census on 2026-09-20 confirmed the Sunday 02:00 UTC
+schedule, complete managed sets for both sites from that run, and a completion
+log showing verification and retention success. This is point-in-time scheduled
+validation; reverify the schedule, latest complete pair, lock, staging, and log
+before relying on it for future recovery work.
 
 Linode provider backups are enabled, and a successful provider backup was
 confirmed before the 2026 storage expansion. That provider snapshot layer is
@@ -236,6 +243,55 @@ sets, a future off-host copy, or restore-test evidence.
 
 Restore testing should happen in a safe target, never directly over production
 without explicit approval.
+
+On 2026-09-18, both sites completed an isolated application restore rehearsal
+from the verified September 17 managed backup sets using the then-current
+production application images. Copied databases passed integrity and foreign-key
+checks and were recognized as their respective untracked TTA and FFG legacy
+schemas. Extracted uploads served through the restored applications; health,
+representative posts, media, and unauthenticated admin redirects passed. The
+containers used temporary data/log mounts, an internal-only network, no host
+ports, and a rehearsal-only session secret. Live containers, image IDs, health,
+schema digests, and migration-metadata absence remained unchanged; all temporary
+resources were removed. This proves application-level reconstruction from those
+sets, not a live-volume restore or off-host recovery. Authenticated workflows
+were not exercised. A standalone container needs `SITE_PORT` set for the image
+health check; the production Compose file supplies its own explicit check.
+
+On 2026-09-20, the stopped-site backup path was rehearsed without touching live
+volumes. Checksum-verified managed backup copies were restored into disposable
+production-shaped data layouts, then temporary named volumes modeled a stopped
+application's data volume. A controlled helper used the current production image
+with `/app/data` mounted read-only, no network, no ports, and a separate writable
+container staging area. The unchanged `backup-host.sh` and `backup.sh` path
+produced the normal `backup-set-<RUN_ID>` layout with exactly `blog.db` and
+`uploads.tar.gz`; the normal lock, checksum verification, archive validation,
+atomic promotion, cleanup, and retention path completed for both sites. No
+backup-tool change was required.
+
+Both generated databases retained their expected TTA/FFG legacy classification,
+row counts, zero migration metadata, successful integrity checks, and zero
+foreign-key violations. The generated archives were safe to extract and matched
+the disposable source upload trees. Restoring each pair into a second isolated
+location and starting the corresponding current production image yielded healthy
+containers with successful health, home, representative post, media, and admin-
+redirect checks. Because each source was quiesced for the whole run, each common
+run identity is a coherent stopped-site recovery point rather than a warm
+sequential snapshot.
+
+Keep the evidence classes distinct: the normal scheduled backup is a warm backup
+created while the application may be writing; the migration-day backup is a
+quiesced recovery point created only after writer exclusion; and the full
+application restore rehearsal proves that a verified database/uploads pair can
+reconstruct a working isolated application.
+
+The helper's data mount must remain read-only, but its ephemeral container root
+and staging directory must be writable: Docker transfer from a read-only root
+with tmpfs staging was not reliable in this environment. The verified design
+writes only temporary staging in the helper and retained output in the existing
+host-managed destination. The rehearsal used AMD64 production images under local
+ARM64 emulation, did not test authenticated editor flows, did not stop a
+production container, and does not establish off-host recovery.
 
 Before a restore test:
 
