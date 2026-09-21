@@ -312,20 +312,37 @@ description/excerpt, images/captions/order, Event Date, public author/byline,
 or public category membership. A no-op save or evidence bookkeeping alone does
 not count. Admin-only immediate publishing and Event Date semantics remain.
 
-The first local implementation slice adds only a shared, versioned SQLite
-migration foundation. It does not add author, publisher, publication, or
-modification fields, change public rendering, or implement JSON-LD.
+The schema/model slice adds a first-class public Person table with no
+relationship to login users, a one-based ordered many-to-many post-author table,
+and a nullable per-post publisher reference to an approved public Person. The
+neutral Person record may be publisher-only; authorship exists only through the
+post-author relationship. Reviewed authorship must be reset before assignments
+change, enforced in both the model transaction and database triggers. The model
+does not infer an Organization from a site name or add a changing site-default
+reference to historical posts.
 
-The next model phase is:
+Publication storage distinguishes an exact `published_at` instant with an
+explicit timezone from a real-calendar date-only `published_on` fact; both may
+remain null and cannot both be set. Unreviewed and reviewed/unavailable history
+has no publication value; verified and owner-attested history requires one.
+Nullable `modified_at` is reserved for meaningful public revisions and has no
+automatic save trigger. Separate authorship and publication review fields
+record `unreviewed`, `verified`, `owner_attested`, or
+`reviewed_unavailable`, plus review time and a concise note.
 
-1. audit the current user/post schema and admin flows;
-2. define approved public author identities and per-post assignment;
-3. define the publisher identity for each site;
-4. add an immutable `published_at` timestamp;
-5. define reliable modification-date semantics;
-6. plan and validate a factual backfill for existing posts;
-7. update editor workflows and test/migrate both sites safely; and
-8. revisit JSON-LD only after those prerequisites are complete.
+Migration `0001_public_author_publication_model` is additive. It preserves
+legacy `author_id`, Event Date in `created_at`, and technical save history in
+`updated_at`. Every existing post remains unreviewed with no public authors,
+publisher, publication value, or modification value; no historical fact is
+derived from login identity or timestamps. The current public rendering and
+admin workflow remain compatible and unchanged.
+
+The migration remains source-only at this checkpoint. No production migration
+or historical backfill has run, and no JSON-LD has been implemented. The next
+model phase is to add
+explicit admin/editor selection and new-post validation, followed by an
+owner-reviewed historical backfill workflow. Structured data remains deferred
+until those persisted facts are available.
 
 The provisional future policy is `WebSite` for homepages, `AboutPage` for About,
 and `BlogPosting` for posts. Category and search pages would remain without
@@ -395,5 +412,5 @@ Use URL Inspection only for representative remaining examples after the known fi
 - Add a sanitized nginx canonical redirect template to the repo later.
 - Review whether canonical URL generation should be consolidated with Open Graph URL generation.
 - Add published/draft filtering to sitemap generation if the content model gains explicit publication state.
-- Complete the public author, publisher, and publication-history data model
-  before reconsidering JSON-LD.
+- Complete editor integration and factual author, publisher, and publication
+  history entry before reconsidering JSON-LD.

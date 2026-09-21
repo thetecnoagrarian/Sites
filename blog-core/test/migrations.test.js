@@ -9,11 +9,11 @@ import test from 'node:test';
 import Database from 'better-sqlite3';
 import { initializeDatabase } from '../src/database/init.js';
 import { createMigrationRunner, loadMigrations } from '../src/database/migrations.js';
-import { BASELINE_VARIANTS, expectedSignature } from '../src/database/schema-recognition.js';
+import { BASELINE_VARIANTS, expectedSignature, schemaSignature } from '../src/database/schema-recognition.js';
 
 const runner = createMigrationRunner();
 const syntheticMigration = {
-    id: '0001_test_only_probe',
+    id: '0002_test_only_probe',
     sql: 'CREATE TABLE migration_probe (id INTEGER PRIMARY KEY, marker TEXT NOT NULL);'
 };
 
@@ -28,6 +28,10 @@ function freshDatabase(directory, name) {
     const db = initializeDatabase(path);
     db.close();
     return path;
+}
+
+function baselineDatabase(directory, name) {
+    return databaseFromSql(directory, name, loadMigrations()[0].sql);
 }
 
 function legacyDatabase(directory, name, fixtureName) {
@@ -89,8 +93,29 @@ function readFixtureData(path) {
     }
 }
 
+function readTrackingData(path) {
+    const db = new Database(path, { readonly: true });
+    try {
+        return {
+            migrations: db.prepare(`
+                SELECT id, checksum FROM schema_migrations ORDER BY id
+            `).all(),
+            baseline: db.prepare(`
+                SELECT singleton, variant FROM schema_baseline
+            `).all(),
+            guards: db.prepare(`
+                SELECT name, sql FROM sqlite_schema
+                WHERE type = 'trigger' AND tbl_name = 'schema_baseline'
+                ORDER BY name
+            `).all()
+        };
+    } finally {
+        db.close();
+    }
+}
+
 test('recognized baseline is inspected and planned without creating or changing state', (t) => {
-    const path = freshDatabase(fixture(t), 'ffg.db');
+    const path = baselineDatabase(fixture(t), 'canonical.db');
     addFixtureData(path);
     const before = digest(path);
     const planned = runner.plan(path);
@@ -99,7 +124,7 @@ test('recognized baseline is inspected and planned without creating or changing 
         baselineVariant: 'canonical_0000',
         variantRecorded: false,
         applied: [],
-        pending: ['0000_existing_schema']
+        pending: ['0000_existing_schema', '0001_public_author_publication_model']
     });
     assert.deepEqual(runner.inspect(path), planned);
     assert.equal(digest(path), before);
@@ -125,12 +150,14 @@ for (const [variant, fixtureName] of [
             const result = operation(path);
             assert.equal(result.baselineVariant, variant);
             assert.equal(result.variantRecorded, false);
-            assert.deepEqual(result.pending, ['0000_existing_schema']);
+            assert.deepEqual(result.pending,
+                ['0000_existing_schema', '0001_public_author_publication_model']);
             assert.equal(digest(path), before);
         }
         initializeDatabase(path).close();
         const first = runner.apply(path);
-        assert.deepEqual(first.appliedNow, ['0000_existing_schema']);
+        assert.deepEqual(first.appliedNow,
+            ['0000_existing_schema', '0001_public_author_publication_model']);
         assert.equal(first.recordedVariantNow, true);
         assert.equal(first.baselineVariant, variant);
         assert.deepEqual(readFixtureData(path), data);
@@ -151,15 +178,15 @@ for (const [variant, fixtureName] of [
         assert.equal(digest(path), after);
 
         const next = createMigrationRunner([...loadMigrations(), syntheticMigration]);
-        assert.deepEqual(next.plan(path).pending, ['0001_test_only_probe']);
-        assert.deepEqual(next.apply(path).appliedNow, ['0001_test_only_probe']);
+        assert.deepEqual(next.plan(path).pending, ['0002_test_only_probe']);
+        assert.deepEqual(next.apply(path).appliedNow, ['0002_test_only_probe']);
         assert.equal(next.inspect(path).baselineVariant, variant);
         assert.deepEqual(readFixtureData(path), data);
     });
 }
 
 test('previous canonical ledger gains variant metadata only on explicit apply', (t) => {
-    const path = freshDatabase(fixture(t), 'old-ledger.db');
+    const path = baselineDatabase(fixture(t), 'old-ledger.db');
     const db = new Database(path);
     const sql = loadMigrations()[0].sql;
     db.exec(`CREATE TABLE schema_migrations (
@@ -174,7 +201,7 @@ test('previous canonical ledger gains variant metadata only on explicit apply', 
     assert.equal(runner.inspect(path).variantRecorded, false);
     assert.equal(digest(path), before);
     const recorded = runner.apply(path);
-    assert.deepEqual(recorded.appliedNow, []);
+    assert.deepEqual(recorded.appliedNow, ['0001_public_author_publication_model']);
     assert.equal(recorded.recordedVariantNow, true);
     assert.equal(runner.inspect(path).baselineVariant, 'canonical_0000');
     assert.equal(runner.inspect(path).variantRecorded, true);
@@ -272,7 +299,7 @@ test('supported baseline classes have one explicit classification', (t) => {
     assert.equal(ffg, canonical);
     const directory = fixture(t);
     for (const [name, create] of [
-        [BASELINE_VARIANTS.CANONICAL, () => freshDatabase(directory, 'canonical.db')],
+        [BASELINE_VARIANTS.CANONICAL, () => baselineDatabase(directory, 'canonical.db')],
         [BASELINE_VARIANTS.TTA, () => legacyDatabase(directory, 'tta.db', 'tta-legacy-schema.sql')],
         [BASELINE_VARIANTS.FFG, () => legacyDatabase(directory, 'ffg.db', 'ffg-legacy-schema.sql')]
     ]) {
@@ -300,7 +327,7 @@ test('site analytics indexes and triggers do not redefine shared schema', (t) =>
 });
 
 test('known site analytics tables coexist with the shared baseline', (t) => {
-    const path = freshDatabase(fixture(t), 'site.db');
+    const path = baselineDatabase(fixture(t), 'site.db');
     const db = new Database(path);
     db.exec(`CREATE TABLE page_views (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -309,7 +336,8 @@ test('known site analytics tables coexist with the shared baseline', (t) => {
     )`);
     db.close();
     assert.equal(runner.inspect(path).state, 'recognized-untracked-baseline');
-    assert.deepEqual(runner.apply(path).appliedNow, ['0000_existing_schema']);
+    assert.deepEqual(runner.apply(path).appliedNow,
+        ['0000_existing_schema', '0001_public_author_publication_model']);
     const reopened = new Database(path, { readonly: true });
     try {
         assert.equal(reopened.prepare(`SELECT COUNT(*) AS count FROM sqlite_schema
@@ -323,7 +351,7 @@ test('startup does not replay baseline schema onto an existing database', (t) =>
     const directory = fixture(t);
     const path = freshDatabase(directory, 'migrated.db');
     const dropTrigger = createMigrationRunner([...loadMigrations(), {
-        id: '0001_test_only_drop_trigger',
+        id: '0002_test_only_drop_trigger',
         sql: 'DROP TRIGGER posts_updated_at;'
     }]);
     dropTrigger.apply(path);
@@ -337,7 +365,7 @@ test('startup does not replay baseline schema onto an existing database', (t) =>
         db.close();
     }
 
-    const recognized = freshDatabase(directory, 'recognized.db');
+    const recognized = baselineDatabase(directory, 'recognized.db');
     initializeDatabase(recognized).close();
     assert.equal(runner.inspect(recognized).state, 'recognized-untracked-baseline');
 
@@ -353,46 +381,58 @@ test('migration files cannot end the runner transaction', (t) => {
     const path = freshDatabase(fixture(t), 'transaction-control.db');
     const before = digest(path);
     assert.throws(() => createMigrationRunner([...loadMigrations(), {
-        id: '0001_test_only_commit',
+        id: '0002_test_only_commit',
         sql: 'CREATE TABLE unsafe_probe (id INTEGER); COMMIT;'
     }]), /transaction control/);
     assert.throws(() => createMigrationRunner([...loadMigrations(), {
-        id: '0001_test_only_end',
+        id: '0002_test_only_end',
         sql: 'END;'
     }]), /transaction control/);
     const multipleStatements = createMigrationRunner([...loadMigrations(), {
-        id: '0001_test_only_multiple',
+        id: '0002_test_only_multiple',
         sql: 'CREATE TABLE unsafe_probe (id INTEGER); CREATE TABLE second_probe (id INTEGER);'
     }]);
-    assert.throws(() => multipleStatements.apply(path), /more than one statement/);
-    assert.equal(digest(path), before);
+    assert.deepEqual(multipleStatements.apply(path).appliedNow, ['0002_test_only_multiple']);
+    const db = new Database(path, { readonly: true });
+    assert.equal(db.prepare(`SELECT COUNT(*) AS count FROM sqlite_schema
+        WHERE name IN ('unsafe_probe', 'second_probe')`).get().count, 2);
+    db.close();
+    assert.notEqual(digest(path), before);
 });
 
-test('a single-statement trigger migration remains supported', (t) => {
+test('a trigger after another migration statement remains supported', (t) => {
     const path = freshDatabase(fixture(t), 'trigger.db');
     const triggerRunner = createMigrationRunner([...loadMigrations(), {
-        id: '0001_test_only_trigger',
-        sql: `CREATE TRIGGER test_only_user_insert AFTER INSERT ON users
+        id: '0002_test_only_trigger',
+        sql: `CREATE TABLE trigger_probe (id INTEGER PRIMARY KEY);
+            CREATE TRIGGER test_only_user_insert AFTER INSERT ON users
             BEGIN UPDATE users SET role = 'editor' WHERE id = NEW.id; END;`
     }]);
     assert.deepEqual(triggerRunner.apply(path).appliedNow,
-        ['0000_existing_schema', '0001_test_only_trigger']);
+        ['0002_test_only_trigger']);
     assert.deepEqual(triggerRunner.inspect(path).pending, []);
+    assert.throws(() => createMigrationRunner([...loadMigrations(), {
+        id: '0002_test_only_trigger_escape',
+        sql: `CREATE TRIGGER test_only_escape AFTER INSERT ON users
+            BEGIN SELECT 1; END; END;`
+    }]), /transaction control/);
 });
 
 test('recognized baseline is recorded once and survives reopen with fixture data intact', (t) => {
-    const path = freshDatabase(fixture(t), 'tta.db');
+    const path = baselineDatabase(fixture(t), 'canonical.db');
     addFixtureData(path);
     const data = readFixtureData(path);
     const first = runner.apply(path);
-    assert.deepEqual(first.appliedNow, ['0000_existing_schema']);
+    assert.deepEqual(first.appliedNow,
+        ['0000_existing_schema', '0001_public_author_publication_model']);
     assert.deepEqual(first.pending, []);
     assert.deepEqual(readFixtureData(path), data);
 
     const after = digest(path);
     assert.deepEqual(runner.apply(path).appliedNow, []);
     assert.equal(digest(path), after);
-    assert.deepEqual(runner.inspect(path).applied, ['0000_existing_schema']);
+    assert.deepEqual(runner.inspect(path).applied,
+        ['0000_existing_schema', '0001_public_author_publication_model']);
 });
 
 test('synthetic migration applies once, persists, and is isolated between two site databases', (t) => {
@@ -405,11 +445,9 @@ test('synthetic migration applies once, persists, and is isolated between two si
     const ttaData = readFixtureData(tta);
     const testRunner = createMigrationRunner([...loadMigrations(), syntheticMigration]);
 
-    assert.deepEqual(testRunner.plan(ffg).pending,
-        ['0000_existing_schema', '0001_test_only_probe']);
-    assert.deepEqual(testRunner.apply(ffg).appliedNow,
-        ['0000_existing_schema', '0001_test_only_probe']);
-    assert.deepEqual(runner.plan(tta).pending, ['0000_existing_schema']);
+    assert.deepEqual(testRunner.plan(ffg).pending, ['0002_test_only_probe']);
+    assert.deepEqual(testRunner.apply(ffg).appliedNow, ['0002_test_only_probe']);
+    assert.deepEqual(runner.plan(tta).pending, []);
     assert.deepEqual(readFixtureData(ffg), ffgData);
     assert.deepEqual(readFixtureData(tta), ttaData);
 
@@ -417,24 +455,26 @@ test('synthetic migration applies once, persists, and is isolated between two si
     assert.deepEqual(testRunner.apply(ffg).appliedNow, []);
     assert.equal(digest(ffg), after);
     assert.deepEqual(testRunner.inspect(ffg).applied,
-        ['0000_existing_schema', '0001_test_only_probe']);
-    assert.deepEqual(testRunner.apply(tta).appliedNow,
-        ['0000_existing_schema', '0001_test_only_probe']);
+        ['0000_existing_schema', '0001_public_author_publication_model',
+            '0002_test_only_probe']);
+    assert.deepEqual(testRunner.apply(tta).appliedNow, ['0002_test_only_probe']);
     assert.deepEqual(readFixtureData(tta), ttaData);
 });
 
 test('a failed migration rolls back its schema and all new migration records', (t) => {
     const directory = fixture(t);
     const testRunner = createMigrationRunner([...loadMigrations(), {
-        id: '0001_test_only_probe',
+        id: '0002_test_only_probe',
         sql: 'CREATE TABLE temporary_probe (id INTEGER);'
     }, {
-        id: '0002_test_only_failure',
+        id: '0003_test_only_failure',
         sql: 'INSERT INTO missing_table VALUES (1);'
     }]);
 
     for (const tracked of [false, true]) {
-        const path = freshDatabase(directory, tracked ? 'tracked.db' : 'untracked.db');
+        const path = tracked
+            ? freshDatabase(directory, 'tracked.db')
+            : baselineDatabase(directory, 'untracked.db');
         addFixtureData(path);
         if (tracked) runner.apply(path);
         const before = readFixtureData(path);
@@ -450,7 +490,8 @@ test('a failed migration rolls back its schema and all new migration records', (
                 WHERE name = 'schema_baseline'`).get().count, tracked ? 1 : 0);
             if (tracked) {
                 assert.deepEqual(db.prepare('SELECT id FROM schema_migrations').all(),
-                    [{ id: '0000_existing_schema' }]);
+                    [{ id: '0000_existing_schema' },
+                        { id: '0001_public_author_publication_model' }]);
             }
         } finally {
             db.close();
@@ -499,24 +540,65 @@ test('fresh schema and frozen existing baseline have equivalent shared objects',
     const db = new Database(baseline);
     db.exec(loadMigrations()[0].sql);
     db.close();
-    assert.deepEqual(runner.plan(fresh), runner.plan(baseline));
-    runner.apply(fresh);
+    assert.deepEqual(runner.plan(fresh).pending, []);
+    assert.deepEqual(runner.plan(baseline).pending,
+        ['0000_existing_schema', '0001_public_author_publication_model']);
     runner.apply(baseline);
-    const objects = path => {
+    const signature = path => {
         const connection = new Database(path, { readonly: true });
         try {
-            return connection.prepare(`SELECT type, name, tbl_name, sql FROM sqlite_schema
-                WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'
-                ORDER BY type, name`).all();
+            return schemaSignature(connection);
         } finally {
             connection.close();
         }
     };
-    assert.deepEqual(objects(fresh), objects(baseline));
+    assert.deepEqual(signature(fresh), signature(baseline));
+    assert.deepEqual(readTrackingData(fresh), readTrackingData(baseline),
+        'fresh and canonical-upgraded databases share ledger checksums and canonical provenance');
+    assert.deepEqual(readTrackingData(fresh).baseline,
+        [{ singleton: 1, variant: BASELINE_VARIANTS.CANONICAL }]);
 });
 
-test('CLI inspect and plan are read-only; CLI apply records only the baseline', (t) => {
-    const path = freshDatabase(fixture(t), 'cli.db');
+test('tracked post-0001 constraint, index, and guard drift are rejected', (t) => {
+    const directory = fixture(t);
+    const mutations = [
+        ['missing-publication-index', db => {
+            db.exec('DROP INDEX idx_posts_publisher_public_person_id');
+        }],
+        ['missing-authorship-guard', db => {
+            db.exec('DROP TRIGGER post_public_authors_delete_unreviewed');
+        }],
+        ['altered-person-constraint', db => {
+            db.unsafeMode(true);
+            db.pragma('writable_schema = ON');
+            const result = db.prepare(`
+                UPDATE sqlite_schema
+                SET sql = replace(sql,
+                    'CHECK (is_active IN (0, 1))',
+                    'CHECK (is_active IN (0, 1, 2))')
+                WHERE type = 'table' AND name = 'public_people'
+            `).run();
+            db.pragma('writable_schema = OFF');
+            db.unsafeMode(false);
+            assert.equal(result.changes, 1);
+        }]
+    ];
+
+    for (const [name, mutate] of mutations) {
+        const path = freshDatabase(directory, `${name}.db`);
+        const db = new Database(path);
+        mutate(db);
+        db.close();
+        const before = digest(path);
+        assert.throws(() => runner.inspect(path), /Unsupported or drifted/);
+        assert.throws(() => runner.apply(path), /Unsupported or drifted/);
+        assert.throws(() => initializeDatabase(path), /Unsupported or drifted/);
+        assert.equal(digest(path), before);
+    }
+});
+
+test('CLI inspect and plan are read-only; CLI apply records all pending migrations', (t) => {
+    const path = baselineDatabase(fixture(t), 'cli.db');
     const cli = join('blog-core', 'src', 'database', 'migrate-cli.js');
     const run = command => spawnSync(process.execPath, [cli, command, '--database', path], {
         cwd: join(import.meta.dirname, '..', '..'),
@@ -531,5 +613,6 @@ test('CLI inspect and plan are read-only; CLI apply records only the baseline', 
     }
     const applied = run('apply');
     assert.equal(applied.status, 0, applied.stderr);
-    assert.deepEqual(JSON.parse(applied.stdout).appliedNow, ['0000_existing_schema']);
+    assert.deepEqual(JSON.parse(applied.stdout).appliedNow,
+        ['0000_existing_schema', '0001_public_author_publication_model']);
 });

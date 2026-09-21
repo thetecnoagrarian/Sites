@@ -642,7 +642,9 @@ docker compose -f docker-compose.local-prod.yml up --build -d
 The explicit shared runner lives in `blog-core/src/database/migrations.js` and its
 command-line entry point is `blog-core/src/database/migrate-cli.js`. The current
 `0000_existing_schema` migration is a frozen recognition baseline, not a replay
-of a historical migration. `schema.sql` remains the empty-database initializer.
+of a historical migration. `schema.sql` represents the current empty-database
+schema, and fresh initialization records the canonical baseline plus every
+current migration transactionally.
 `schema-recognition.js` recognizes three supported starting states: canonical
 `0000`, verified TTA legacy with `categories.description`, and verified FFG
 legacy with `users.role` physically last. It compares SQLite column metadata,
@@ -663,11 +665,13 @@ An existing canonical ledger from the original foundation is readable without
 metadata and gains that record only on explicit `apply`. Ordinary startup,
 `inspect`, and `plan` do not create migration records or apply migrations.
 
-Migration IDs are ordered, four-digit-prefixed SQL filenames. Each future file
-contains one SQL statement; a trigger definition counts as one statement. The
-runner rejects transaction-control SQL.
-Only the shared baseline schema is currently registered. Future SQL files must
-be appended in order; never edit a previously applied migration.
+Migration IDs are ordered, four-digit-prefixed SQL filenames. A migration may
+contain multiple statements; the runner owns one immediate transaction around
+the pending batch and rejects transaction-control SQL inside migration files.
+`0001_public_author_publication_model` is the first additive migration after
+the baseline. It is implemented and tested locally but has not been applied to
+production. Future SQL files must be appended in order; never edit a previously
+applied migration.
 
 Read-only inspection/planning command shapes, for a separately authorized
 database file:
@@ -685,8 +689,9 @@ node blog-core/src/database/migrate-cli.js apply --database [DATABASE_PATH]
 ```
 
 The runner opens inspection connections read-only and requires the database
-file to exist. Application startup also inspects supported existing schemas and
-fails on unsupported drift without applying migrations. Unknown shared-schema
+file to exist. Application startup enables SQLite foreign-key enforcement,
+inspects supported existing schemas, and fails on unsupported drift without
+applying pending migrations. Unknown shared-schema
 drift, an invalid ledger or variant record, a changed checksum, and foreign-key
 violations fail closed. An apply rechecks under a SQLite immediate transaction
 before recording the baseline or running pending migrations. A failure rolls

@@ -30,6 +30,7 @@ export function initializeDatabase(dbPath) {
     }
     
     const db = new Database(dbPath);
+    db.pragma('foreign_keys = ON');
     
     try {
         // Only a genuinely empty database receives the fresh baseline. Existing
@@ -42,7 +43,7 @@ export function initializeDatabase(dbPath) {
         if (!hasSchema) {
             const schemaPath = join(__dirname, 'schema.sql');
             const schema = readFileSync(schemaPath, 'utf8');
-            db.transaction(() => db.exec(schema)).immediate();
+            createMigrationRunner().initializeFresh(db, schema);
         } else {
             // Reject unsupported existing schemas without applying migrations.
             createMigrationRunner().inspect(dbPath);
@@ -75,5 +76,7 @@ export function createDatabase(dbPath) {
         }
         throw error;
     }
-    return new Database(dbPath);
+    const db = new Database(dbPath);
+    db.pragma('foreign_keys = ON');
+    return db;
 }

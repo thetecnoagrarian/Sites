@@ -58,6 +58,54 @@ ON CONFLICT(slug) DO UPDATE SET
     created_at = excluded.created_at,
     author_id = NULL;
 
+-- Explicit synthetic editorial facts exercise the current public identity and
+-- date-only publication model without deriving either fact from legacy fields.
+INSERT INTO public_people (public_key, display_name, profile_url)
+VALUES
+    ('mode-b-author-one', 'Mode B Author One', NULL),
+    ('mode-b-author-two', 'Mode B Author Two', NULL)
+ON CONFLICT(public_key) DO UPDATE SET
+    display_name = excluded.display_name,
+    profile_url = excluded.profile_url,
+    is_active = 1;
+
+-- Reset the review before replacing the complete ordered assignment set. This
+-- keeps repeated fixture runs compatible with the database review guards.
+UPDATE posts
+SET authorship_review_state = 'unreviewed',
+    authorship_reviewed_at = NULL,
+    authorship_review_note = NULL
+WHERE slug = 'local-test-post';
+
+DELETE FROM post_public_authors
+WHERE post_id = (SELECT id FROM posts WHERE slug = 'local-test-post');
+
+INSERT INTO post_public_authors (post_id, public_person_id, position)
+SELECT posts.id, public_people.id, 1
+FROM posts, public_people
+WHERE posts.slug = 'local-test-post'
+  AND public_people.public_key = 'mode-b-author-one';
+
+INSERT INTO post_public_authors (post_id, public_person_id, position)
+SELECT posts.id, public_people.id, 2
+FROM posts, public_people
+WHERE posts.slug = 'local-test-post'
+  AND public_people.public_key = 'mode-b-author-two';
+
+UPDATE posts
+SET publisher_public_person_id = (
+        SELECT id FROM public_people WHERE public_key = 'mode-b-author-one'
+    ),
+    published_at = NULL,
+    published_on = '2026-01-08',
+    authorship_review_state = 'owner_attested',
+    authorship_reviewed_at = '2026-09-21T12:00:00Z',
+    authorship_review_note = 'Synthetic Mode B fixture',
+    publication_review_state = 'owner_attested',
+    publication_reviewed_at = '2026-09-21T12:00:00Z',
+    publication_review_note = 'Synthetic Mode B fixture'
+WHERE slug = 'local-test-post';
+
 INSERT INTO posts (
     title,
     slug,

@@ -28,6 +28,64 @@ const baselineGuards = [
 
 const checksum = (sql) => createHash('sha256').update(sql).digest('hex');
 
+function executableSql(sql) {
+    let result = '';
+    for (let index = 0; index < sql.length;) {
+        const char = sql[index];
+        if (sql.slice(index, index + 2) === '--') {
+            const end = sql.indexOf('\n', index + 2);
+            if (end === -1) break;
+            result += '\n';
+            index = end + 1;
+        } else if (sql.slice(index, index + 2) === '/*') {
+            const end = sql.indexOf('*/', index + 2);
+            if (end === -1) throw new Error('Unterminated SQL comment');
+            result += ' ';
+            index = end + 2;
+        } else if ("'\"`[".includes(char)) {
+            const closing = char === '[' ? ']' : char;
+            let end = index + 1;
+            while (end < sql.length) {
+                if (sql[end] === closing) {
+                    if (sql[end + 1] === closing) {
+                        end += 2;
+                        continue;
+                    }
+                    break;
+                }
+                end += 1;
+            }
+            if (end === sql.length) throw new Error('Unterminated quoted SQL token');
+            result += ' ';
+            index = end + 1;
+        } else {
+            result += char;
+            index += 1;
+        }
+    }
+    return result;
+}
+
+function containsTransactionControl(sql) {
+    const executable = executableSql(sql);
+    if (/\b(?:COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b|\bEND\s+TRANSACTION\b/i.test(executable)) {
+        return true;
+    }
+    if (/\bBEGIN\s+(?:DEFERRED|IMMEDIATE|EXCLUSIVE|TRANSACTION)\b/i.test(executable)
+        || /\bBEGIN\s*(?:;|$)/i.test(executable)) {
+        return true;
+    }
+
+    // Trigger programs use bare BEGIN ... END even when they occur after other
+    // statements in a migration. Permit one END for each CREATE TRIGGER and
+    // CASE expression; any extra END is transaction control owned by the runner.
+    const triggerCount = [...executable.matchAll(
+        /\bCREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER\b/gi)].length;
+    const caseCount = [...executable.matchAll(/\bCASE\b/gi)].length;
+    const endCount = [...executable.matchAll(/\bEND\s*(?:;|$)/gi)].length;
+    return endCount > triggerCount + caseCount;
+}
+
 export function loadMigrations() {
     const names = readdirSync(migrationDirectory)
         .filter(name => name.endsWith('.sql'))
@@ -48,12 +106,9 @@ function validateMigrations(migrations) {
             || typeof migration.sql !== 'string' || !migration.sql.trim()) {
             throw new Error(`Invalid or unordered migration: ${migration.id}`);
         }
-        // The runner owns the outer transaction. A migration must not end it
-        // before its checksum is recorded and the final schema is verified.
-        if (migration.id !== baselineId
-            && (/\b(?:COMMIT|ROLLBACK|SAVEPOINT|RELEASE)\b|\bEND\s+TRANSACTION\b/i.test(migration.sql)
-                || (/\bEND\s*;/i.test(migration.sql)
-                    && !/^\s*CREATE\s+(?:TEMP(?:ORARY)?\s+)?TRIGGER\b/i.test(migration.sql)))) {
+        // The runner owns the outer transaction. Migration files may contain
+        // multiple statements, but cannot open, end, or nest transactions.
+        if (migration.id !== baselineId && containsTransactionControl(migration.sql)) {
             throw new Error(`Migration contains transaction control: ${migration.id}`);
         }
         previous = migration.id;
@@ -146,6 +201,36 @@ export function createMigrationRunner(migrationDefinitions = loadMigrations()) {
         }
     }
 
+    function initializeFresh(db, schemaSql) {
+        db.pragma('foreign_keys = ON');
+        const run = db.transaction(() => {
+            const existing = db.prepare(`
+                SELECT 1 FROM sqlite_schema
+                WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'
+                LIMIT 1
+            `).get();
+            if (existing) throw new Error('Fresh schema initialization requires an empty database');
+            db.exec(schemaSql);
+            const expected = expectedSignature(migrations, migrations.length, BASELINE_VARIANTS.CANONICAL);
+            if (JSON.stringify(schemaSignature(db)) !== JSON.stringify(expected)) {
+                throw new Error('Fresh schema does not match the current canonical migration state');
+            }
+            if (db.pragma('foreign_key_check').length > 0) {
+                throw new Error('Fresh schema contains foreign-key violations');
+            }
+            db.exec(ledgerSql);
+            const insertMigration = db.prepare(
+                'INSERT INTO schema_migrations (id, checksum) VALUES (?, ?)');
+            for (const migration of migrations) insertMigration.run(migration.id, migration.checksum);
+            db.exec(baselineMetadataSql);
+            db.prepare('INSERT INTO schema_baseline (singleton, variant) VALUES (1, ?)')
+                .run(BASELINE_VARIANTS.CANONICAL);
+            for (const guard of baselineGuards) db.exec(guard);
+            return inspectConnection(db, migrations);
+        });
+        return run.immediate();
+    }
+
     function apply(databasePath) {
         const preliminary = inspect(databasePath);
         if (preliminary.pending.length === 0 && preliminary.variantRecorded) {
@@ -171,8 +256,7 @@ export function createMigrationRunner(migrationDefinitions = loadMigrations()) {
                     for (const guard of baselineGuards) db.exec(guard);
                 }
                 for (const migration of migrations.slice(Math.max(1, current.applied.length))) {
-                    // prepare rejects a second statement before any SQL executes.
-                    db.prepare(migration.sql).run();
+                    db.exec(migration.sql);
                     db.prepare('INSERT INTO schema_migrations (id, checksum) VALUES (?, ?)')
                         .run(migration.id, migration.checksum);
                     appliedNow.push(migration.id);
@@ -186,5 +270,5 @@ export function createMigrationRunner(migrationDefinitions = loadMigrations()) {
         }
     }
 
-    return { inspect, plan: inspect, apply };
+    return { inspect, plan: inspect, apply, initializeFresh };
 }

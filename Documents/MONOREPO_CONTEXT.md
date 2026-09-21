@@ -194,26 +194,30 @@ Future Codex sessions should read this file early, after `AGENTS.md`, when worki
 
 ## 7. Current Next Work
 
-The next planned cross-site SEO/data-model phase is **Structured Data
-Prerequisite: Public Author and Publication Model**. Before JSON-LD can be
-implemented accurately, both sites need approved public author identities,
-publisher identity, an immutable publication timestamp, reliable modification
-semantics, a factual existing-post backfill, and corresponding editor workflow.
-The detailed decision boundary is recorded in
-`Documents/SEO_CRAWLABILITY_NOTES.md`.
+The repository now contains the schema and shared-model foundation for
+**Structured Data Prerequisite: Public Author and Publication Model**. Public
+Person identities are independent of login accounts; posts can persist ordered
+authors using one-based positions and an explicit nullable Person publisher.
+The Person entity is neutral and may be an author, a publisher, or both;
+authorship is represented by the post-author relationship. Exact publication
+instants, date-only publication facts, and unknown history remain distinct. Separate
+authorship and publication review states preserve verified, owner-attested, and
+reviewed/unavailable outcomes. `created_at` remains Event Date, `updated_at`
+remains legacy save history, and nullable `modified_at` is reserved for later
+meaningful-public-revision logic.
 
-This is model and product-definition work, not a markup-only task. No JSON-LD
-should be added until the owner approves those underlying facts and workflows.
-The planned sequence is:
+Migration `0001_public_author_publication_model` is source-only at this
+checkpoint. No production database has been migrated, no historical row was
+backfilled, and no public or admin route consumes the new fields. Existing
+posts upgrade with no public author, publisher, publication value, or
+modification value and with each review dimension marked `unreviewed`.
+Database guards require reviewed authorship to be reset before its ordered
+assignment set changes.
 
-1. audit the current user/post schema and admin flows;
-2. design factual public-author representation;
-3. decide publisher representation per site;
-4. add immutable publication-date semantics;
-5. plan a factual historical backfill;
-6. update admin/editor workflows;
-7. test and migrate both sites safely; and
-8. implement JSON-LD only after those prerequisites are established.
+The next slice should add the admin/editor integration and explicit new-post
+requirements, then prepare an owner-reviewed historical backfill workflow.
+JSON-LD remains deferred until factual identities and publication history have
+been entered and verified.
 
 ## 8. Open Questions
 

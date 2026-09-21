@@ -11,7 +11,7 @@ const analyticsTables = new Set([
 ]);
 const metadataTables = new Set(['schema_migrations', 'schema_baseline']);
 const unsupportedTableSyntax = new Set([
-    'CHECK', 'COLLATE', 'GENERATED', 'STRICT', 'WITHOUT', 'DEFERRABLE', 'CONFLICT'
+    'COLLATE', 'GENERATED', 'STRICT', 'WITHOUT', 'DEFERRABLE', 'CONFLICT'
 ]);
 const ffgUserOrder = [
     'id', 'username', 'password_hash', 'isAdmin', 'created_at', 'updated_at', 'role'
@@ -63,6 +63,27 @@ function sqlTokens(sql) {
 }
 
 const normalizedSql = sql => sqlTokens(sql).join(' ');
+const checkConstraints = (sql) => {
+    const tokens = sqlTokens(sql);
+    const checks = [];
+    for (let index = 0; index < tokens.length; index += 1) {
+        if (tokens[index] !== 'CHECK') continue;
+        if (tokens[index + 1] !== '(') throw new Error('Malformed CHECK constraint');
+        const constraint = ['CHECK'];
+        let depth = 0;
+        index += 1;
+        for (; index < tokens.length; index += 1) {
+            const token = tokens[index];
+            constraint.push(token);
+            if (token === '(') depth += 1;
+            if (token === ')') depth -= 1;
+            if (depth === 0) break;
+        }
+        if (depth !== 0) throw new Error('Unterminated CHECK constraint');
+        checks.push(constraint.join(' '));
+    }
+    return checks.sort();
+};
 const normalizedType = type => type.trim().replace(/\s+/g, ' ').toUpperCase();
 const sorted = values => values.sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
 
@@ -128,6 +149,7 @@ export function schemaSignature(db) {
                         hidden: column.hidden
                     }))),
                 autoIncrement: tokens.filter(token => token === 'AUTOINCREMENT').length,
+                checks: checkConstraints(object.sql),
                 foreignKeys: foreignKeys(db, object.name),
                 indexes: indexes(db, object.name, byName)
             };
@@ -154,7 +176,7 @@ export function expectedSignature(migrations, appliedCount, variant) {
             throw new Error(`Unknown baseline variant: ${variant}`);
         }
         for (let index = 1; index < appliedCount; index += 1) {
-            reference.prepare(migrations[index].sql).run();
+            reference.exec(migrations[index].sql);
         }
         return schemaSignature(reference);
     } finally {
