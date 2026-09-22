@@ -776,6 +776,60 @@ read-only `inspect`/`plan`, integrity, schema, and handle checks may run during
 preflight, but all of their handles must be closed before the final PASS. Treat
 unknown access conservatively as ABORT.
 
+### Proposed `0001` and editorial-workflow production order (not authorized)
+
+Production remains on the pre-`0001` revision. The target source includes both
+`0001_public_author_publication_model` and the editorial workflow. An existing
+database is inspected at application startup, not upgraded there. Build and
+identify each approved target image before stopping a site; retain and verify
+the running site's old image by immutable ID. Do not start the new editor on an
+unmigrated database or assume the old application can run on a migrated one.
+
+For a separately approved rollout, take TTA first, then FFG only after TTA
+passes all gates. For each site, while the other remains healthy: confirm the
+approved source revision, clean production tree, target and rollback image IDs,
+provider backup availability/freshness, expected read-only plan, no backup
+overlap, and owner authorization. Stop the target and complete the quiescence and
+verified host-managed recovery-point procedure above, including the second
+zero-handle scan after helper removal. From that same approved target image, run
+read-only `plan` again against the stopped database, compare the two expected
+IDs and source checksums, then run explicit `apply` once using a controlled
+one-shot helper with target data mounted read-write. Remove that helper and
+verify the recorded baseline variant, `0000`/`0001` checksums, integrity, foreign
+keys, preserved site-specific schema, and unchanged historical public facts.
+Start only that site's approved new image and check Docker health, logs, public
+routes, unchanged legacy bylines, and authenticated admin/editor pages. Create
+only separately approved Public Person records through that site's admin UI;
+verify their keys/names and keep historical posts untouched. Preserve the
+recovery set and old image ID and record the final state before moving on. Until
+at least one active approved Person exists in that site's database, its new-post
+workflow cannot publish; explicit author and publisher selection is required.
+
+If a gate fails before `apply`, keep the target stopped until the cause is
+resolved; the old image can resume only after the original database is verified
+unchanged and healthy. If `apply` fails, its transaction should roll back, but
+verify the database before restarting the old image; restore the verified
+pre-migration database/uploads pair if its state is uncertain. After a committed
+`apply`, an old-image-only rollback is not established. Stop the site and restore
+the verified pre-migration pair before restarting the preserved old image if
+post-migration verification or new-app startup fails. If editorial writes have
+occurred, first preserve and assess the failed state because restoring the
+pre-migration pair discards those writes. A failed Person setup with an otherwise
+healthy new app can be held for correction with new-post publishing paused;
+it does not by itself require a database restore. Do not proceed to FFG on any
+unresolved TTA failure.
+
+The 2026-09-22 disposable TTA/FFG rehearsal exercised separate untracked legacy
+databases through read-only plan, stopped-source backup, explicit `apply`, and
+new-image startup. Both retained their distinct baseline provenance, passed
+integrity/foreign-key checks, kept historical facts unknown, and served public
+and authenticated editor pages. It was not a production migration, a provider
+backup check, a privileged production zero-handle scan, or an HTTPS session test.
+Standalone image health checks needed `SITE_PORT`; production Compose supplies
+its own explicit health check. The owner has since approved MDC as the initial
+author and Person publisher for both separate site databases, with explicit
+manual selection and no preselection; production record creation remains pending.
+
 The read-only production inventory on 2026-09-16 found both live databases
 outside the original exact-DDL matcher: TTA has a category description column
 and historical SQL formatting; FFG has a historically appended `users.role`
