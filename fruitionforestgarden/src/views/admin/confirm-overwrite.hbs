@@ -17,7 +17,9 @@
                 </div>
                 <div class="card-body">
                     <h5>{{existingPost.title}}</h5>
-                    <p><strong>Created:</strong> {{formatDate existingPost.created_at}}</p>
+                    <p><strong>Event Date:</strong> {{formatDate existingPost.created_at}}</p>
+                    <p><strong>First publication:</strong> {{facts.published_at}}{{facts.published_on}} (preserved)</p>
+                    <p><strong>Authorship review:</strong> {{facts.authorship_review_state}}</p>
                     <p><strong>Slug:</strong> {{existingPost.slug}}</p>
                     <div class="post-preview">
                         <p>{{truncate existingPost.body 200}}</p>
@@ -34,6 +36,7 @@
                 <div class="card-body">
                     <h5>{{pendingPostData.title}}</h5>
                     <p><strong>Description:</strong> {{pendingPostData.description}}</p>
+                    <p><strong>Selected public authors:</strong> {{#each authorNames}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>
                     <div class="post-preview">
                         <p>{{truncate pendingPostData.body 200}}</p>
                     </div>
@@ -54,6 +57,7 @@
                 <p><strong>Overwrite:</strong> Replace the existing post with your new content</p>
                 <p><strong>Cancel:</strong> Go back and change the title</p>
             </div>
+            <label><input type="checkbox" name="reopenAuthorship" value="yes"> Deliberately reopen reviewed authorship if the selected author list differs. Existing review state and evidence will be reset.</label>
 
             <div class="form-actions">
                 <button type="submit" name="action" value="overwrite" class="btn btn-warning">

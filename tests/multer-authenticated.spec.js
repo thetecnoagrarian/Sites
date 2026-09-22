@@ -81,6 +81,8 @@ async function submitPostForm(page, { title, files = [], nestedFieldName }) {
   await page.locator('input[name="title"]').fill(title);
   await page.locator('textarea[name="body"]').fill(`${title} synthetic body`);
   await page.locator('input[name="created_at"]').fill('2026-08-18');
+  await page.locator('select[name="authorIds[]"]').first().selectOption({ label: 'Mode B Author One' });
+  await page.locator('select[name="publisherId"]').selectOption({ label: 'Mode B Author One' });
 
   if (files.length > 0) {
     await page.locator('input[name="image"]').setInputFiles(files);
@@ -111,7 +113,7 @@ async function runSharedUploadMatrix(page, site) {
     const title = `Mode B Multer ${site.key} Single`;
     await submitPostForm(page, { title, files: [imageFile(`${site.key}-single.png`)] });
     await expect(page).toHaveURL(`${site.baseURL}/admin/dashboard`);
-    expect(tempFileCount(site.service)).toBe(before + 1);
+    expect(tempFileCount(site.service)).toBe(before);
 
     const publicPost = await page.request.get(`${site.baseURL}/post/mode-b-multer-${site.key}-single`);
     expect(publicPost.status()).toBe(200);
@@ -125,7 +127,7 @@ async function runSharedUploadMatrix(page, site) {
       files: [imageFile(`${site.key}-multiple-a.png`), imageFile(`${site.key}-multiple-b.png`)]
     });
     await expect(page).toHaveURL(`${site.baseURL}/admin/dashboard`);
-    expect(tempFileCount(site.service)).toBe(before + 2);
+    expect(tempFileCount(site.service)).toBe(before);
   });
 
   await test.step('invalid MIME rejection', async () => {

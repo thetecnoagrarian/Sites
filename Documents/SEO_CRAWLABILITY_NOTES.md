@@ -307,10 +307,11 @@ name. Owner attestation and direct publishing records can support historical
 facts. Indirect timestamps and account links are investigation leads only.
 Historical review records verified, owner-attested, or reviewed/unavailable
 status. Publication precision is preserved as known: exact instant or calendar
-date. Future `modified_at` advances on real changes to title, body, public
-description/excerpt, images/captions/order, Event Date, public author/byline,
-or public category membership. A no-op save or evidence bookkeeping alone does
-not count. Admin-only immediate publishing and Event Date semantics remain.
+date. The local editorial service advances `modified_at` on real changes to
+title, body, public description/excerpt, images/captions/order, Event Date,
+public author/byline, or public category membership. A no-op save or evidence
+bookkeeping alone does not count. Admin-only immediate publishing and Event
+Date semantics remain.
 
 The schema/model slice adds a first-class public Person table with no
 relationship to login users, a one-based ordered many-to-many post-author table,
@@ -325,24 +326,31 @@ Publication storage distinguishes an exact `published_at` instant with an
 explicit timezone from a real-calendar date-only `published_on` fact; both may
 remain null and cannot both be set. Unreviewed and reviewed/unavailable history
 has no publication value; verified and owner-attested history requires one.
-Nullable `modified_at` is reserved for meaningful public revisions and has no
-automatic save trigger. Separate authorship and publication review fields
-record `unreviewed`, `verified`, `owner_attested`, or
+Nullable `modified_at` has no automatic save trigger. The local editorial
+service advances it only when a modeled public post fact changes, including
+content, Event Date, category membership, public author order, publisher, or
+publication value. No-op saves and evidence-note-only changes do not advance
+it; legacy `updated_at` remains technical save history. Separate authorship and
+publication review fields record `unreviewed`, `verified`, `owner_attested`, or
 `reviewed_unavailable`, plus review time and a concise note.
 
 Migration `0001_public_author_publication_model` is additive. It preserves
 legacy `author_id`, Event Date in `created_at`, and technical save history in
 `updated_at`. Every existing post remains unreviewed with no public authors,
 publisher, publication value, or modification value; no historical fact is
-derived from login identity or timestamps. The current public rendering and
-admin workflow remain compatible and unchanged.
+derived from login identity or timestamps. The current public rendering remains
+compatible and unchanged. The local admin workflow now uses explicit Public
+Person selection and historical review controls on both sites, while public
+templates still use legacy bylines.
 
 The migration remains source-only at this checkpoint. No production migration
-or historical backfill has run, and no JSON-LD has been implemented. The next
-model phase is to add
-explicit admin/editor selection and new-post validation, followed by an
-owner-reviewed historical backfill workflow. Structured data remains deferred
-until those persisted facts are available.
+or historical backfill has run, and no JSON-LD has been implemented. The local
+admin workflow requires explicit active authors and a persisted Person
+publisher for new posts; no site default or production identity is seeded.
+New posts receive a verified server-observed exact UTC first-publication
+instant. Historical posts retain unknown facts until separately reviewed;
+the editor accepts evidence-backed exact, date-only, or unavailable outcomes.
+Structured data remains deferred until the facts are entered and verified.
 
 The provisional future policy is `WebSite` for homepages, `AboutPage` for About,
 and `BlogPosting` for posts. Category and search pages would remain without
@@ -412,5 +420,5 @@ Use URL Inspection only for representative remaining examples after the known fi
 - Add a sanitized nginx canonical redirect template to the repo later.
 - Review whether canonical URL generation should be consolidated with Open Graph URL generation.
 - Add published/draft filtering to sitemap generation if the content model gains explicit publication state.
-- Complete editor integration and factual author, publisher, and publication
-  history entry before reconsidering JSON-LD.
+- After a separately approved production migration, review and enter factual
+  author, publisher, and publication history before reconsidering JSON-LD.

@@ -203,21 +203,35 @@ authorship is represented by the post-author relationship. Exact publication
 instants, date-only publication facts, and unknown history remain distinct. Separate
 authorship and publication review states preserve verified, owner-attested, and
 reviewed/unavailable outcomes. `created_at` remains Event Date, `updated_at`
-remains legacy save history, and nullable `modified_at` is reserved for later
-meaningful-public-revision logic.
+remains legacy save history. The local editorial service advances `modified_at`
+only when post content, categories, public authors/order, publisher, or a
+publication value changes. No-op saves and review-note-only changes do not
+advance it.
 
-Migration `0001_public_author_publication_model` is source-only at this
-checkpoint. No production database has been migrated, no historical row was
-backfilled, and no public or admin route consumes the new fields. Existing
-posts upgrade with no public author, publisher, publication value, or
-modification value and with each review dimension marked `unreviewed`.
-Database guards require reviewed authorship to be reset before its ordered
-assignment set changes.
+Migration `0001_public_author_publication_model` remains source-only. No
+production database has been migrated and no historical row has been
+backfilled. Locally, both admin post routes now use a shared transactional
+editorial service. New posts require explicit active Public Person authors in
+one-based order and an explicitly selected Person publisher. There is no site
+default or seeded production Person. A successful new post records one
+server-observed exact UTC publication instant as verified provenance; later
+ordinary edits and FFG overwrite preserve it.
 
-The next slice should add the admin/editor integration and explicit new-post
-requirements, then prepare an owner-reviewed historical backfill workflow.
-JSON-LD remains deferred until factual identities and publication history have
-been entered and verified.
+Historical posts may still have unknown authors, publisher, and publication
+history. The admin form supports separate authorship and publication review
+states, evidence notes, exact timestamp with timezone, date-only publication,
+and reviewed/unavailable outcomes. Reviewed authorship requires deliberate
+reopening before assignment changes. Archived People remain visible and
+preservable on existing posts but are excluded from new assignments. The
+revision fingerprint rejects stale saves without a new schema migration.
+Existing public byline rendering remains legacy. JSON-LD and historical
+backfill remain deferred; production has not received migration `0001`.
+The isolated HTTP admin browser harness uses `NODE_ENV=test` so its login
+session can retain a cookie without HTTPS. It still exercises normal login,
+admin authorization, and CSRF checks; it does not validate Secure-cookie
+transport over production HTTPS. The local Mode B containers are returned to
+production mode for final health and public-route checks. This source-side
+workflow has not been deployed.
 
 ## 8. Open Questions
 

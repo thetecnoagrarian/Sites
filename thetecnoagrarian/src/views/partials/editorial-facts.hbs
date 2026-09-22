@@ -1,0 +1,89 @@
+<fieldset class="form-group">
+    <legend>Public authors (order starts at 1)</legend>
+    <p>These Public People are factual identities, separate from Login Users. Fill consecutive rows. Archived people already assigned to this post can be preserved.</p>
+    {{#each authorRows}}
+    <div class="form-group">
+        <label for="public-author-{{position}}">Author {{position}}</label>
+        <input type="number" name="authorPositions[]" value="{{position}}" min="1" aria-label="Author position {{position}}" style="width:5rem">
+        <select id="public-author-{{position}}" name="authorIds[]">
+            <option value="">No author in this position</option>
+            {{#each options}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+        </select>
+    </div>
+    {{/each}}
+    <p><a href="/admin/public-people">Manage Public People</a></p>
+</fieldset>
+
+<fieldset class="form-group">
+    <legend>Publisher Person</legend>
+    <p>Select a Public Person explicitly. This value is stored on the post; there is no site default.</p>
+    {{#if post}}
+    <label for="publisherAction">Publisher change</label>
+    <select id="publisherAction" name="publisherAction">
+        <option value="preserve">Preserve current publisher</option>
+        <option value="set">Set or clear publisher</option>
+    </select>
+    {{/if}}
+    <label for="publisherId">Public Person publisher</label>
+    <select id="publisherId" name="publisherId" {{#unless post}}required{{/unless}}>
+        <option value="">{{#if post}}Unknown / unassigned{{else}}Select a publisher{{/if}}</option>
+        {{#each publisherOptions}}<option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
+    </select>
+</fieldset>
+
+{{#if post}}
+<input type="hidden" name="revisionToken" value="{{revisionToken}}">
+<fieldset class="form-group">
+    <legend>Authorship review</legend>
+    <p>Current state: <strong>{{facts.authorship_review_state}}</strong>. Review occurred: {{facts.authorship_reviewed_at}}. Evidence: {{facts.authorship_review_note}}</p>
+    <p>Changing a reviewed author list requires the deliberate “Reopen and replace” action. Review evidence is independent of publication evidence.</p>
+    <label for="authorshipAction">Action</label>
+    <select id="authorshipAction" name="authorshipAction">
+        <option value="preserve">Preserve assignments and review</option>
+        <option value="review">Review existing assignments</option>
+        <option value="replace">Replace assignments (only while unreviewed)</option>
+        <option value="reopen">Reopen reviewed authorship and replace assignments</option>
+    </select>
+    <label for="authorshipReviewState">New review state (when reviewing or replacing)</label>
+    <select id="authorshipReviewState" name="authorshipReviewState">
+        <option value="unreviewed">Unreviewed</option>
+        <option value="verified">Verified</option>
+        <option value="owner_attested">Owner-attested</option>
+        <option value="reviewed_unavailable">Reviewed, unavailable (no authors)</option>
+    </select>
+    <label for="authorshipReviewNote">Authorship evidence note</label>
+    <textarea id="authorshipReviewNote" name="authorshipReviewNote" maxlength="2000" rows="2">{{facts.authorship_review_note}}</textarea>
+</fieldset>
+<fieldset class="form-group">
+    <legend>Publication history</legend>
+    <p>Current state: <strong>{{facts.publication_review_state}}</strong>. Exact: {{facts.published_at}}. Date only: {{facts.published_on}}. Reviewed: {{facts.publication_reviewed_at}}. Evidence: {{facts.publication_review_note}}</p>
+    <p>Event Date above is separate. Ordinary edits preserve this publication fact. Re-enter a supported value only when deliberately reviewing or correcting history.</p>
+    <label for="publicationAction">Action</label>
+    <select id="publicationAction" name="publicationAction">
+        <option value="preserve">Preserve publication history</option>
+        <option value="review">Review or correct publication history</option>
+    </select>
+    <label for="publicationReviewState">Review state</label>
+    <select id="publicationReviewState" name="publicationReviewState">
+        <option value="unreviewed">Unreviewed</option>
+        <option value="verified">Verified</option>
+        <option value="owner_attested">Owner-attested</option>
+        <option value="reviewed_unavailable">Reviewed, unavailable</option>
+    </select>
+    <label for="publicationPrecision">Evidence precision</label>
+    <select id="publicationPrecision" name="publicationPrecision">
+        <option value="unknown">Unknown</option>
+        <option value="exact">Exact timestamp</option>
+        <option value="date">Date only</option>
+    </select>
+    <label for="publishedAt">Exact timestamp with timezone</label>
+    <input id="publishedAt" name="publishedAt" type="text" placeholder="2026-09-21T14:30:00Z or 2026-09-21T10:30:00-04:00">
+    <p>The entered timezone is retained. A local time without a timezone is rejected.</p>
+    <label for="publishedOn">Date only</label>
+    <input id="publishedOn" name="publishedOn" type="date">
+    <label for="publicationReviewNote">Publication evidence note</label>
+    <textarea id="publicationReviewNote" name="publicationReviewNote" maxlength="2000" rows="2">{{facts.publication_review_note}}</textarea>
+</fieldset>
+{{else}}
+<p>The server will record the exact UTC first-publication instant when this new post is saved. Event Date is independent. Initial authorship remains unreviewed until separately reviewed.</p>
+{{/if}}

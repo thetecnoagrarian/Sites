@@ -65,6 +65,26 @@ class PublicPerson {
         `).run(id);
         return result.changes === 1;
     }
+
+    static updateProfile(id, { displayName, profileUrl = null }) {
+        const name = normalizedRequiredText(displayName, 'displayName');
+        const result = getDatabase().prepare(`
+            UPDATE public_people
+            SET display_name = ?, profile_url = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `).run(name, normalizedProfileUrl(profileUrl), id);
+        if (result.changes !== 1) throw new Error(`Public Person ${id} does not exist`);
+        return PublicPerson.findById(id);
+    }
+
+    static unarchive(id) {
+        const result = getDatabase().prepare(`
+            UPDATE public_people
+            SET is_active = 1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND is_active = 0
+        `).run(id);
+        return result.changes === 1;
+    }
 }
 
 export default PublicPerson;

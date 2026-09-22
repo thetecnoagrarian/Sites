@@ -142,9 +142,14 @@ Do not inspect SQLite database files. Schema files are source; database files ar
 - `post.js` handles post creation, duplicate-title checks, slug generation, lookup, listing, updates, category links, and JSON image/caption parsing.
 - `user.js` handles user lookup, password hashing/verification, updates, and deletion.
 - `category.js` handles category CRUD and category-to-post retrieval.
-- `public-person.js` creates, reads, lists, and archives approved public Person identities. These records have no login capability and no foreign-key relationship to `users`.
-- `post-publication.js` assigns and reads one-based ordered public authors, persists a nullable per-post Person publisher, and records exact or date-only publication facts with separate review state. Reviewed authorship must be reset before its ordered assignment set changes; the model transaction and database triggers enforce that rule. `modified_at` advancement remains deferred. Existing routes do not call these primitives yet.
+- `public-person.js` creates, reads, lists, edits public profile fields, and archives/unarchives public Person identities. These records have no login capability and no foreign-key relationship to `users`; archiving retains historical post references.
+- `post-publication.js` assigns and reads one-based ordered public authors, persists a nullable per-post Person publisher, and records exact or date-only publication facts with separate review state. Reviewed authorship must be reset before its ordered assignment set changes; the model transaction and database triggers enforce that rule.
+- `editorial-service.js` coordinates post content, categories, public authors, publisher, review facts, and meaningful `modified_at` in one SQLite transaction. A revision fingerprint rejects stale edit forms. The service records a verified, server-observed UTC first-publication instant for new posts and preserves it on ordinary edits and FFG overwrite.
 - `index.js` re-exports models.
+
+### `blog-core/src/admin/`
+
+- `editorial-router.js` provides the shared admin-only Public Person and post editor routes for both sites. It validates multipart CSRF after upload parsing, cleans temporary and failed generated media, and delegates database changes to the editorial service. Uploaded media is prepared outside the transaction; replaced media is removed after a successful database save only when no post still references it. FFG retains generated media while duplicate-title confirmation is pending; cancellation or replacement of that pending submission cleans it, but session expiry or abandonment can leave up to one pending submission's generated variants orphaned per session. That media debt needs a separately designed cleanup procedure.
 
 ### `blog-core/src/utils/`
 

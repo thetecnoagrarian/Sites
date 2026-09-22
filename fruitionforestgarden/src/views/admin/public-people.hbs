@@ -1,0 +1,33 @@
+{{#> layouts/admin}}
+<div class="admin-content">
+    <h1>Public People</h1>
+    <p>Public People are author or publisher identities. Login Users and permissions are managed separately.</p>
+    {{#if error}}<div class="alert alert-danger">{{error}}</div>{{/if}}
+    {{#if success}}<div class="alert alert-success">{{success}}</div>{{/if}}
+    <h2>Create Public Person</h2>
+    <form method="POST" action="/admin/public-people">
+        <input type="hidden" name="_csrf" value="{{csrfToken}}">
+        <label>Stable public key <input name="publicKey" required pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="jane-doe"></label>
+        <label>Display name <input name="displayName" required></label>
+        <label>Profile URL (optional) <input name="profileUrl" type="url"></label>
+        <button type="submit">Create Person</button>
+    </form>
+    <h2>Existing Public People</h2>
+    {{#each people}}
+    <section class="card">
+        <h3>{{display_name}} {{#unless is_active}}(archived){{/unless}}</h3>
+        <p>Stable key: {{public_key}}. Profile: {{profile_url}}</p>
+        <form method="POST" action="/admin/public-people/{{id}}/profile">
+            <input type="hidden" name="_csrf" value="{{../csrfToken}}">
+            <label>Display name <input name="displayName" value="{{display_name}}" required></label>
+            <label>Profile URL <input name="profileUrl" value="{{profile_url}}" type="url"></label>
+            <button type="submit">Save profile</button>
+        </form>
+        <form method="POST" action="/admin/public-people/{{id}}/{{#if is_active}}archive{{else}}unarchive{{/if}}">
+            <input type="hidden" name="_csrf" value="{{../csrfToken}}">
+            <button type="submit">{{#if is_active}}Archive{{else}}Unarchive{{/if}}</button>
+        </form>
+    </section>
+    {{else}}<p>No Public People yet. Create a factual identity before publishing a new post.</p>{{/each}}
+</div>
+{{/layouts/admin}}

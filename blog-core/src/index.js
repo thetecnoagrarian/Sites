@@ -6,8 +6,8 @@
  */
 
 export { createBlogApp } from './app.js';
+export { createEditorialAdminRouter } from './admin/editorial-router.js';
 export { initializeDatabase } from './database/init.js';
 export * from './models/index.js';
 export * from './middleware/index.js';
 export * from './utils/index.js';
-

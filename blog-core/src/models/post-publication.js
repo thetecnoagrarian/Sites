@@ -100,13 +100,18 @@ class PostPublication {
                 SELECT authorship_review_state FROM posts WHERE id = ?
             `).get(postId);
             if (!post) throw new Error(`Post ${postId} does not exist`);
-            for (const id of publicPersonIds) requireActivePublicPerson(db, id);
             const currentIds = db.prepare(`
                 SELECT public_person_id
                 FROM post_public_authors
                 WHERE post_id = ?
                 ORDER BY position
             `).all(postId).map(row => row.public_person_id);
+            // An archived person may remain on an existing post, including a
+            // deliberate reorder. Only a genuinely new assignment needs an
+            // active identity.
+            for (const id of publicPersonIds) {
+                if (!currentIds.includes(id)) requireActivePublicPerson(db, id);
+            }
             if (currentIds.length === publicPersonIds.length
                 && currentIds.every((id, index) => id === publicPersonIds[index])) {
                 return;

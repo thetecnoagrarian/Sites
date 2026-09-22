@@ -22,14 +22,14 @@
             --sl-color-primary-500: var(--primary);
             --sl-color-primary-400: var(--primary-dark);
         }
-        
+
         /* Admin primary button overrides using class-based approach */
         .admin-primary-button::part(base) {
             --sl-color-primary-600: var(--primary);
             --sl-color-primary-500: var(--primary);
             --sl-color-primary-400: var(--primary-dark);
         }
-        
+
         .admin-primary-button::part(base):hover {
             --sl-color-primary-600: var(--primary-dark);
             --sl-color-primary-500: var(--primary-dark);
@@ -49,8 +49,9 @@
             <nav>
                 <ul>
                     <li><a href="/admin/analytics">Analytics</a></li>
+                    <li><a href="/admin/public-people">Public People</a></li>
                 {{#if user.isAdmin}}
-            
+
                 {{/if}}
                     <li>
                 <form action="/logout" method="POST" style="display: inline;">
@@ -71,4 +72,4 @@
 
     <script src="/js/admin.js"></script>
 </body>
-</html> 
+</html>

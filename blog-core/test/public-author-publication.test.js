@@ -214,7 +214,8 @@ test('public identities, ordered authors, publisher, and publication precision a
         assert.equal(PublicPerson.archive(lou.id), true);
         assert.equal(PostPublication.getAuthors(postId)[0].public_key, 'lou',
             'archiving preserves historical assignments');
-        assert.throws(() => PostPublication.replaceAuthors(postId, [lou.id]), /archived/);
+        assert.throws(() => PostPublication.replaceAuthors(postId, [lou.id]),
+            /Reset authorship review/);
         assert.throws(() => db.prepare('DELETE FROM public_people WHERE id = ?').run(mike.id),
             /FOREIGN KEY/);
 

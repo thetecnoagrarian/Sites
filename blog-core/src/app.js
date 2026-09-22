@@ -207,6 +207,10 @@ export function createBlogApp(config) {
         
         // Always add CSRF token generation method
         req.csrfToken = () => csrfProtection.create(secret);
+        // Multipart bodies become available only after Multer. Admin upload
+        // routes call this same verifier after parsing their body.
+        req.verifyCsrfToken = token => typeof token === 'string'
+            && csrfProtection.verify(req.session.csrfSecret, token);
         
         // Skip CSRF validation for multipart form data (handled manually in routes)
         if (req.get('content-type') && req.get('content-type').includes('multipart/form-data')) {
@@ -249,6 +253,7 @@ export function createBlogApp(config) {
     const upload = createUploadMiddleware(path.join(uploadsPath, 'temp'));
     // Export upload middleware for routes that need it
     app.locals.upload = upload;
+    app.locals.uploadsPath = uploadsPath;
 
     // Make CSRF token available to all templates
     app.use((req, res, next) => {

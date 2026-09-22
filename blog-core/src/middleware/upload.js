@@ -2,6 +2,7 @@ import multer from 'multer';
 import { promises as fs } from 'fs';
 import fsSync from 'fs';
 import path from 'path';
+import { randomUUID } from 'node:crypto';
 
 // Create uploads directory if it doesn't exist
 const ensureUploadsDir = async (uploadsPath) => {
@@ -34,7 +35,7 @@ export const createUploadMiddleware = (uploadsPath) => {
             const timestamp = Date.now();
             const ext = path.extname(file.originalname);
             const basename = path.basename(file.originalname, ext);
-            const filename = `${basename}-${timestamp}${ext}`;
+            const filename = `${basename}-${timestamp}-${randomUUID()}${ext}`;
             cb(null, filename);
         }
     });
@@ -62,4 +63,3 @@ export const createUploadMiddleware = (uploadsPath) => {
 
 // Default upload middleware for backward compatibility
 export const upload = createUploadMiddleware('./uploads/temp/');
-

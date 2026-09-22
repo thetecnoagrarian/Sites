@@ -26,6 +26,7 @@
                 <sl-button href="/" variant="text" target="_blank">View Site</sl-button>
                 {{#if user.isAdmin}}
                 <sl-button href="/admin/posts/new" variant="text">New Post</sl-button>
+                <sl-button href="/admin/public-people" variant="text">Public People</sl-button>
                 {{/if}}
                 <form action="/logout" method="POST" style="display: inline;">
                     <input type="hidden" name="_csrf" value="{{csrfToken}}">
@@ -44,4 +45,4 @@
 
     <script src="/js/admin.js"></script>
 </body>
-</html> 
+</html>

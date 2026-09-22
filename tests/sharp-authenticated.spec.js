@@ -134,6 +134,8 @@ async function submitPost(page, title, files) {
   await page.locator('input[name="title"]').fill(title);
   await page.locator('textarea[name="body"]').fill(`${title} synthetic body`);
   await page.locator('input[name="created_at"]').fill('2026-08-18');
+  await page.locator('select[name="authorIds[]"]').first().selectOption({ label: 'Mode B Author One' });
+  await page.locator('select[name="publisherId"]').selectOption({ label: 'Mode B Author One' });
   await page.locator('input[name="image"]').setInputFiles(files);
 
   await Promise.all([
@@ -188,7 +190,7 @@ async function runPostProcessingMatrix(page, site) {
       ...containerFiles(site.service, '/app/data/uploads/temp', jpegBase),
       ...containerFiles(site.service, '/app/data/uploads/temp', pngBase)
     ];
-    console.log(`[sharp cleanup observation] ${site.key} successful source files retained: ${retainedSources.length}`);
+    expect(retainedSources).toHaveLength(0);
   });
 
   await test.step('corrupt image MIME reaches Sharp but creates no post or variants', async () => {
@@ -206,7 +208,7 @@ async function runPostProcessingMatrix(page, site) {
     expect(publicPost.status()).toBe(404);
 
     const retainedSources = containerFiles(site.service, '/app/data/uploads/temp', corruptBase);
-    console.log(`[sharp cleanup observation] ${site.key} corrupt source files retained: ${retainedSources.length}`);
+    expect(retainedSources).toHaveLength(0);
   });
 
   await test.step('invalid non-image MIME creates no processed variants', async () => {
