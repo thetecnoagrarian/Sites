@@ -203,17 +203,18 @@ authorship is represented by the post-author relationship. Exact publication
 instants, date-only publication facts, and unknown history remain distinct. Separate
 authorship and publication review states preserve verified, owner-attested, and
 reviewed/unavailable outcomes. `created_at` remains Event Date, `updated_at`
-remains legacy save history. The local editorial service advances `modified_at`
+remains legacy save history. The shared editorial service advances `modified_at`
 only when post content, categories, public authors/order, publisher, or a
 publication value changes. No-op saves and review-note-only changes do not
 advance it.
 
-Migration `0001_public_author_publication_model` remains source-only. No
-production database has been migrated and no historical row has been
-backfilled. Locally, both admin post routes now use a shared transactional
-editorial service. New posts require explicit active Public Person authors in
-one-based order and an explicitly selected Person publisher. There is no site
-default or seeded production Person. A successful new post records one
+Migration `0001_public_author_publication_model` and the shared transactional
+editorial workflow are deployed on both production sites at commit
+`6141050fbec7eeb7b79466517d03ef2d127e970f`. Each site has exactly one active
+Public Person, `MDC` with key `mdc`. No historical post has been assigned a
+Public Person or given reviewed publication facts. New posts require explicit
+active Public Person authors in one-based order and an explicitly selected
+Person publisher. There is no site default. A successful new post records one
 server-observed exact UTC publication instant as verified provenance; later
 ordinary edits and FFG overwrite preserve it.
 
@@ -224,14 +225,28 @@ and reviewed/unavailable outcomes. Reviewed authorship requires deliberate
 reopening before assignment changes. Archived People remain visible and
 preservable on existing posts but are excluded from new assignments. The
 revision fingerprint rejects stale saves without a new schema migration.
-Existing public byline rendering remains legacy. JSON-LD and historical
-backfill remain deferred; production has not received migration `0001`.
-The isolated HTTP admin browser harness uses `NODE_ENV=test` so its login
-session can retain a cookie without HTTPS. It still exercises normal login,
-admin authorization, and CSRF checks; it does not validate Secure-cookie
-transport over production HTTPS. The local Mode B containers are returned to
-production mode for final health and public-route checks. This source-side
-workflow has not been deployed.
+Existing public byline rendering remains legacy. Historical authorship review,
+the later public-byline transition, publication-history review, and structured
+data are separate phases. Approved authorship may be recorded while publication
+history remains unreviewed. Current public bylines still obtain the login
+username through legacy `author_id`; public templates must later consume only
+approved ordered Public Person assignments. Login usernames remain compatibility
+data and must not be promoted into public identity. JSON-LD and historical
+backfill remain deferred in production.
+
+The owner has attested that MDC is the sole author, at one-based position `1`,
+of all six historical TTA posts and all twenty historical FFG posts. The local
+manifest-backed mechanism lists those 26 posts by site, ID, and expected slug;
+it does not discover or include later posts. Its intended result is
+`owner_attested` authorship with the concise owner-attestation note. Publication
+review remains `unreviewed`; publication values and publisher remain null.
+Because this is initial establishment of previously unmodeled historical facts,
+the controlled backfill preserves null `modified_at` as an explicit exception
+to ordinary editorial saves, which advance `modified_at` when public authorship
+changes. It also preserves Event Date, legacy `updated_at`, and `author_id`.
+This mechanism has been implemented and tested locally only. No production
+historical backfill has run, public templates still render the legacy byline,
+and JSON-LD remains unimplemented.
 
 ## 8. Open Questions
 

@@ -339,18 +339,41 @@ legacy `author_id`, Event Date in `created_at`, and technical save history in
 `updated_at`. Every existing post remains unreviewed with no public authors,
 publisher, publication value, or modification value; no historical fact is
 derived from login identity or timestamps. The current public rendering remains
-compatible and unchanged. The local admin workflow now uses explicit Public
+compatible and unchanged. The shared admin workflow now uses explicit Public
 Person selection and historical review controls on both sites, while public
 templates still use legacy bylines.
 
-The migration remains source-only at this checkpoint. No production migration
-or historical backfill has run, and no JSON-LD has been implemented. The local
-admin workflow requires explicit active authors and a persisted Person
-publisher for new posts; no site default or production identity is seeded.
-New posts receive a verified server-observed exact UTC first-publication
-instant. Historical posts retain unknown facts until separately reviewed;
-the editor accepts evidence-backed exact, date-only, or unavailable outcomes.
-Structured data remains deferred until the facts are entered and verified.
+Migration `0001_public_author_publication_model` and the shared editorial
+workflow are deployed on both production sites at commit
+`6141050fbec7eeb7b79466517d03ef2d127e970f`. Each site has exactly one active
+Public Person, `MDC` with key `mdc`. No historical post has been assigned a
+Public Person or given reviewed publication facts, and no JSON-LD has been
+implemented. New posts require explicit active authors and a persisted Person
+publisher; there is no site default. New posts receive a verified
+server-observed exact UTC first-publication instant. Historical posts retain
+unknown facts until separately reviewed; the editor accepts evidence-backed
+exact, date-only, or unavailable outcomes.
+
+Historical authorship review, public-byline rendering, publication-history
+review, and structured data remain separate phases. Approved authorship may be
+rendered while publication history remains unreviewed. Current public bylines
+still obtain `users.username` through legacy `author_id`. The future byline path
+must use only ordered `post_public_authors` joined to `public_people`; it must not
+infer a Public Person from `author_id` or `users.username`. Structured data
+remains deferred until its required public facts are established and rendered.
+
+The owner has attested that MDC is the sole author, in position `1`, of all six
+historical TTA posts and all twenty historical FFG posts. A local reviewed
+manifest enumerates the exact 26 site/ID/slug assignments and protects them with
+a deterministic digest. The controlled backfill is designed to set only the
+ordered MDC assignment and `owner_attested` authorship review fields. It leaves
+publication `unreviewed`, publication values and publisher null, and
+`modified_at` null. That last behavior is a narrow initial-history exception:
+ordinary editorial authorship changes continue to advance `modified_at`.
+Event Date, legacy `author_id`, and legacy `updated_at` also remain unchanged.
+The backfill has not been executed in production. Public templates still show
+the legacy byline; the later template transition must omit unresolved or
+reviewed-unavailable bylines instead of falling back to a login username.
 
 The provisional future policy is `WebSite` for homepages, `AboutPage` for About,
 and `BlogPosting` for posts. Category and search pages would remain without
@@ -420,5 +443,8 @@ Use URL Inspection only for representative remaining examples after the known fi
 - Add a sanitized nginx canonical redirect template to the repo later.
 - Review whether canonical URL generation should be consolidated with Open Graph URL generation.
 - Add published/draft filtering to sitemap generation if the content model gains explicit publication state.
-- After a separately approved production migration, review and enter factual
-  author, publisher, and publication history before reconsidering JSON-LD.
+- Final-review and commit the manifest-backed historical-authorship mechanism,
+  then use a separately authorized production operation to resolve all 26 rows
+  before transitioning public bylines. Publication history remains independent.
+- Reconsider JSON-LD only after its required public facts are established and
+  rendered consistently.

@@ -669,9 +669,10 @@ Migration IDs are ordered, four-digit-prefixed SQL filenames. A migration may
 contain multiple statements; the runner owns one immediate transaction around
 the pending batch and rejects transaction-control SQL inside migration files.
 `0001_public_author_publication_model` is the first additive migration after
-the baseline. It is implemented and tested locally but has not been applied to
-production. Future SQL files must be appended in order; never edit a previously
-applied migration.
+the baseline. It and the shared editorial workflow are deployed on both
+production sites at commit `6141050fbec7eeb7b79466517d03ef2d127e970f`.
+Future SQL files must be appended in order; never edit a previously applied
+migration.
 
 Read-only inspection/planning command shapes, for a separately authorized
 database file:
@@ -700,8 +701,8 @@ schema unchanged. Inspection, test results, and source documentation do not
 authorize a production migration.
 
 Migration operations checkpoint (2026-09-20): Migration Gate B operational
-prerequisites are ready, but no production migration has run and readiness does
-not authorize one. Both current production images passed isolated restores, and
+prerequisites were established before the later separately authorized TTA and
+FFG `0001` rollouts. Both production images passed isolated restores, and
 the stopped-site recovery-point path passed against disposable data for both
 sites. The existing `backup-host.sh`/`backup.sh` contract worked through a
 controlled helper with the stopped source volume mounted read-only, separate
@@ -776,14 +777,13 @@ read-only `inspect`/`plan`, integrity, schema, and handle checks may run during
 preflight, but all of their handles must be closed before the final PASS. Treat
 unknown access conservatively as ABORT.
 
-### Proposed `0001` and editorial-workflow production order (not authorized)
+### Completed `0001` and editorial-workflow production order (historical record)
 
-Production remains on the pre-`0001` revision. The target source includes both
-`0001_public_author_publication_model` and the editorial workflow. An existing
-database is inspected at application startup, not upgraded there. Build and
-identify each approved target image before stopping a site; retain and verify
-the running site's old image by immutable ID. Do not start the new editor on an
-unmigrated database or assume the old application can run on a migrated one.
+Both production sites now run the approved revision containing
+`0001_public_author_publication_model` and the editorial workflow. Each rollout
+followed the site-isolated sequence below. Existing databases are inspected at
+application startup, not upgraded there. The retained operational sequence is
+also the model for future schema migrations.
 
 For a separately approved rollout, take TTA first, then FFG only after TTA
 passes all gates. For each site, while the other remains healthy: confirm the
@@ -826,19 +826,95 @@ integrity/foreign-key checks, kept historical facts unknown, and served public
 and authenticated editor pages. It was not a production migration, a provider
 backup check, a privileged production zero-handle scan, or an HTTPS session test.
 Standalone image health checks needed `SITE_PORT`; production Compose supplies
-its own explicit health check. The owner has since approved MDC as the initial
-author and Person publisher for both separate site databases, with explicit
-manual selection and no preselection; production record creation remains pending.
+its own explicit health check. The owner approved MDC as the initial selectable
+author and Person publisher for new posts in both separate site databases, with
+explicit manual selection and no preselection. Each production database now
+contains the active Public Person `MDC` with key `mdc`; historical posts remain
+untouched at this checkpoint.
 
-The read-only production inventory on 2026-09-16 found both live databases
+The read-only production inventory on 2026-09-16 found both then-live databases
 outside the original exact-DDL matcher: TTA has a category description column
 and historical SQL formatting; FFG has a historically appended `users.role`
 column and historical session DDL. The revised recognition code is present at
-the current production revision and identifies both variants without applying
-migration metadata. A production migration remains separately blocked until the
-owner authorizes one site's complete stop, recovery-point, apply, verify, and
-rollback sequence. Do not deploy or apply the earlier migration-foundation
-revision by itself.
+the current production revision. The later site-specific rollouts recorded the
+respective baseline identity plus `0000` and `0001` without erasing those
+historical differences.
+
+### Historical authorship manifest backfill (not authorized or executed)
+
+The local mechanism uses one reviewed manifest with explicit TTA and FFG
+partitions at
+`blog-core/src/database/manifests/historical-authorship-owner-attestation-v1.json`.
+A required `--site` selects exactly one partition and database per invocation.
+The manifest enumerates all six approved TTA posts and all twenty approved FFG
+posts by ID and slug; it never expands to later posts. Its deterministic SHA-256
+digest covers both partitions, and the service also compares every entry with
+the compiled approved corpus, so recomputing a digest does not authorize altered
+scope. Both copies deliberately repeat the same owner-approved ID/slug decision
+as defense-in-depth for this one-time tool; the compiled copy is an execution
+guard, not an independent source of historical truth. Both the CLI and manifest
+live under `blog-core/src`, so a future approved production image built from
+this source contains them. Run the relative command shapes below with `/app` as
+the helper working directory.
+
+The default command is read-only even if `--dry-run` is omitted:
+
+```text
+node blog-core/src/database/historical-authorship-backfill-cli.js \
+  --manifest blog-core/src/database/manifests/historical-authorship-owner-attestation-v1.json \
+  --database [DATABASE_PATH] \
+  --site [tta-or-ffg] \
+  --dry-run
+```
+
+Apply requires both an explicit flag and one controlled UTC review timestamp:
+
+```text
+node blog-core/src/database/historical-authorship-backfill-cli.js \
+  --manifest blog-core/src/database/manifests/historical-authorship-owner-attestation-v1.json \
+  --database [DATABASE_PATH] \
+  --site [tta-or-ffg] \
+  --apply \
+  --reviewed-at [UTC-ISO-8601-TIMESTAMP-ENDING-IN-Z]
+```
+
+Do not run apply merely because the source exists. A later production action
+requires separate site-specific authorization. Work on one site while the other
+remains healthy, outside the Sunday 02:00 UTC backup window. Repeat the existing
+writer census, stop the target, prove zero database/sidecar handles, create and
+verify a fresh quiesced recovery set, remove the helper, and prove zero handles
+again. Run the dry run against the stopped target and compare its baseline,
+migration ledger, manifest version/digest, count, MDC identity, and every
+ID/slug with the approved receipt. Any mismatch is ABORT. After the dry-run
+process exits, repeat the zero-handle check before explicit apply.
+
+Only after those checks may a separately authorized apply run against that same
+stopped database and approved source. The service rechecks the full batch inside
+one immediate transaction. It inserts MDC at one-based position `1` and records
+`owner_attested` with one shared review timestamp and the note
+`Owner-attested historical authorship`. Any failure rolls back the entire site.
+An exact repeat is a no-op and preserves the original review timestamp; mixed or
+stale state is blocked.
+
+This initial-history operation intentionally preserves null `modified_at` even
+though an ordinary editorial authorship change advances it. To preserve the
+legacy technical `updated_at` value, the transaction captures and temporarily
+removes the recognized `posts_updated_at` trigger, applies the narrowly scoped
+review changes, and restores the exact trigger SQL before commit. It compares
+all other post columns before commit and also protects publication fields,
+publisher, Event Date, legacy `author_id`, titles/slugs/content/media, users,
+categories, sessions, and analytics from the operation. Publication remains
+`unreviewed`; publication values and publisher remain null.
+
+After apply, retain the complete console receipt and verify the exact assignment
+count, shared review timestamp, note/state, unchanged protected fields, restored
+schema recognition, empty foreign-key check, and integrity `ok`. Start only the
+target application and verify health, logs, public/admin routes, and unchanged
+legacy bylines. Preserve the recovery set and rollback image. A committed
+backfill requiring reversal uses the previously established stopped-site restore
+procedure; do not improvise row-by-row repair. Finish observation of the first
+site before separately authorizing the second. Public-template transition and
+JSON-LD remain later changes.
 
 ## 10. Rollback Concepts
 
