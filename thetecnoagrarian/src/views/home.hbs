@@ -10,26 +10,26 @@
     {{#if posts.length}}
         <div class="post-previews">
             {{#each posts}}
-                <a href="/post/{{this.slug}}" class="card-link">
-                    <sl-card>
-                        {{#if this.images.[0]}}
-                            <img slot="image" src="{{this.images.[0].medium}}" alt="{{this.title}}" loading="lazy">
-                        {{/if}}
+                <sl-card>
+                    {{#if this.images.[0]}}
+                        <a href="/post/{{this.slug}}" slot="image" class="card-link post-image-link">
+                            <img src="{{this.images.[0].medium}}" alt="{{this.title}}" loading="lazy">
+                        </a>
+                    {{/if}}
+                    <a href="/post/{{this.slug}}" class="card-link post-summary-link">
                         <h3>{{this.title}}</h3>
                         {{#if this.excerpt}}
                             <p>{{this.excerpt}}</p>
                         {{else}}
                             <p>{{truncate this.body 150}}</p>
                         {{/if}}
-                        <div class="post-meta">
-                            <span>Event: {{formatDate this.created_at}}</span>
-                            <span>Posted: {{formatDate this.updated_at}}</span>
-                            {{#if this.author}}
-                            <span>By: {{this.author}}</span>
-                            {{/if}}
-                        </div>
-                    </sl-card>
-                </a>
+                    </a>
+                    <div class="post-meta">
+                        <span>Event: {{formatDate this.created_at}}</span>
+                        <span>Posted: {{formatDate this.updated_at}}</span>
+                        {{> public-byline publicByline=this.publicByline}}
+                    </div>
+                </sl-card>
             {{/each}}
         </div>
 

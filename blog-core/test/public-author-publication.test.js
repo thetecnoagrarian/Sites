@@ -514,7 +514,7 @@ test('Mode B editorial fixture is repeatable under authorship review guards', (t
             SELECT position FROM post_public_authors
             WHERE post_id = (SELECT id FROM posts WHERE slug = 'local-test-post')
             ORDER BY position
-        `).all(), [{ position: 1 }, { position: 2 }]);
+        `).all(), [{ position: 1 }, { position: 2 }, { position: 3 }]);
         assert.deepEqual(db.pragma('foreign_key_check'), []);
     } finally {
         db.close();

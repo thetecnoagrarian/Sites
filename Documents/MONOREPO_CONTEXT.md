@@ -58,7 +58,9 @@ Both The Tecnoagrarian and Fruition Forest Garden are live production sites.
 They retain distinct identities and content, while shared behavior should be
 kept in `blog-core` when it genuinely applies to both. The current verified
 production source checkpoint is commit
-`f3fe658c1989634fe1d3fba4b20c8928e42571a8`.
+`6141050fbec7eeb7b79466517d03ef2d127e970f`. The later historical-authorship
+backfill changed database facts under a separately controlled operation; it did
+not deploy the newer repository commit that contains the backfill tooling.
 
 ## 3. Shared `blog-core` Role
 
@@ -211,8 +213,7 @@ advance it.
 Migration `0001_public_author_publication_model` and the shared transactional
 editorial workflow are deployed on both production sites at commit
 `6141050fbec7eeb7b79466517d03ef2d127e970f`. Each site has exactly one active
-Public Person, `MDC` with key `mdc`. No historical post has been assigned a
-Public Person or given reviewed publication facts. New posts require explicit
+Public Person, `MDC` with key `mdc`. New posts require explicit
 active Public Person authors in one-based order and an explicitly selected
 Person publisher. There is no site default. A successful new post records one
 server-observed exact UTC publication instant as verified provenance; later
@@ -225,28 +226,36 @@ and reviewed/unavailable outcomes. Reviewed authorship requires deliberate
 reopening before assignment changes. Archived People remain visible and
 preservable on existing posts but are excluded from new assignments. The
 revision fingerprint rejects stale saves without a new schema migration.
-Existing public byline rendering remains legacy. Historical authorship review,
-the later public-byline transition, publication-history review, and structured
-data are separate phases. Approved authorship may be recorded while publication
-history remains unreviewed. Current public bylines still obtain the login
-username through legacy `author_id`; public templates must later consume only
-approved ordered Public Person assignments. Login usernames remain compatibility
-data and must not be promoted into public identity. JSON-LD and historical
-backfill remain deferred in production.
+Production historical authorship is now reviewed: all six TTA posts and all
+twenty FFG posts have one ordered MDC assignment at position `1` with
+`owner_attested` review state. Publication remains `unreviewed`; publication
+values, publisher, and `modified_at` remain null, while Event Date, legacy
+`author_id`, and legacy `updated_at` remain unchanged. The post-backfill
+observation passed for both sites.
 
-The owner has attested that MDC is the sole author, at one-based position `1`,
-of all six historical TTA posts and all twenty historical FFG posts. The local
-manifest-backed mechanism lists those 26 posts by site, ID, and expected slug;
-it does not discover or include later posts. Its intended result is
-`owner_attested` authorship with the concise owner-attestation note. Publication
-review remains `unreviewed`; publication values and publisher remain null.
-Because this is initial establishment of previously unmodeled historical facts,
-the controlled backfill preserves null `modified_at` as an explicit exception
-to ordinary editorial saves, which advance `modified_at` when public authorship
-changes. It also preserves Event Date, legacy `updated_at`, and `author_id`.
-This mechanism has been implemented and tested locally only. No production
-historical backfill has run, public templates still render the legacy byline,
-and JSON-LD remains unimplemented.
+The current repository source implements the next public-byline transition for
+homepage and post-detail views, but that transition is not deployed at this
+checkpoint. It reads ordered Public People only when authorship is `verified`
+or `owner_attested`; `unreviewed`, `reviewed_unavailable`, empty, and malformed
+assignment sets omit the byline without falling back to `users.username` or
+`author_id`. Multiple authors use preserved order and natural grammar. A valid
+optional profile URL links only that author name, and archived People remain
+visible for existing historical attribution. Publication review is independent
+and does not gate a reviewed byline. Search and category views did not render
+bylines and remain unchanged. Login usernames and `author_id` remain
+compatibility/admin data rather than public identity. JSON-LD remains deferred.
+
+The manifest-backed historical operation remains limited to the approved 26
+site/ID/slug rows and is not a general discovery mechanism. Its completed
+production result uses the concise note `Owner-attested historical authorship`.
+The initial-history exception preserved null `modified_at`; ordinary editorial
+authorship changes still advance `modified_at` when modeled facts change.
+
+The future deployment sequence is: retain the already reviewed production
+data, deploy the reviewed-byline-capable application, then verify that current
+reviewed posts still show `By: MDC` while any unresolved post omits its byline.
+That later deployment requires its own authorization and verification. It must
+not add JSON-LD or infer any publication or publisher fact.
 
 ## 8. Open Questions
 

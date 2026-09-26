@@ -336,44 +336,41 @@ publication review fields record `unreviewed`, `verified`, `owner_attested`, or
 
 Migration `0001_public_author_publication_model` is additive. It preserves
 legacy `author_id`, Event Date in `created_at`, and technical save history in
-`updated_at`. Every existing post remains unreviewed with no public authors,
-publisher, publication value, or modification value; no historical fact is
-derived from login identity or timestamps. The current public rendering remains
-compatible and unchanged. The shared admin workflow now uses explicit Public
-Person selection and historical review controls on both sites, while public
-templates still use legacy bylines.
+`updated_at`; no historical fact was derived from login identity or timestamps.
+The shared admin workflow uses explicit Public Person selection and separate
+historical authorship/publication review controls on both sites.
 
 Migration `0001_public_author_publication_model` and the shared editorial
 workflow are deployed on both production sites at commit
 `6141050fbec7eeb7b79466517d03ef2d127e970f`. Each site has exactly one active
-Public Person, `MDC` with key `mdc`. No historical post has been assigned a
-Public Person or given reviewed publication facts, and no JSON-LD has been
-implemented. New posts require explicit active authors and a persisted Person
-publisher; there is no site default. New posts receive a verified
+Public Person, `MDC` with key `mdc`. New posts require explicit active authors
+and a persisted Person publisher; there is no site default. New posts receive a verified
 server-observed exact UTC first-publication instant. Historical posts retain
 unknown facts until separately reviewed; the editor accepts evidence-backed
 exact, date-only, or unavailable outcomes.
 
-Historical authorship review, public-byline rendering, publication-history
-review, and structured data remain separate phases. Approved authorship may be
-rendered while publication history remains unreviewed. Current public bylines
-still obtain `users.username` through legacy `author_id`. The future byline path
-must use only ordered `post_public_authors` joined to `public_people`; it must not
-infer a Public Person from `author_id` or `users.username`. Structured data
-remains deferred until its required public facts are established and rendered.
+Historical authorship review is complete in production: the six TTA and twenty
+FFG historical posts each have sole MDC authorship at position `1` with
+`owner_attested` review state. Publication remains `unreviewed`; publication
+values and publisher remain null. Event Date, legacy `author_id`, legacy
+`updated_at`, and null `modified_at` were preserved.
 
-The owner has attested that MDC is the sole author, in position `1`, of all six
-historical TTA posts and all twenty historical FFG posts. A local reviewed
-manifest enumerates the exact 26 site/ID/slug assignments and protects them with
-a deterministic digest. The controlled backfill is designed to set only the
-ordered MDC assignment and `owner_attested` authorship review fields. It leaves
-publication `unreviewed`, publication values and publisher null, and
-`modified_at` null. That last behavior is a narrow initial-history exception:
-ordinary editorial authorship changes continue to advance `modified_at`.
-Event Date, legacy `author_id`, and legacy `updated_at` also remain unchanged.
-The backfill has not been executed in production. Public templates still show
-the legacy byline; the later template transition must omit unresolved or
-reviewed-unavailable bylines instead of falling back to a login username.
+The current repository source implements reviewed Public Person bylines on the
+homepage and post-detail page, but production templates at commit
+`6141050fbec7eeb7b79466517d03ef2d127e970f` still render the legacy username
+until a separately authorized deployment. The new path renders only `verified`
+or `owner_attested` ordered assignments. Unreviewed, reviewed/unavailable,
+missing, or malformed assignments omit the byline, with no login-username
+fallback. Multiple authors retain their one-based order; profile links are
+optional; archived People remain visible on already attributed posts.
+Publication review does not gate reviewed authorship rendering.
+
+The manifest remains an exact record of the approved 26 site/ID/slug facts, not
+a reusable discovery rule. Deployment of the local byline transition should
+leave the current visible `By: MDC` text stable for those reviewed posts while
+changing its source from login identity to Public Person identity. Unresolved
+posts will omit the byline. This deployment must not add publication claims,
+publisher claims, author profile pages, or structured data.
 
 The provisional future policy is `WebSite` for homepages, `AboutPage` for About,
 and `BlogPosting` for posts. Category and search pages would remain without

@@ -143,7 +143,7 @@ Do not inspect SQLite database files. Schema files are source; database files ar
 - `user.js` handles user lookup, password hashing/verification, updates, and deletion.
 - `category.js` handles category CRUD and category-to-post retrieval.
 - `public-person.js` creates, reads, lists, edits public profile fields, and archives/unarchives public Person identities. These records have no login capability and no foreign-key relationship to `users`; archiving retains historical post references.
-- `post-publication.js` assigns and reads one-based ordered public authors, persists a nullable per-post Person publisher, and records exact or date-only publication facts with separate review state. Reviewed authorship must be reset before its ordered assignment set changes; the model transaction and database triggers enforce that rule.
+- `post-publication.js` assigns and reads one-based ordered public authors, persists a nullable per-post Person publisher, and records exact or date-only publication facts with separate review state. Its public read path returns ordered People only for `verified` or `owner_attested` authorship and retains archived People for historical attribution. Reviewed authorship must be reset before its ordered assignment set changes; the model transaction and database triggers enforce that rule.
 - `editorial-service.js` coordinates post content, categories, public authors, publisher, review facts, and meaningful `modified_at` in one SQLite transaction. A revision fingerprint rejects stale edit forms. The service records a verified, server-observed UTC first-publication instant for new posts and preserves it on ordinary edits and FFG overwrite.
 - `index.js` re-exports models.
 
@@ -153,6 +153,7 @@ Do not inspect SQLite database files. Schema files are source; database files ar
 
 ### `blog-core/src/utils/`
 
+- `publicByline.js` converts ordered reviewed People into a template-safe byline view model. It preserves one-based order, supports one/two/three-or-more grammar and optional HTTP(S) profile links, and returns no byline for empty or malformed assignment sets. Handlebars performs the final display-name and URL escaping.
 - `imageProcessor.js` processes uploaded images into thumbnail, medium, and large WebP variants.
 - `logger.js` provides shared logging.
 - `index.js` re-exports utilities.

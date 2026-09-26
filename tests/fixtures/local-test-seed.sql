@@ -62,8 +62,9 @@ ON CONFLICT(slug) DO UPDATE SET
 -- date-only publication model without deriving either fact from legacy fields.
 INSERT INTO public_people (public_key, display_name, profile_url)
 VALUES
-    ('mode-b-author-one', 'Mode B Author One', NULL),
-    ('mode-b-author-two', 'Mode B Author Two', NULL)
+    ('mode-b-author-one', 'Mode B Author One', 'https://example.test/mode-b-author-one'),
+    ('mode-b-author-two', 'Mode B Author Two', NULL),
+    ('mode-b-author-three', 'Mode B Author Three', NULL)
 ON CONFLICT(public_key) DO UPDATE SET
     display_name = excluded.display_name,
     profile_url = excluded.profile_url,
@@ -92,6 +93,12 @@ FROM posts, public_people
 WHERE posts.slug = 'local-test-post'
   AND public_people.public_key = 'mode-b-author-two';
 
+INSERT INTO post_public_authors (post_id, public_person_id, position)
+SELECT posts.id, public_people.id, 3
+FROM posts, public_people
+WHERE posts.slug = 'local-test-post'
+  AND public_people.public_key = 'mode-b-author-three';
+
 UPDATE posts
 SET publisher_public_person_id = (
         SELECT id FROM public_people WHERE public_key = 'mode-b-author-one'
@@ -105,6 +112,30 @@ SET publisher_public_person_id = (
     publication_reviewed_at = '2026-09-21T12:00:00Z',
     publication_review_note = 'Synthetic Mode B fixture'
 WHERE slug = 'local-test-post';
+
+-- These unresolved fixtures retain a legacy login author deliberately. Public
+-- rendering must omit their bylines instead of falling back to that username.
+INSERT INTO posts (
+    title, slug, body, description, excerpt, images, captions, created_at, author_id
+)
+VALUES
+    ('Local Unreviewed Legacy Author', 'local-unreviewed-legacy-author',
+     'Synthetic unresolved byline body.', 'Synthetic description.',
+     'Synthetic unresolved excerpt.', '[]', '[]', '2000-01-01 12:00:00',
+     (SELECT id FROM users WHERE username = 'mode-b-multer-admin')),
+    ('Local Unavailable Legacy Author', 'local-unavailable-legacy-author',
+     'Synthetic unavailable byline body.', 'Synthetic description.',
+     'Synthetic unavailable excerpt.', '[]', '[]', '2000-01-02 12:00:00',
+     (SELECT id FROM users WHERE username = 'mode-b-multer-admin'))
+ON CONFLICT(slug) DO UPDATE SET
+    body = excluded.body,
+    author_id = excluded.author_id;
+
+UPDATE posts
+SET authorship_review_state = 'reviewed_unavailable',
+    authorship_reviewed_at = '2026-09-21T12:00:00Z',
+    authorship_review_note = 'Synthetic unavailable fixture'
+WHERE slug = 'local-unavailable-legacy-author';
 
 INSERT INTO posts (
     title,
@@ -134,6 +165,29 @@ ON CONFLICT(slug) DO UPDATE SET
     captions = excluded.captions,
     created_at = excluded.created_at,
     author_id = NULL;
+
+-- A separate reviewed sole-author post exercises the one-author public byline
+-- without changing the pagination corpus or deriving identity from author_id.
+UPDATE posts
+SET authorship_review_state = 'unreviewed',
+    authorship_reviewed_at = NULL,
+    authorship_review_note = NULL
+WHERE slug = 'local-pagination-post-7';
+
+DELETE FROM post_public_authors
+WHERE post_id = (SELECT id FROM posts WHERE slug = 'local-pagination-post-7');
+
+INSERT INTO post_public_authors (post_id, public_person_id, position)
+SELECT posts.id, public_people.id, 1
+FROM posts, public_people
+WHERE posts.slug = 'local-pagination-post-7'
+  AND public_people.public_key = 'mode-b-author-one';
+
+UPDATE posts
+SET authorship_review_state = 'verified',
+    authorship_reviewed_at = '2026-09-21T12:00:00Z',
+    authorship_review_note = 'Synthetic Mode B sole-author fixture'
+WHERE slug = 'local-pagination-post-7';
 
 INSERT OR IGNORE INTO post_categories (post_id, category_id)
 SELECT posts.id, categories.id

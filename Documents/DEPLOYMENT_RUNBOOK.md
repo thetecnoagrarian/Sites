@@ -829,8 +829,9 @@ Standalone image health checks needed `SITE_PORT`; production Compose supplies
 its own explicit health check. The owner approved MDC as the initial selectable
 author and Person publisher for new posts in both separate site databases, with
 explicit manual selection and no preselection. Each production database now
-contains the active Public Person `MDC` with key `mdc`; historical posts remain
-untouched at this checkpoint.
+contains the active Public Person `MDC` with key `mdc`; historical posts were
+still untouched at that migration checkpoint, before the separately authorized
+authorship backfill recorded below.
 
 The read-only production inventory on 2026-09-16 found both then-live databases
 outside the original exact-DDL matcher: TTA has a category description column
@@ -840,9 +841,22 @@ the current production revision. The later site-specific rollouts recorded the
 respective baseline identity plus `0000` and `0001` without erasing those
 historical differences.
 
-### Historical authorship manifest backfill (not authorized or executed)
+### Completed historical authorship manifest backfill (historical record)
 
-The local mechanism uses one reviewed manifest with explicit TTA and FFG
+The production backfill completed site by site on 2026-09-25 while the other
+site remained healthy. TTA recorded all six approved MDC assignments with the
+shared review time `2026-09-25T07:34:42Z`; FFG recorded all twenty with
+`2026-09-25T07:45:03Z`. Every assignment uses one-based position `1` and
+`owner_attested`. Publication remains unreviewed; publication values and
+publisher remain null; `modified_at`, Event Date, legacy `author_id`, and legacy
+`updated_at` were preserved. Integrity, foreign keys, schema recognition,
+public/admin checks, and the later read-only observation passed for both sites.
+The retained quiesced recovery sets are
+`backup-set-tta-authorship-backfill-2026-09-25_07-30-40` and
+`backup-set-ffg-authorship-backfill-2026-09-25_07-40-35` under their respective
+site backup roots.
+
+The mechanism uses one reviewed manifest with explicit TTA and FFG
 partitions at
 `blog-core/src/database/manifests/historical-authorship-owner-attestation-v1.json`.
 A required `--site` selects exactly one partition and database per invocation.
@@ -853,9 +867,9 @@ the compiled approved corpus, so recomputing a digest does not authorize altered
 scope. Both copies deliberately repeat the same owner-approved ID/slug decision
 as defense-in-depth for this one-time tool; the compiled copy is an execution
 guard, not an independent source of historical truth. Both the CLI and manifest
-live under `blog-core/src`, so a future approved production image built from
-this source contains them. Run the relative command shapes below with `/app` as
-the helper working directory.
+live under `blog-core/src`. The command shapes below are retained to explain the
+completed operation and its verification contract; they do not authorize a
+rerun. The helper working directory was `/app`.
 
 The default command is read-only even if `--dry-run` is omitted:
 
@@ -878,18 +892,17 @@ node blog-core/src/database/historical-authorship-backfill-cli.js \
   --reviewed-at [UTC-ISO-8601-TIMESTAMP-ENDING-IN-Z]
 ```
 
-Do not run apply merely because the source exists. A later production action
-requires separate site-specific authorization. Work on one site while the other
-remains healthy, outside the Sunday 02:00 UTC backup window. Repeat the existing
-writer census, stop the target, prove zero database/sidecar handles, create and
-verify a fresh quiesced recovery set, remove the helper, and prove zero handles
-again. Run the dry run against the stopped target and compare its baseline,
-migration ledger, manifest version/digest, count, MDC identity, and every
-ID/slug with the approved receipt. Any mismatch is ABORT. After the dry-run
-process exits, repeat the zero-handle check before explicit apply.
+Do not rerun apply merely because the source exists. Any future production use
+requires new site-specific authorization. The completed operation worked on one
+site while the other remained healthy, away from the Sunday 02:00 UTC backup
+window. It repeated the writer census, stopped the target, proved zero
+database/sidecar handles, created and verified a fresh quiesced recovery set,
+removed the helper, and proved zero handles again. The dry run against the
+stopped target matched its baseline, migration ledger, manifest version/digest,
+count, MDC identity, and every approved ID/slug before explicit apply.
 
-Only after those checks may a separately authorized apply run against that same
-stopped database and approved source. The service rechecks the full batch inside
+The authorized apply ran only after those checks against that same stopped
+database and approved source. The service rechecks the full batch inside
 one immediate transaction. It inserts MDC at one-based position `1` and records
 `owner_attested` with one shared review timestamp and the note
 `Owner-attested historical authorship`. Any failure rolls back the entire site.
@@ -906,15 +919,18 @@ publisher, Event Date, legacy `author_id`, titles/slugs/content/media, users,
 categories, sessions, and analytics from the operation. Publication remains
 `unreviewed`; publication values and publisher remain null.
 
-After apply, retain the complete console receipt and verify the exact assignment
-count, shared review timestamp, note/state, unchanged protected fields, restored
-schema recognition, empty foreign-key check, and integrity `ok`. Start only the
-target application and verify health, logs, public/admin routes, and unchanged
-legacy bylines. Preserve the recovery set and rollback image. A committed
+After apply, the operator retained the console receipt and verified the exact
+assignment count, shared review timestamp, note/state, unchanged protected
+fields, restored schema recognition, empty foreign-key check, and integrity
+`ok`. Only the target application restarted before health, logs, public/admin
+routes, and unchanged legacy bylines were checked. Preserve the recovery sets
+and rollback images. A committed
 backfill requiring reversal uses the previously established stopped-site restore
 procedure; do not improvise row-by-row repair. Finish observation of the first
-site before separately authorizing the second. Public-template transition and
-JSON-LD remain later changes.
+site before separately authorizing the second. The public-template transition
+is implemented only in local source at this checkpoint and still needs final
+review, commit, and a separately authorized deployment. JSON-LD remains
+deferred.
 
 ## 10. Rollback Concepts
 

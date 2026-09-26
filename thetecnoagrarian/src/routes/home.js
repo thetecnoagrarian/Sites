@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+    buildPublicByline,
     buildPagination,
     getPagedMetaDescription,
     getPostMetaDescription,
@@ -44,7 +45,7 @@ router.use(async (req, res, next) => {
 // Home page
 router.get('/', async (req, res) => {
     try {
-        const { Post } = await import('@ffg/blog-core');
+        const { Post, PostPublication } = await import('@ffg/blog-core');
         const page = parsePageNumber(req.query.page);
         if (page === null) {
             return renderPageNotFound(res);
@@ -73,6 +74,12 @@ router.get('/', async (req, res) => {
 
         try {
             posts = Post.findAll(limit, (page - 1) * limit) || [];
+            const authorsByPost = PostPublication.getReviewedAuthorsForPosts(
+                posts.map(post => post.id));
+            posts = posts.map(post => ({
+                ...post,
+                publicByline: buildPublicByline(authorsByPost.get(post.id) ?? [])
+            }));
         } catch (err) {
             console.error('Error fetching posts:', err);
             posts = [];
@@ -214,7 +221,7 @@ router.get('/search', async (req, res) => {
 // Single post page
 router.get('/post/:slug', async (req, res) => {
     try {
-        const { Post } = await import('@ffg/blog-core');
+        const { Post, PostPublication } = await import('@ffg/blog-core');
         const post = Post.findBySlug(req.params.slug);
         if (!post) {
             return res.status(404).render('error', {
@@ -256,6 +263,7 @@ router.get('/post/:slug', async (req, res) => {
 
         post.categories = Post.getCategories ? Post.getCategories(post.id) : [];
         post.multipleImages = Array.isArray(post.imageList) && post.imageList.length > 1;
+        post.publicByline = buildPublicByline(PostPublication.getReviewedAuthors(post.id));
 
         res.locals.post = post; // Make post available to template
         const ogTags = buildOgTags(post);

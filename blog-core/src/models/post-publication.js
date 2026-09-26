@@ -79,6 +79,40 @@ function requireActivePublicPerson(db, id) {
 }
 
 class PostPublication {
+    static getReviewedAuthorsForPosts(postIds) {
+        if (!Array.isArray(postIds)) {
+            throw new TypeError('postIds must be an array');
+        }
+        const ids = [...new Set(postIds)];
+        if (ids.some(id => !Number.isInteger(id) || id < 1)) {
+            throw new TypeError('post IDs must be positive integers');
+        }
+        const authorsByPost = new Map(ids.map(id => [id, []]));
+        if (ids.length === 0) return authorsByPost;
+
+        const placeholders = ids.map(() => '?').join(', ');
+        const rows = getDatabase().prepare(`
+            SELECT p.id AS post_id, a.id, a.public_key, a.display_name,
+                   a.profile_url, a.is_active, pa.position
+            FROM posts p
+            JOIN post_public_authors pa ON pa.post_id = p.id
+            JOIN public_people a ON a.id = pa.public_person_id
+            WHERE p.id IN (${placeholders})
+              AND p.authorship_review_state IN ('verified', 'owner_attested')
+            ORDER BY p.id, pa.position
+        `).all(...ids);
+
+        for (const row of rows) {
+            const { post_id: postId, ...author } = row;
+            authorsByPost.get(postId)?.push(author);
+        }
+        return authorsByPost;
+    }
+
+    static getReviewedAuthors(postId) {
+        return PostPublication.getReviewedAuthorsForPosts([postId]).get(postId) ?? [];
+    }
+
     static getAuthors(postId) {
         return getDatabase().prepare(`
             SELECT a.*, pa.position
