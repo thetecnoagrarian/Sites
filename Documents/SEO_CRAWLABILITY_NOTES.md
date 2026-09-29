@@ -27,9 +27,9 @@ Do not claim that Search Console has fully cleared yet. The current position is 
 
 Both sites now get a public `GET /sitemap.xml` endpoint from shared `blog-core` app logic.
 
-The source behavior below includes the date-policy change and remains
-undeployed until a separate production authorization. Current production still
-renders legacy `Posted` from `updated_at` and still includes post `lastmod`.
+The date-policy behavior below is deployed at production revision
+`26061b6e6498d9ff72676e090869915ca5255cdd`. Public `Posted` is gone and post
+sitemap entries omit `lastmod`.
 
 The sitemap response:
 
@@ -394,9 +394,11 @@ internal editorial behavior but is not displayed or used for structured data.
 Post sitemap entries intentionally omit `lastmod`, with no replacement date.
 Corpus-wide historical publication reconstruction is abandoned. Reviewed
 publication facts should be established only for posts where the Event versus
-Published distinction has reader value. This date-display/sitemap change is
-present in repository source and remains undeployed until a separate deployment
-is authorized; it adds no publication data.
+Published distinction has reader value. Conditional Published support and the
+date-display/sitemap policy are live. Only FFG post ID 3 currently meets the
+reader-value and evidence threshold: the owner attests to a date-only
+publication value of `2024-09-22`. Recording that fact remains a controlled
+one-row operation until completion and does not establish a publisher.
 
 The provisional future policy is `WebSite` for homepages, `AboutPage` for About,
 and `BlogPosting` for posts. Category and search pages would remain without
@@ -466,7 +468,7 @@ Use URL Inspection only for representative remaining examples after the known fi
 - Add a sanitized nginx canonical redirect template to the repo later.
 - Review whether canonical URL generation should be consolidated with Open Graph URL generation.
 - Add published/draft filtering to sitemap generation if the content model gains explicit publication state.
-- Use a separately authorized production preflight before deploying the
-  date-model simplification.
+- Treat the public date-model simplification as deployed at `26061b6`; do not
+  repeat its production rollout.
 - Reconsider factual partial JSON-LD separately; omit unsupported publication
   and modification dates rather than reconstructing the historical corpus.

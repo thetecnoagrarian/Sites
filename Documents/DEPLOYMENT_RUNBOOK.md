@@ -931,12 +931,12 @@ site before separately authorizing the second. The later reviewed Public Person
 byline transition was deployed and verified on both sites; unresolved
 authorship omits the byline rather than falling back to login identity.
 
-### Repository public date-model simplification checkpoint
+### Deployed public date-model simplification checkpoint
 
-Production still uses the preceding date templates at this checkpoint: legacy
-`Posted` remains visible and post sitemap entries still carry `lastmod`. The
-behavior in this section is present in repository source and awaits a separately
-authorized deployment.
+The public date-model simplification is deployed at production revision
+`26061b6e6498d9ff72676e090869915ca5255cdd`. Public `Posted` is gone, Event
+remains, conditional Published support is live, and post sitemap entries omit
+`lastmod`.
 
 The repository date-policy slice removes public Posted/Updated semantics
 without changing schema or historical data. Homepage, category, and search
@@ -948,10 +948,13 @@ display or backfill `modified_at`, and it leaves legacy `updated_at`, its trigge
 stale-form fingerprints, and migration compatibility intact.
 
 Post sitemap entries omit `lastmod`; no other date replaces it. Corpus-wide
-historical publication reconstruction is abandoned, and no migration or
-historical data operation belongs to this slice. JSON-LD remains deferred and
-may later omit unsupported publication/modification dates. This checkpoint is
-source-only and requires a separate production preflight before any deployment.
+historical publication reconstruction is abandoned. Only FFG post ID 3,
+`from-oregon-to-michigan-a-cross-country-camper-adventure`, currently has
+sufficient reader-facing chronology value and owner evidence for a historical
+publication fact. The owner attests to the date-only value `2024-09-22`; a
+separately authorized controlled one-row operation records it without changing
+Event, legacy timestamps, authorship, publisher, or other posts. JSON-LD remains
+deferred and may later omit unsupported publication/modification dates.
 
 ## 10. Rollback Concepts
 

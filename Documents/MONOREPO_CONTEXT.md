@@ -58,9 +58,9 @@ Both The Tecnoagrarian and Fruition Forest Garden are live production sites.
 They retain distinct identities and content, while shared behavior should be
 kept in `blog-core` when it genuinely applies to both. The current verified
 production source checkpoint is commit
-`6141050fbec7eeb7b79466517d03ef2d127e970f`. The later historical-authorship
-backfill changed database facts under a separately controlled operation; it did
-not deploy the newer repository commit that contains the backfill tooling.
+`26061b6e6498d9ff72676e090869915ca5255cdd`. The historical-authorship
+backfill and subsequent public date-model simplification were separately
+authorized, deployed, and verified before this checkpoint.
 
 ## 3. Shared `blog-core` Role
 
@@ -244,10 +244,10 @@ and does not gate a reviewed byline. Search and category views did not render
 bylines and remain unchanged. Login usernames and `author_id` remain
 compatibility/admin data rather than public identity.
 
-Production still renders the legacy `Posted` value from `updated_at` and still
-emits post sitemap `lastmod` at this checkpoint. The simplified public date
-behavior below is present in repository source and remains undeployed until a
-separately authorized deployment.
+The simplified public date behavior is deployed at production revision
+`26061b6e6498d9ff72676e090869915ca5255cdd`. Public `Posted` is gone, Event
+remains, conditional Published support is live, and post sitemap entries omit
+`lastmod`.
 
 The owner-approved public date policy now treats `created_at` only as Event
 Date. Homepage, category, and search cards show Event only. A post detail page
@@ -268,13 +268,13 @@ The initial-history exception preserved null `modified_at`; ordinary editorial
 authorship changes still advance `modified_at` when modeled facts change.
 
 Corpus-wide historical publication reconstruction is abandoned as unnecessary.
-Reviewed publication should be established later only where the distinction
-between Event and Published has reader value; no historical publication,
-publisher, or modification fact should be inferred. The date-display and
-sitemap changes that implement this policy are present in repository source
-and remain undeployed until a separately authorized deployment. JSON-LD remains
-deferred; a later factual partial `BlogPosting` may omit `datePublished` and
-`dateModified` when support is absent.
+Only FFG post ID 3, `from-oregon-to-michigan-a-cross-country-camper-adventure`,
+currently has sufficient reader-facing chronology value and owner evidence to
+justify establishing a historical publication fact. The owner attests to the
+date-only value `2024-09-22`; recording it remains a separate controlled
+one-row operation until completion. No publisher or modification fact is part
+of that operation. JSON-LD remains deferred; a later factual partial
+`BlogPosting` may omit unsupported `datePublished` and `dateModified` values.
 
 ## 8. Open Questions
 
