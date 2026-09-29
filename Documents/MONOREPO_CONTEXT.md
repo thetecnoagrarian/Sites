@@ -233,9 +233,8 @@ values, publisher, and `modified_at` remain null, while Event Date, legacy
 `author_id`, and legacy `updated_at` remain unchanged. The post-backfill
 observation passed for both sites.
 
-The current repository source implements the next public-byline transition for
-homepage and post-detail views, but that transition is not deployed at this
-checkpoint. It reads ordered Public People only when authorship is `verified`
+Reviewed Public Person bylines are deployed on homepage and post-detail views.
+They read ordered Public People only when authorship is `verified`
 or `owner_attested`; `unreviewed`, `reviewed_unavailable`, empty, and malformed
 assignment sets omit the byline without falling back to `users.username` or
 `author_id`. Multiple authors use preserved order and natural grammar. A valid
@@ -243,7 +242,24 @@ optional profile URL links only that author name, and archived People remain
 visible for existing historical attribution. Publication review is independent
 and does not gate a reviewed byline. Search and category views did not render
 bylines and remain unchanged. Login usernames and `author_id` remain
-compatibility/admin data rather than public identity. JSON-LD remains deferred.
+compatibility/admin data rather than public identity.
+
+Production still renders the legacy `Posted` value from `updated_at` and still
+emits post sitemap `lastmod` at this checkpoint. The simplified public date
+behavior below is present in repository source and remains undeployed until a
+separately authorized deployment.
+
+The owner-approved public date policy now treats `created_at` only as Event
+Date. Homepage, category, and search cards show Event only. A post detail page
+always shows Event and shows Published only when exactly one reviewed
+`published_on` or `published_at` fact is `verified` or `owner_attested` and its
+calendar day is more than 30 days after Event. Date-only values remain literal,
+and an exact timestamp uses the calendar date written in its explicit offset.
+There is no public Posted or Updated field. Legacy `updated_at` remains an
+internal compatibility/save-history field and is not cleaned or used for
+public date semantics. `modified_at` retains its editorial behavior but has no
+public display or structured-data use. Post sitemap entries intentionally omit
+`lastmod` rather than substituting any other date.
 
 The manifest-backed historical operation remains limited to the approved 26
 site/ID/slug rows and is not a general discovery mechanism. Its completed
@@ -251,11 +267,14 @@ production result uses the concise note `Owner-attested historical authorship`.
 The initial-history exception preserved null `modified_at`; ordinary editorial
 authorship changes still advance `modified_at` when modeled facts change.
 
-The future deployment sequence is: retain the already reviewed production
-data, deploy the reviewed-byline-capable application, then verify that current
-reviewed posts still show `By: MDC` while any unresolved post omits its byline.
-That later deployment requires its own authorization and verification. It must
-not add JSON-LD or infer any publication or publisher fact.
+Corpus-wide historical publication reconstruction is abandoned as unnecessary.
+Reviewed publication should be established later only where the distinction
+between Event and Published has reader value; no historical publication,
+publisher, or modification fact should be inferred. The date-display and
+sitemap changes that implement this policy are present in repository source
+and remain undeployed until a separately authorized deployment. JSON-LD remains
+deferred; a later factual partial `BlogPosting` may omit `datePublished` and
+`dateModified` when support is absent.
 
 ## 8. Open Questions
 

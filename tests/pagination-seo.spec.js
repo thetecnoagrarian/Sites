@@ -41,7 +41,7 @@ for (const site of sites) {
       const firstSlugs = extractPostSlugs(firstHtml);
       const secondSlugs = extractPostSlugs(secondHtml);
       expect(firstSlugs).toHaveLength(6);
-      expect(secondSlugs).toHaveLength(2);
+      expect(secondSlugs).toHaveLength(4);
       expect(secondSlugs.some((slug) => firstSlugs.includes(slug))).toBe(false);
     });
 
@@ -111,7 +111,7 @@ for (const site of sites) {
       expect(malformedResponse.status()).toBe(404);
     });
 
-    test('sitemap keeps base URLs and excludes pagination and search URLs', async ({ request }) => {
+    test('sitemap keeps post locations, omits post lastmod, and excludes transient URLs', async ({ request, page }) => {
       const response = await request.get(`${site.baseUrl}/sitemap.xml`);
       expect(response.status()).toBe(200);
       const sitemapXml = await response.text();
@@ -120,8 +120,16 @@ for (const site of sites) {
       expect(sitemapXml).toContain(
         `<loc>${site.baseUrl}/category/local-test-category</loc>`
       );
+      expect(sitemapXml).toContain(
+        `<loc>${site.baseUrl}/post/local-test-post</loc>`
+      );
+      expect(sitemapXml).not.toContain('<lastmod>');
       expect(sitemapXml).not.toContain('?page=');
       expect(sitemapXml).not.toContain('/search');
+      expect(await page.evaluate(xml => {
+        const parsed = new DOMParser().parseFromString(xml, 'application/xml');
+        return parsed.querySelector('parsererror') === null;
+      }, sitemapXml)).toBe(true);
     });
   });
 }

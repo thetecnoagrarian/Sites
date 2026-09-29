@@ -48,13 +48,6 @@ const buildSitemapXml = (urls) => {
     ].join('\n');
 };
 
-const formatSitemapDate = (value) => {
-    if (!value) return null;
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return null;
-    return date.toISOString();
-};
-
 /**
  * Create a blog application with the given configuration
  * @param {Object} config - Configuration object
@@ -400,8 +393,7 @@ export function createBlogApp(config) {
                 .filter(post => post && post.slug)
                 .forEach(post => {
                     urls.push({
-                        loc: `${canonicalBaseUrl}/post/${encodeURIComponent(post.slug)}`,
-                        lastmod: formatSitemapDate(post.updated_at || post.created_at)
+                        loc: `${canonicalBaseUrl}/post/${encodeURIComponent(post.slug)}`
                     });
                 });
 

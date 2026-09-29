@@ -134,8 +134,21 @@ ON CONFLICT(slug) DO UPDATE SET
 UPDATE posts
 SET authorship_review_state = 'reviewed_unavailable',
     authorship_reviewed_at = '2026-09-21T12:00:00Z',
-    authorship_review_note = 'Synthetic unavailable fixture'
+    authorship_review_note = 'Synthetic unavailable fixture',
+    published_at = NULL,
+    published_on = NULL,
+    publication_review_state = 'reviewed_unavailable',
+    publication_reviewed_at = '2026-09-21T12:00:00Z',
+    publication_review_note = 'Synthetic unavailable publication fixture'
 WHERE slug = 'local-unavailable-legacy-author';
+
+UPDATE posts
+SET published_at = NULL,
+    published_on = NULL,
+    publication_review_state = 'unreviewed',
+    publication_reviewed_at = NULL,
+    publication_review_note = NULL
+WHERE slug = 'local-unreviewed-legacy-author';
 
 INSERT INTO posts (
     title,
@@ -186,7 +199,12 @@ WHERE posts.slug = 'local-pagination-post-7'
 UPDATE posts
 SET authorship_review_state = 'verified',
     authorship_reviewed_at = '2026-09-21T12:00:00Z',
-    authorship_review_note = 'Synthetic Mode B sole-author fixture'
+    authorship_review_note = 'Synthetic Mode B sole-author fixture',
+    published_at = NULL,
+    published_on = '2026-02-07',
+    publication_review_state = 'verified',
+    publication_reviewed_at = '2026-09-21T12:00:00Z',
+    publication_review_note = 'Synthetic Mode B 31-day publication fixture'
 WHERE slug = 'local-pagination-post-7';
 
 INSERT OR IGNORE INTO post_categories (post_id, category_id)

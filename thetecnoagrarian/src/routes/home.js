@@ -2,6 +2,7 @@ import express from 'express';
 import {
     buildPublicByline,
     buildPagination,
+    getPublicPublicationDisplay,
     getPagedMetaDescription,
     getPostMetaDescription,
     parsePageNumber
@@ -264,6 +265,7 @@ router.get('/post/:slug', async (req, res) => {
         post.categories = Post.getCategories ? Post.getCategories(post.id) : [];
         post.multipleImages = Array.isArray(post.imageList) && post.imageList.length > 1;
         post.publicByline = buildPublicByline(PostPublication.getReviewedAuthors(post.id));
+        post.publicationDisplay = getPublicPublicationDisplay(post.created_at, post);
 
         res.locals.post = post; // Make post available to template
         const ogTags = buildOgTags(post);

@@ -4,7 +4,9 @@
         <h1>{{post.title}}</h1>
         <div class="post-meta">
             <span>Event: {{formatDate post.created_at}}</span>
-            <span>Posted: {{formatDate post.updated_at}}</span>
+            {{#if post.publicationDisplay}}
+            <span>Published: {{post.publicationDisplay.formattedDate}}</span>
+            {{/if}}
             {{> public-byline publicByline=post.publicByline}}
             {{#if post.categories}}
             <div class="post-categories">

@@ -923,14 +923,35 @@ After apply, the operator retained the console receipt and verified the exact
 assignment count, shared review timestamp, note/state, unchanged protected
 fields, restored schema recognition, empty foreign-key check, and integrity
 `ok`. Only the target application restarted before health, logs, public/admin
-routes, and unchanged legacy bylines were checked. Preserve the recovery sets
+routes, and unchanged visible bylines were checked. Preserve the recovery sets
 and rollback images. A committed
 backfill requiring reversal uses the previously established stopped-site restore
 procedure; do not improvise row-by-row repair. Finish observation of the first
-site before separately authorizing the second. The public-template transition
-is implemented only in local source at this checkpoint and still needs final
-review, commit, and a separately authorized deployment. JSON-LD remains
-deferred.
+site before separately authorizing the second. The later reviewed Public Person
+byline transition was deployed and verified on both sites; unresolved
+authorship omits the byline rather than falling back to login identity.
+
+### Repository public date-model simplification checkpoint
+
+Production still uses the preceding date templates at this checkpoint: legacy
+`Posted` remains visible and post sitemap entries still carry `lastmod`. The
+behavior in this section is present in repository source and awaits a separately
+authorized deployment.
+
+The repository date-policy slice removes public Posted/Updated semantics
+without changing schema or historical data. Homepage, category, and search
+cards retain Event only. Detail pages retain Event and add Published only for
+one `verified` or `owner_attested` publication fact whose calendar date is more
+than 30 days after Event. The implementation preserves date-only literals and
+the calendar day written in an exact timestamp's explicit offset. It does not
+display or backfill `modified_at`, and it leaves legacy `updated_at`, its trigger,
+stale-form fingerprints, and migration compatibility intact.
+
+Post sitemap entries omit `lastmod`; no other date replaces it. Corpus-wide
+historical publication reconstruction is abandoned, and no migration or
+historical data operation belongs to this slice. JSON-LD remains deferred and
+may later omit unsupported publication/modification dates. This checkpoint is
+source-only and requires a separate production preflight before any deployment.
 
 ## 10. Rollback Concepts
 

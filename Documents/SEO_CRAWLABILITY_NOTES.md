@@ -27,6 +27,10 @@ Do not claim that Search Console has fully cleared yet. The current position is 
 
 Both sites now get a public `GET /sitemap.xml` endpoint from shared `blog-core` app logic.
 
+The source behavior below includes the date-policy change and remains
+undeployed until a separate production authorization. Current production still
+renders legacy `Posted` from `updated_at` and still includes post `lastmod`.
+
 The sitemap response:
 
 - returns XML
@@ -35,7 +39,8 @@ The sitemap response:
 - includes `/about`
 - includes public category URLs that have at least one publicly exposed post
 - includes public post URLs
-- includes `lastmod` for posts when `updated_at` or `created_at` is available
+- includes each public post location without a `lastmod`; Event, reviewed
+  publication, legacy `updated_at`, and `modified_at` are not sitemap substitutes
 
 The sitemap excludes:
 
@@ -264,9 +269,11 @@ Needs Review: if draft/private post state is added later, sitemap generation sho
 
 ## Structured Data Prerequisite: Public Author and Publication Model
 
-A JSON-LD audit stopped before implementation because the current data model
-does not provide sufficiently reliable public facts for post authorship,
-publisher identity, or publication history.
+The original JSON-LD audit stopped before implementation because the earlier
+data model did not provide sufficiently reliable public facts for post
+authorship, publisher identity, or publication history. The later schema and
+editorial work now model those facts without inventing historical values, and
+reviewed Public Person bylines are deployed. JSON-LD itself remains deferred.
 
 Supported factual data currently includes:
 
@@ -276,14 +283,14 @@ Supported factual data currently includes:
 - normalized post description; and
 - an optional public post image.
 
-Those facts alone do not resolve the following identity and date requirements.
+The original blockers were:
 
-- `post.author` is sourced from `users.username`; it is an authentication field,
-  not a modeled public author entity or approved public byline.
-- Fruition Forest Garden's public Mike-and-Lou identity is not a per-post author
-  assignment.
-- The Tecnoagrarian has no approved public author or publisher identity in the
-  current model.
+- `post.author` was sourced from `users.username`; it is an authentication
+  field, not a modeled public author entity or approved public byline.
+- Fruition Forest Garden's public Mike-and-Lou identity was not a per-post
+  author assignment.
+- The Tecnoagrarian had no approved public author or publisher identity in the
+  earlier model.
 - Site names alone are not enough to assert an `Organization` publisher.
 - Social-profile links do not resolve these identity gaps.
 - `created_at` is used and displayed as **Event Date**, so it is not a reliable
@@ -291,23 +298,25 @@ Those facts alone do not resolve the following identity and date requirements.
 - `updated_at` is reset on edits. It cannot recover immutable first-publication
   history, and its current semantics are not sufficient to infer original
   publication timing.
-- The model has no immutable `published_at` history or separately reliable
-  publication and modification semantics.
+- The earlier model had no immutable `published_at` history or separately
+  reliable publication and modification semantics.
 
-The owner chose not to add a stripped-down `BlogPosting` object that would
-avoid those gaps. No JSON-LD is currently implemented.
+The owner chose to model the facts first. Complete historical publication
+coverage is no longer a prerequisite for a later factual partial `BlogPosting`:
+unsupported `datePublished` and `dateModified` may be omitted. No JSON-LD is
+currently implemented.
 
-Owner decisions for later model work: public authors are independent of login
-accounts; ordered multiple authors are supported; a newly published post needs
-at least one explicitly persisted approved author. Site defaults may preselect
-authors or publishers, but each post's final author and publisher assignments
-must be persisted so future default changes do not rewrite history. An approved
-Person may be a publisher; an Organization must not be inferred from a site
-name. Owner attestation and direct publishing records can support historical
-facts. Indirect timestamps and account links are investigation leads only.
-Historical review records verified, owner-attested, or reviewed/unavailable
-status. Publication precision is preserved as known: exact instant or calendar
-date. The local editorial service advances `modified_at` on real changes to
+The implemented model keeps public authors independent of login accounts,
+supports ordered multiple authors, and requires a newly published post to have
+at least one explicitly persisted approved author. Authors and the Person
+publisher are explicitly selected and persisted per post; there is no dynamic
+site default that can rewrite history. An approved Person may be a publisher;
+an Organization must not be inferred from a site name. Owner attestation and
+direct publishing records can support historical facts. Indirect timestamps
+and account links are investigation leads only. Historical review records
+verified, owner-attested, or reviewed/unavailable status. Publication precision
+is preserved as known: exact instant or calendar date. The local editorial
+service advances `modified_at` on real changes to
 title, body, public description/excerpt, images/captions/order, Event Date,
 public author/byline, or public category membership. A no-op save or evidence
 bookkeeping alone does not count. Admin-only immediate publishing and Event
@@ -355,10 +364,8 @@ FFG historical posts each have sole MDC authorship at position `1` with
 values and publisher remain null. Event Date, legacy `author_id`, legacy
 `updated_at`, and null `modified_at` were preserved.
 
-The current repository source implements reviewed Public Person bylines on the
-homepage and post-detail page, but production templates at commit
-`6141050fbec7eeb7b79466517d03ef2d127e970f` still render the legacy username
-until a separately authorized deployment. The new path renders only `verified`
+Reviewed Public Person bylines are deployed on the homepage and post-detail
+page. The public path renders only `verified`
 or `owner_attested` ordered assignments. Unreviewed, reviewed/unavailable,
 missing, or malformed assignments omit the byline, with no login-username
 fallback. Multiple authors retain their one-based order; profile links are
@@ -366,11 +373,30 @@ optional; archived People remain visible on already attributed posts.
 Publication review does not gate reviewed authorship rendering.
 
 The manifest remains an exact record of the approved 26 site/ID/slug facts, not
-a reusable discovery rule. Deployment of the local byline transition should
-leave the current visible `By: MDC` text stable for those reviewed posts while
-changing its source from login identity to Public Person identity. Unresolved
-posts will omit the byline. This deployment must not add publication claims,
-publisher claims, author profile pages, or structured data.
+a reusable discovery rule. The deployed transition leaves the visible
+`By: MDC` text stable for those reviewed posts while sourcing it from Public
+Person identity. Unresolved posts omit the byline.
+
+The owner-approved public date policy is narrower than the stored editorial
+model. Homepage, category, and search cards show Event (`created_at`) only. A
+detail page always shows Event and conditionally shows Published only when one
+reviewed `published_on` or `published_at` fact is more than 30 calendar days
+after Event. Zero through 30 days, same-day/before-Event, unresolved,
+unavailable, missing, invalid, or contradictory publication facts do not
+render. Date-only values are formatted from the literal calendar components;
+exact timestamps use the calendar date represented by their explicit offset.
+No public Posted or Updated field exists under this policy.
+
+Legacy `updated_at` remains internal compatibility and technical save history.
+It has no public date, sitemap, or future structured-data meaning; known
+historical contamination needs no cleanup. `modified_at` retains existing
+internal editorial behavior but is not displayed or used for structured data.
+Post sitemap entries intentionally omit `lastmod`, with no replacement date.
+Corpus-wide historical publication reconstruction is abandoned. Reviewed
+publication facts should be established only for posts where the Event versus
+Published distinction has reader value. This date-display/sitemap change is
+present in repository source and remains undeployed until a separate deployment
+is authorized; it adds no publication data.
 
 The provisional future policy is `WebSite` for homepages, `AboutPage` for About,
 and `BlogPosting` for posts. Category and search pages would remain without
@@ -440,8 +466,7 @@ Use URL Inspection only for representative remaining examples after the known fi
 - Add a sanitized nginx canonical redirect template to the repo later.
 - Review whether canonical URL generation should be consolidated with Open Graph URL generation.
 - Add published/draft filtering to sitemap generation if the content model gains explicit publication state.
-- Final-review and commit the manifest-backed historical-authorship mechanism,
-  then use a separately authorized production operation to resolve all 26 rows
-  before transitioning public bylines. Publication history remains independent.
-- Reconsider JSON-LD only after its required public facts are established and
-  rendered consistently.
+- Use a separately authorized production preflight before deploying the
+  date-model simplification.
+- Reconsider factual partial JSON-LD separately; omit unsupported publication
+  and modification dates rather than reconstructing the historical corpus.

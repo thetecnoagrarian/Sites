@@ -154,6 +154,7 @@ Do not inspect SQLite database files. Schema files are source; database files ar
 ### `blog-core/src/utils/`
 
 - `publicByline.js` converts ordered reviewed People into a template-safe byline view model. It preserves one-based order, supports one/two/three-or-more grammar and optional HTTP(S) profile links, and returns no byline for empty or malformed assignment sets. Handlebars performs the final display-name and URL escaping.
+- `publicPublicationDisplay.js` derives the nullable detail-page Published view model from Event Date plus reviewed publication facts. It validates literal calendar dates, preserves the calendar day written in an exact timestamp's explicit offset, and returns a display only when publication is more than 30 calendar days after Event. It also formats calendar dates without runtime-timezone conversion.
 - `imageProcessor.js` processes uploaded images into thumbnail, medium, and large WebP variants.
 - `logger.js` provides shared logging.
 - `index.js` re-exports utilities.
@@ -168,6 +169,7 @@ Responsibilities that should stay shared:
 - Shared database connection/model behavior.
 - Shared authentication/session primitives.
 - Shared upload/image processing primitives.
+- Shared public date-display policy and timezone-safe calendar formatting.
 - Shared security middleware and request handling defaults.
 - Shared logging/utilities.
 

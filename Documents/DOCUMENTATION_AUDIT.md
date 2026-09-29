@@ -21,10 +21,14 @@ The goals are:
 
 This audit is the current classification record and archive log. It does not authorize future cleanup or operational changes beyond an explicitly approved task.
 
-> Current-state checkpoint (2026-09-15): use
+> Current-state checkpoint (2026-09-28): use
 > `Documents/DEPLOYMENT_RUNBOOK.md` for production, capacity, and host-backup
 > state; `Documents/SEO_CRAWLABILITY_NOTES.md` for current SEO and structured-data
-> decisions; and `Documents/MONOREPO_CONTEXT.md` for the next project phase.
+> decisions, including the Event/conditional-Published public date policy and
+> intentional omission of post sitemap `lastmod`; and
+> `Documents/MONOREPO_CONTEXT.md` for the next project phase.
+> The date-policy implementation is in repository source; production retains
+> legacy `Posted` and post `lastmod` until a separately authorized deployment.
 > Dated audit batches below remain historical classification records.
 
 ## 2. Current Documentation Landscape
