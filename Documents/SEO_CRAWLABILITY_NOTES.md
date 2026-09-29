@@ -396,9 +396,10 @@ Corpus-wide historical publication reconstruction is abandoned. Reviewed
 publication facts should be established only for posts where the Event versus
 Published distinction has reader value. Conditional Published support and the
 date-display/sitemap policy are live. Only FFG post ID 3 currently meets the
-reader-value and evidence threshold: the owner attests to a date-only
-publication value of `2024-09-22`. Recording that fact remains a controlled
-one-row operation until completion and does not establish a publisher.
+reader-value and evidence threshold. Its controlled operation completed on
+2026-09-29 and records the owner-attested date-only publication value
+`2024-09-22`, reviewed at `2026-09-29T11:28:23Z`. It does not establish a
+publisher or modification fact, and the other 19 FFG posts remain unchanged.
 
 The provisional future policy is `WebSite` for homepages, `AboutPage` for About,
 and `BlogPosting` for posts. Category and search pages would remain without

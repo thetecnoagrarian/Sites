@@ -270,11 +270,12 @@ authorship changes still advance `modified_at` when modeled facts change.
 Corpus-wide historical publication reconstruction is abandoned as unnecessary.
 Only FFG post ID 3, `from-oregon-to-michigan-a-cross-country-camper-adventure`,
 currently has sufficient reader-facing chronology value and owner evidence to
-justify establishing a historical publication fact. The owner attests to the
-date-only value `2024-09-22`; recording it remains a separate controlled
-one-row operation until completion. No publisher or modification fact is part
-of that operation. JSON-LD remains deferred; a later factual partial
-`BlogPosting` may omit unsupported `datePublished` and `dateModified` values.
+justify a historical publication fact. The controlled one-row operation
+completed on 2026-09-29 and records the owner-attested date-only value
+`2024-09-22`, reviewed at `2026-09-29T11:28:23Z`. Event, legacy timestamps,
+authorship, publisher, and the other 19 FFG posts were preserved. JSON-LD
+remains deferred; a later factual partial `BlogPosting` may omit unsupported
+`datePublished` and `dateModified` values.
 
 ## 8. Open Questions
 

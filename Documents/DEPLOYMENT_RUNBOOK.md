@@ -951,10 +951,15 @@ Post sitemap entries omit `lastmod`; no other date replaces it. Corpus-wide
 historical publication reconstruction is abandoned. Only FFG post ID 3,
 `from-oregon-to-michigan-a-cross-country-camper-adventure`, currently has
 sufficient reader-facing chronology value and owner evidence for a historical
-publication fact. The owner attests to the date-only value `2024-09-22`; a
-separately authorized controlled one-row operation records it without changing
-Event, legacy timestamps, authorship, publisher, or other posts. JSON-LD remains
-deferred and may later omit unsupported publication/modification dates.
+publication fact. The separately authorized controlled operation completed on
+2026-09-29 and records the owner-attested date-only value `2024-09-22`, reviewed
+at `2026-09-29T11:28:23Z`, without changing Event, legacy timestamps,
+authorship, publisher, or other posts. The verified quiesced recovery set is
+`/opt/Sites/backups/ffg/backup-set-ffg3-publication-2026-09-29_11-25-09`.
+The same-image FFG restart passed health and log checks; one authorized live
+detail request rendered Event, Published, and the existing MDC byline and added
+exactly one expected analytics row. JSON-LD remains deferred and may later omit
+unsupported publication/modification dates.
 
 ## 10. Rollback Concepts
 

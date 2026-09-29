@@ -31,7 +31,9 @@ This audit is the current classification record and archive log. It does not aut
 > gone, Event remains, conditional Published support is live, and post sitemap
 > entries omit `lastmod`. Corpus-wide publication recovery is abandoned; only
 > FFG post ID 3 currently has owner-supported reader value for a historical
-> publication date, pending its separately controlled one-row operation.
+> publication date. Its controlled operation completed on 2026-09-29 with the
+> owner-attested date-only value `2024-09-22`; other historical publication
+> facts remain unestablished and JSON-LD remains deferred.
 > Dated audit batches below remain historical classification records.
 
 ## 2. Current Documentation Landscape
