@@ -155,6 +155,7 @@ Do not inspect SQLite database files. Schema files are source; database files ar
 
 - `publicByline.js` converts ordered reviewed People into a template-safe byline view model. It preserves one-based order, supports one/two/three-or-more grammar and optional HTTP(S) profile links, and returns no byline for empty or malformed assignment sets. Handlebars performs the final display-name and URL escaping.
 - `publicPublicationDisplay.js` derives the nullable detail-page Published view model from Event Date plus reviewed publication facts. It validates literal calendar dates, preserves the calendar day written in an exact timestamp's explicit offset, and returns a display only when publication is more than 30 calendar days after Event. It also formats calendar dates without runtime-timezone conversion.
+- `blogPostingJsonLd.js` builds and safely serializes factual partial `BlogPosting` data for post-detail pages. It accepts reviewed Public Person authors, an explicitly assigned Person publisher, and a reviewed exact or date-only publication fact; it provides no fallback from login identity, Event Date, legacy timestamps, or `modified_at`, and never emits `dateModified`. Its serializer escapes script-breaking HTML characters and Unicode line separators.
 - `imageProcessor.js` processes uploaded images into thumbnail, medium, and large WebP variants.
 - `logger.js` provides shared logging.
 - `index.js` re-exports utilities.
@@ -214,7 +215,7 @@ Common route files:
 
 Confirmed route responsibilities:
 
-- Home/public routes: health check, homepage, about page, category page, search page, and single-post page.
+- Home/public routes: health check, homepage, about page, category page, search page, and single-post page. The single-post route reuses its reviewed ordered Public Person query for both the visible byline and the local factual `BlogPosting` view model, resolves an explicit publisher only when the post stores one, and selects a real post image when available.
 - Auth routes: login and logout.
 - Admin routes: dashboard, post/category administration, image upload handling, analytics/admin views, and protected admin workflows.
 
@@ -287,6 +288,11 @@ Common view folders:
 - `src/views/auth/`
 - `src/views/admin/`
 - top-level page templates such as home, about, search, category, error, 404, and 500 pages.
+
+Both active main layouts conditionally render a pre-serialized
+`application/ld+json` block only when the post-detail route supplies one.
+Homepage, About, category, and search rendering do not supply it. This
+structured-data integration is currently local and undeployed.
 
 CSS maintenance rule: avoid `!important` in committed styles. Use it only for temporary debugging, remove it before completion, and resolve lasting conflicts through selector specificity, cascade order, or refactoring.
 

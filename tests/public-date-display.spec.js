@@ -48,7 +48,7 @@ for (const site of sites) {
       'href', `${site.baseURL}/post/local-pagination-post-7`);
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
       'content', 'Local Pagination Post 7');
-    await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(0);
+    await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(1);
 
     await page.goto(`${site.baseURL}/post/local-unreviewed-legacy-author`);
     const unreviewedHeader = page.locator('.post-header');

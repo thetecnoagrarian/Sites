@@ -958,8 +958,27 @@ authorship, publisher, or other posts. The verified quiesced recovery set is
 `/opt/Sites/backups/ffg/backup-set-ffg3-publication-2026-09-29_11-25-09`.
 The same-image FFG restart passed health and log checks; one authorized live
 detail request rendered Event, Published, and the existing MDC byline and added
-exactly one expected analytics row. JSON-LD remains deferred and may later omit
-unsupported publication/modification dates.
+exactly one expected analytics row.
+
+### Repository factual BlogPosting checkpoint
+
+The repository implementation adds factual partial `BlogPosting` JSON-LD to
+post-detail pages only. Production has not received or been checked against
+this implementation. No deployment is authorized by this checkpoint.
+
+The payload requires a valid headline and canonical post URL. It may include a
+normalized description and a real post image. Reviewed ordered Public Person
+authors are included only for `verified` or `owner_attested` authorship. A
+publisher is included only when a Person is explicitly stored on that post;
+there is no site default or inferred Organization. `datePublished` is included
+only for one valid reviewed exact or date-only fact, independently of the
+30-day visible Published threshold. FFG post ID 3 is the only currently
+established historical example; other historical posts omit the field.
+`created_at` remains Event Date, and neither it nor `updated_at` or
+`modified_at` supplies a structured-data fallback. `dateModified` is not
+emitted. Homepage, About, category, search, and sitemap behavior are unchanged.
+The JSON serializer escapes script-breaking characters before the layout emits
+the conditional script block.
 
 ## 10. Rollback Concepts
 

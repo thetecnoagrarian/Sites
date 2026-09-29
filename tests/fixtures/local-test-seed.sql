@@ -43,7 +43,7 @@ VALUES (
     'Synthetic local test body containing the unique search marker isolated-harness-search-marker.',
     '',
     'A "quoted" & <em>HTML-like</em> summary for safe metadata.',
-    '[]',
+    '[{"medium":"/images/nostr.png"}]',
     '[]',
     '2026-01-08 12:00:00',
     NULL
@@ -149,6 +149,82 @@ SET published_at = NULL,
     publication_reviewed_at = NULL,
     publication_review_note = NULL
 WHERE slug = 'local-unreviewed-legacy-author';
+
+-- Detail-only JSON-LD fixtures keep reviewed authorship independent from
+-- publication history and reproduce the one approved date-only historical fact.
+INSERT INTO posts (
+    title, slug, body, description, excerpt, images, captions, created_at, author_id
+)
+VALUES
+    ('Local Reviewed Author Unreviewed Publication',
+     'local-reviewed-author-unreviewed-publication',
+     'Synthetic reviewed-author body.',
+     'Synthetic reviewed-author description.',
+     'Synthetic reviewed-author excerpt.', '[]', '[]', '2020-01-01', NULL),
+    ('Local FFG3 Publication',
+     'local-ffg3-publication',
+     'Synthetic FFG3-like body.',
+     'Synthetic FFG3-like description.',
+     'Synthetic FFG3-like excerpt.', '[]', '[]', '2022-07-18', NULL)
+ON CONFLICT(slug) DO UPDATE SET
+    title = excluded.title,
+    body = excluded.body,
+    description = excluded.description,
+    excerpt = excluded.excerpt,
+    images = excluded.images,
+    captions = excluded.captions,
+    created_at = excluded.created_at,
+    author_id = NULL;
+
+UPDATE posts
+SET authorship_review_state = 'unreviewed',
+    authorship_reviewed_at = NULL,
+    authorship_review_note = NULL
+WHERE slug IN (
+    'local-reviewed-author-unreviewed-publication',
+    'local-ffg3-publication'
+);
+
+DELETE FROM post_public_authors
+WHERE post_id IN (
+    SELECT id FROM posts WHERE slug IN (
+        'local-reviewed-author-unreviewed-publication',
+        'local-ffg3-publication'
+    )
+);
+
+INSERT INTO post_public_authors (post_id, public_person_id, position)
+SELECT posts.id, public_people.id, 1
+FROM posts, public_people
+WHERE posts.slug IN (
+        'local-reviewed-author-unreviewed-publication',
+        'local-ffg3-publication'
+    )
+  AND public_people.public_key = 'mode-b-author-one';
+
+UPDATE posts
+SET publisher_public_person_id = NULL,
+    published_at = NULL,
+    published_on = NULL,
+    authorship_review_state = 'owner_attested',
+    authorship_reviewed_at = '2026-09-29T12:00:00Z',
+    authorship_review_note = 'Synthetic JSON-LD fixture',
+    publication_review_state = 'unreviewed',
+    publication_reviewed_at = NULL,
+    publication_review_note = NULL
+WHERE slug = 'local-reviewed-author-unreviewed-publication';
+
+UPDATE posts
+SET publisher_public_person_id = NULL,
+    published_at = NULL,
+    published_on = '2024-09-22',
+    authorship_review_state = 'owner_attested',
+    authorship_reviewed_at = '2026-09-29T12:00:00Z',
+    authorship_review_note = 'Synthetic JSON-LD fixture',
+    publication_review_state = 'owner_attested',
+    publication_reviewed_at = '2026-09-29T12:00:00Z',
+    publication_review_note = 'Synthetic owner-attested publication fixture'
+WHERE slug = 'local-ffg3-publication';
 
 INSERT INTO posts (
     title,

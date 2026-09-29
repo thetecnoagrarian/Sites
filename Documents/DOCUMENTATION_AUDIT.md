@@ -33,7 +33,10 @@ This audit is the current classification record and archive log. It does not aut
 > FFG post ID 3 currently has owner-supported reader value for a historical
 > publication date. Its controlled operation completed on 2026-09-29 with the
 > owner-attested date-only value `2024-09-22`; other historical publication
-> facts remain unestablished and JSON-LD remains deferred.
+> facts remain unestablished. The repository now contains an undeployed factual
+> partial `BlogPosting` implementation for detail pages. It uses
+> reviewed Public Person authors, explicit Person publisher facts, and reviewed
+> publication facts without Event/legacy timestamp fallbacks or `dateModified`.
 > Dated audit batches below remain historical classification records.
 
 ## 2. Current Documentation Landscape

@@ -42,7 +42,7 @@ for (const site of sites) {
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
       'href', `${site.baseURL}/post/local-test-post`);
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute('content', 'Local Test Post');
-    await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(0);
+    await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(1);
   });
 
   test(`${site.name} unresolved authorship omits legacy username fallback`, async ({ page }) => {
@@ -51,7 +51,7 @@ for (const site of sites) {
       await expect(page.locator('.post-header .public-byline')).toHaveCount(0);
       await expect(page.locator('.post-header')).not.toContainText('mode-b-multer-admin');
       await expect(page.locator('.post-header')).toContainText('Event:');
-      await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(0);
+      await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(1);
     }
   });
 }

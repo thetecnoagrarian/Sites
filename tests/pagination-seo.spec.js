@@ -6,7 +6,9 @@ const sites = [
 ];
 
 const extractPostSlugs = (html) => (
-  [...html.matchAll(/href="\/post\/([^"]+)"/g)].map((match) => match[1])
+  [...new Set(
+    [...html.matchAll(/href="\/post\/([^"]+)"/g)].map((match) => match[1])
+  )]
 );
 
 const normalizeAttributeEntities = (html) => (
@@ -41,7 +43,7 @@ for (const site of sites) {
       const firstSlugs = extractPostSlugs(firstHtml);
       const secondSlugs = extractPostSlugs(secondHtml);
       expect(firstSlugs).toHaveLength(6);
-      expect(secondSlugs).toHaveLength(4);
+      expect(secondSlugs).toHaveLength(6);
       expect(secondSlugs.some((slug) => firstSlugs.includes(slug))).toBe(false);
     });
 

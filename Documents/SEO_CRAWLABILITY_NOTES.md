@@ -273,7 +273,9 @@ The original JSON-LD audit stopped before implementation because the earlier
 data model did not provide sufficiently reliable public facts for post
 authorship, publisher identity, or publication history. The later schema and
 editorial work now model those facts without inventing historical values, and
-reviewed Public Person bylines are deployed. JSON-LD itself remains deferred.
+reviewed Public Person bylines are deployed. The repository now contains a
+factual partial `BlogPosting` implementation for post-detail pages, but
+production has not received it.
 
 Supported factual data currently includes:
 
@@ -302,9 +304,8 @@ The original blockers were:
   reliable publication and modification semantics.
 
 The owner chose to model the facts first. Complete historical publication
-coverage is no longer a prerequisite for a later factual partial `BlogPosting`:
-unsupported `datePublished` and `dateModified` may be omitted. No JSON-LD is
-currently implemented.
+coverage is not a prerequisite for factual partial `BlogPosting`: unsupported
+`datePublished` is omitted, and `dateModified` is not emitted.
 
 The implemented model keeps public authors independent of login accounts,
 supports ordered multiple authors, and requires a newly published post to have
@@ -401,12 +402,27 @@ reader-value and evidence threshold. Its controlled operation completed on
 `2024-09-22`, reviewed at `2026-09-29T11:28:23Z`. It does not establish a
 publisher or modification fact, and the other 19 FFG posts remain unchanged.
 
-The provisional future policy is `WebSite` for homepages, `AboutPage` for About,
-and `BlogPosting` for posts. Category and search pages would remain without
-JSON-LD unless later evidence supports it. Any implementation must serialize
-structured data safely and escape closing script sequences, `<`, `>`, `&`, and
-Unicode line separators U+2028 and U+2029. Do not construct JSON-LD with unsafe
-string concatenation.
+The undeployed repository implementation emits one safely serialized
+`BlogPosting` object on post-detail pages only. Its required factual core is
+headline, canonical URL, and `mainEntityOfPage`; normalized description and a
+real post image are optional. It includes ordered reviewed Public Person
+authors only for `verified` or `owner_attested` authorship. It includes a
+publisher only when that post explicitly references a Person and never infers
+an Organization from the site name. It includes `datePublished` only for one
+valid `verified` or `owner_attested` exact or date-only publication fact. The
+public display's 30-day threshold does not govern this factual field: the
+reviewed fact is emitted even when the visible Published row is intentionally
+suppressed. Event Date, `created_at`, legacy `updated_at`, and `modified_at`
+never provide fallbacks, and `dateModified` is absent. At present FFG post ID 3
+can emit the reviewed historical date `2024-09-22`; other historical posts
+without reviewed publication facts omit `datePublished`.
+
+Homepage, About, category, and search pages remain without JSON-LD in this
+slice. The serializer escapes closing script sequences, `<`, `>`, `&`, and
+Unicode line separators U+2028 and U+2029 rather than constructing JSON-LD with
+string concatenation. The slice has not been deployed or verified against
+production. Possible future `WebSite` and `AboutPage` markup remains a
+separate decision.
 
 ## Search Console Interpretation
 
@@ -471,5 +487,6 @@ Use URL Inspection only for representative remaining examples after the known fi
 - Add published/draft filtering to sitemap generation if the content model gains explicit publication state.
 - Treat the public date-model simplification as deployed at `26061b6`; do not
   repeat its production rollout.
-- Reconsider factual partial JSON-LD separately; omit unsupported publication
-  and modification dates rather than reconstructing the historical corpus.
+- Perform a read-only production preflight before any deployment of the factual
+  partial `BlogPosting` slice; continue omitting unsupported publication and
+  modification dates rather than reconstructing the historical corpus.

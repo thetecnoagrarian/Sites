@@ -1,11 +1,14 @@
 import express from 'express';
 import {
+    buildBlogPostingJsonLd,
     buildPublicByline,
     buildPagination,
     getPublicPublicationDisplay,
     getPagedMetaDescription,
     getPostMetaDescription,
-    parsePageNumber
+    parsePageNumber,
+    resolveAbsoluteWebUrl,
+    serializeJsonLd
 } from '@ffg/blog-core';
 import buildOgTags, { SITE_DESCRIPTION } from '../middleware/ogTags.js';
 import { getHeroImagePath } from '../utils/heroImageProcessor.js';
@@ -227,7 +230,7 @@ router.get('/search', async (req, res) => {
 // Single post page
 router.get('/post/:slug', async (req, res) => {
     try {
-        const { Post, PostPublication } = await import('@ffg/blog-core');
+        const { Post, PostPublication, PublicPerson } = await import('@ffg/blog-core');
         const post = Post.findBySlug(req.params.slug);
         if (!post) {
             return res.status(404).render('error', {
@@ -269,8 +272,32 @@ router.get('/post/:slug', async (req, res) => {
 
         post.categories = Post.getCategories ? Post.getCategories(post.id) : [];
         post.multipleImages = Array.isArray(post.imageList) && post.imageList.length > 1;
-        post.publicByline = buildPublicByline(PostPublication.getReviewedAuthors(post.id));
+        const reviewedAuthors = PostPublication.getReviewedAuthors(post.id);
+        post.publicByline = buildPublicByline(reviewedAuthors);
         post.publicationDisplay = getPublicPublicationDisplay(post.created_at, post);
+
+        const canonicalUrl = getCanonicalUrl(res, `/post/${post.slug}`);
+        const metaDescription = getPostMetaDescription(post);
+        const representativeImagePath = post.imageList?.[0]?.medium
+            ?? post.images?.[0]?.medium
+            ?? null;
+        const publisher = post.publisher_public_person_id
+            ? PublicPerson.findById(post.publisher_public_person_id)
+            : null;
+        const blogPostingJsonLd = serializeJsonLd(buildBlogPostingJsonLd({
+            headline: post.title,
+            description: metaDescription,
+            canonicalUrl,
+            imageUrl: resolveAbsoluteWebUrl(representativeImagePath, canonicalUrl),
+            authors: reviewedAuthors,
+            authorshipReviewState: post.authorship_review_state,
+            publisher,
+            publication: {
+                state: post.publication_review_state,
+                publishedOn: post.published_on,
+                publishedAt: post.published_at
+            }
+        }));
 
         res.locals.post = post; // Make post available to template
         const ogTags = await buildOgTags(post, req);
@@ -278,8 +305,9 @@ router.get('/post/:slug', async (req, res) => {
             title: post.title,
             post,
             ogTags,
-            metaDescription: getPostMetaDescription(post),
-            canonicalUrl: getCanonicalUrl(res, `/post/${post.slug}`)
+            metaDescription,
+            canonicalUrl,
+            blogPostingJsonLd
         });
     } catch (error) {
         console.error('Error loading post:', error);

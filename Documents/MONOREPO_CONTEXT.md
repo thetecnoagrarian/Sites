@@ -273,9 +273,21 @@ currently has sufficient reader-facing chronology value and owner evidence to
 justify a historical publication fact. The controlled one-row operation
 completed on 2026-09-29 and records the owner-attested date-only value
 `2024-09-22`, reviewed at `2026-09-29T11:28:23Z`. Event, legacy timestamps,
-authorship, publisher, and the other 19 FFG posts were preserved. JSON-LD
-remains deferred; a later factual partial `BlogPosting` may omit unsupported
-`datePublished` and `dateModified` values.
+authorship, publisher, and the other 19 FFG posts were preserved.
+
+The repository now contains an undeployed factual partial `BlogPosting`
+JSON-LD slice for post-detail pages. It uses the canonical post URL, headline, normalized
+description, and an optional real post image. Ordered Public Person authors are
+included only for `verified` or `owner_attested` authorship. A publisher is
+included only when a Person is explicitly assigned to that post; site names are
+not inferred as Organizations. `datePublished` is included only for one valid
+reviewed exact or date-only publication fact, so the currently established
+historical example is FFG post ID 3 with `2024-09-22`. Other historical posts
+omit it. The structured data never substitutes Event Date, `created_at`,
+`updated_at`, or `modified_at`, and it does not emit `dateModified`. Homepage,
+category, and search pages remain without this JSON-LD. Safe serialization
+escapes script-breaking characters. This slice has not been deployed or
+verified against production.
 
 ## 8. Open Questions
 

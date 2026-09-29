@@ -23,6 +23,9 @@
     {{#if canonicalUrl}}
     <link rel="canonical" href="{{canonicalUrl}}">
     {{/if}}
+    {{#if blogPostingJsonLd}}
+    <script type="application/ld+json">{{{blogPostingJsonLd}}}</script>
+    {{/if}}
     {{#if robotsDirective}}
     <meta name="robots" content="{{robotsDirective}}">
     {{/if}}

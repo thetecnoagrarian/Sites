@@ -1,4 +1,5 @@
 export * from './imageProcessor.js';
+export * from './blogPostingJsonLd.js';
 export * from './metaDescription.js';
 export * from './pagination.js';
 export * from './publicByline.js';
