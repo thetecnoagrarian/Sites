@@ -3,6 +3,35 @@ import path from 'path';
 import { promises as fs } from 'fs';
 import { fileURLToPath } from 'url';
 
+const HERO_IMAGE_PATH = '/images/HeroCamp.webp';
+const HERO_OG_IMAGE_PATH = '/images/HeroCamp-og.webp';
+
+const getDefaultImagesDir = () => {
+  const currentFile = fileURLToPath(import.meta.url);
+  return path.resolve(path.dirname(currentFile), '../public/images');
+};
+
+const getImageDescriptor = async (imagesDir, publicPath) => {
+  const filePath = path.join(imagesDir, path.basename(publicPath));
+  try {
+    await fs.access(filePath);
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+
+  const metadata = await sharp(filePath).metadata();
+  if (!Number.isInteger(metadata.width) || !Number.isInteger(metadata.height)) {
+    throw new Error(`Image dimensions are unavailable for ${filePath}`);
+  }
+
+  return {
+    path: publicPath,
+    width: metadata.width,
+    height: metadata.height
+  };
+};
+
 /**
  * Process hero image: creates both hero and OG versions
  * @param {string} inputPath - Path to uploaded image file
@@ -21,8 +50,8 @@ const processHeroImage = async (inputPath, imagesDir = null) => {
     const { width, height } = metadata;
 
     // Delete old hero images before processing new ones
-    const oldHeroPath = path.join(outputDir, 'HeroCamp.webp');
-    const oldOgPath = path.join(outputDir, 'HeroCamp-og.webp');
+    const oldHeroPath = path.join(outputDir, path.basename(HERO_IMAGE_PATH));
+    const oldOgPath = path.join(outputDir, path.basename(HERO_OG_IMAGE_PATH));
     
     try {
       await fs.unlink(oldHeroPath);
@@ -51,7 +80,7 @@ const processHeroImage = async (inputPath, imagesDir = null) => {
       heroHeight = Math.round(heroMaxWidth / aspectRatio);
     }
 
-    const heroOutputPath = path.join(outputDir, 'HeroCamp.webp');
+    const heroOutputPath = path.join(outputDir, path.basename(HERO_IMAGE_PATH));
     
     await sharp(inputPath)
       .resize(heroWidth, heroHeight, {
@@ -62,7 +91,7 @@ const processHeroImage = async (inputPath, imagesDir = null) => {
       .toFile(heroOutputPath);
 
     // Process OG Image: 1200x630px with center crop
-    const ogOutputPath = path.join(outputDir, 'HeroCamp-og.webp');
+    const ogOutputPath = path.join(outputDir, path.basename(HERO_OG_IMAGE_PATH));
     
     await sharp(inputPath)
       .resize(1200, 630, {
@@ -77,8 +106,8 @@ const processHeroImage = async (inputPath, imagesDir = null) => {
     const ogStats = await fs.stat(ogOutputPath);
 
     return {
-      heroImagePath: '/images/HeroCamp.webp',
-      ogImagePath: '/images/HeroCamp-og.webp',
+      heroImagePath: HERO_IMAGE_PATH,
+      ogImagePath: HERO_OG_IMAGE_PATH,
       heroSize: heroStats.size,
       ogSize: ogStats.size,
       heroDimensions: { width: heroWidth, height: heroHeight },
@@ -96,8 +125,8 @@ const processHeroImage = async (inputPath, imagesDir = null) => {
  * @returns {Promise<boolean>}
  */
 const heroImageExists = async (imagesDir = null) => {
-  const dir = imagesDir || path.join(process.cwd(), 'src/public/images');
-  const heroPath = path.join(dir, 'HeroCamp.webp');
+  const dir = imagesDir || getDefaultImagesDir();
+  const heroPath = path.join(dir, path.basename(HERO_IMAGE_PATH));
   
   try {
     await fs.access(heroPath);
@@ -108,43 +137,29 @@ const heroImageExists = async (imagesDir = null) => {
 };
 
 /**
- * Get hero image path if it exists
- * Falls back to about page hero image (HeroCamp.png) if no uploaded hero image exists
+ * Get the optimized hero image and its intrinsic dimensions.
+ * The archival HeroCamp.png is deliberately not a public fallback.
  * @param {string} imagesDir - Directory to check (default: src/public/images)
- * @returns {Promise<string|null>} Path to hero image or null if doesn't exist
+ * @returns {Promise<Object|null>} Public path and dimensions, or null if missing
  */
-const getHeroImagePath = async (imagesDir = null) => {
-  // Use __dirname to get the actual file location, then resolve relative to it
-  // This works better in Docker containers where process.cwd() might not be reliable
-  const fileUrl = import.meta.url;
-  const currentFile = fileURLToPath(fileUrl);
-  const currentDir = path.dirname(currentFile);
-  
-  // Resolve images directory: go up from utils/ to src/, then to public/images
-  const defaultDir = path.resolve(currentDir, '../public/images');
-  const dir = imagesDir || defaultDir;
-  
-  // First check for uploaded hero image (HeroCamp.webp)
-  const uploadedHeroPath = path.join(dir, 'HeroCamp.webp');
-  try {
-    await fs.access(uploadedHeroPath);
-    return '/images/HeroCamp.webp';
-  } catch {
-    // Fallback to about page hero image (HeroCamp.png)
-    const defaultHeroPath = path.join(dir, 'HeroCamp.png');
-    try {
-      await fs.access(defaultHeroPath);
-      return '/images/HeroCamp.png';
-    } catch (err) {
-      console.error('Hero image not found at:', defaultHeroPath, err.message);
-      return null;
-    }
-  }
+const getHeroImage = async (imagesDir = null) => (
+  getImageDescriptor(imagesDir || getDefaultImagesDir(), HERO_IMAGE_PATH)
+);
+
+const getHeroOgImage = async (imagesDir = null) => {
+  const dir = imagesDir || getDefaultImagesDir();
+  return (await getImageDescriptor(dir, HERO_OG_IMAGE_PATH))
+    || getImageDescriptor(dir, HERO_IMAGE_PATH);
 };
+
+const getHeroImagePath = async (imagesDir = null) => (
+  (await getHeroImage(imagesDir))?.path || null
+);
 
 export {
   processHeroImage,
   heroImageExists,
+  getHeroImage,
+  getHeroOgImage,
   getHeroImagePath
 };
-

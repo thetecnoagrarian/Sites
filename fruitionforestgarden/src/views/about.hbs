@@ -1,5 +1,7 @@
 <div class="about-container">
-   <img src="/images/HeroCamp.png" alt="Aerial view of Fruition Forest Garden" class="about-image lightbox-trigger" data-caption="Aerial view of Fruition Forest Garden">
+   {{#if heroImage}}
+   <img src="{{heroImage.path}}" width="{{heroImage.width}}" height="{{heroImage.height}}" alt="Aerial view of Fruition Forest Garden" class="about-image lightbox-trigger" data-caption="Aerial view of Fruition Forest Garden" loading="eager" fetchpriority="high" decoding="async">
+   {{/if}}
    
    <div class="about-text">
      <h2>About Us</h2>

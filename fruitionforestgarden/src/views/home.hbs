@@ -1,9 +1,9 @@
 <div class="hero-content">
     <h1>Fruition Forest Garden</h1>
 </div>
-{{#if heroImagePath}}
+{{#if heroImage}}
 <div class="hero">
-    <img src="{{heroImagePath}}" alt="Aerial view of Fruition Forest Garden" class="hero-image lightbox-trigger" data-caption="Aerial view of Fruition Forest Garden">
+    <img src="{{heroImage.path}}" width="{{heroImage.width}}" height="{{heroImage.height}}" alt="Aerial view of Fruition Forest Garden" class="hero-image lightbox-trigger" data-caption="Aerial view of Fruition Forest Garden" loading="eager" fetchpriority="high" decoding="async">
 </div>
 {{/if}}
 

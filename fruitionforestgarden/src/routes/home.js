@@ -11,7 +11,7 @@ import {
     serializeJsonLd
 } from '@ffg/blog-core';
 import buildOgTags, { SITE_DESCRIPTION } from '../middleware/ogTags.js';
-import { getHeroImagePath } from '../utils/heroImageProcessor.js';
+import { getHeroImage } from '../utils/heroImageProcessor.js';
 
 const router = express.Router();
 
@@ -91,7 +91,7 @@ router.get('/', async (req, res) => {
         }
 
         // Get hero image path if it exists
-        const heroImagePath = await getHeroImagePath();
+        const heroImage = await getHeroImage();
 
         // Add default OG tags for home page (pass req for dynamic base URL)
         const ogTags = await buildOgTags(null, req);
@@ -100,7 +100,7 @@ router.get('/', async (req, res) => {
             title: 'Home',
             posts,
             pagination,
-            heroImagePath,
+            heroImage,
             ogTags,
             metaDescription: getPagedMetaDescription(SITE_DESCRIPTION, page),
             canonicalUrl: getCanonicalUrl(res, pagination.currentUrl)
@@ -117,6 +117,7 @@ router.get('/', async (req, res) => {
 // About page
 router.get('/about', async (req, res) => {
     const canonicalUrl = getCanonicalUrl(res, '/about');
+    const heroImage = await getHeroImage();
     const ogTags = await buildOgTags(null, req, {
         title: ABOUT_TITLE,
         description: ABOUT_DESCRIPTION,
@@ -124,6 +125,7 @@ router.get('/about', async (req, res) => {
     });
     res.render('about', {
         title: 'About',
+        heroImage,
         ogTags,
         metaDescription: ABOUT_DESCRIPTION,
         canonicalUrl

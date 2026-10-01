@@ -1,9 +1,4 @@
-import path from 'path';
-import { promises as fs } from 'fs';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { getHeroOgImage } from '../utils/heroImageProcessor.js';
 
 export const SITE_DESCRIPTION = 'A blog about our adventure building our homestead on a undeveloped 20 acres in Michigan\'s Upper Peninsula.';
 
@@ -26,39 +21,11 @@ function getBaseUrl(req) {
   return process.env.BASE_URL || 'https://www.fruitionforestgarden.com';
 }
 
-// Check if hero OG image exists (WebP format)
-async function getHeroOgImagePath() {
-  const imagesDir = path.join(process.cwd(), 'src/public/images');
-  
-  // Priority 1: Check for uploaded OG image (HeroCamp-og.webp)
-  const ogPath = path.join(imagesDir, 'HeroCamp-og.webp');
-  try {
-    await fs.access(ogPath);
-    return '/images/HeroCamp-og.webp';
-  } catch {
-    // Priority 2: Fallback to uploaded hero image (HeroCamp.webp)
-    const heroPath = path.join(imagesDir, 'HeroCamp.webp');
-    try {
-      await fs.access(heroPath);
-      return '/images/HeroCamp.webp';
-    } catch {
-      // Priority 3: Fallback to about page hero image (HeroCamp.png)
-      const defaultHeroPath = path.join(imagesDir, 'HeroCamp.png');
-      try {
-        await fs.access(defaultHeroPath);
-        return '/images/HeroCamp.png';
-      } catch {
-        // Priority 4: Final fallback to old OG PNG if it exists
-        const oldOgPath = path.join(imagesDir, 'HeroCamp-og.png');
-        try {
-          await fs.access(oldOgPath);
-          return '/images/HeroCamp-og.png';
-        } catch {
-          return null;
-        }
-      }
-    }
-  }
+// Resolve the tracked/admin-managed WebP social image without falling back to
+// the archival 19 MB source PNG.
+async function getSiteImagePath(imagesDir = null) {
+  const image = await getHeroOgImage(imagesDir);
+  return image?.path || '/images/FFGnewLogo.PNG';
 }
 
 async function buildOgTags(post, req = null, pageMetadata = null) {
@@ -94,13 +61,7 @@ async function buildOgTags(post, req = null, pageMetadata = null) {
   
   // For homepage or if no post image, use hero OG image
   if (!image) {
-    const heroOgPath = await getHeroOgImagePath();
-    if (heroOgPath) {
-      image = `${baseUrl}${heroOgPath}`;
-    } else {
-      // Final fallback to about page hero image
-      image = `${baseUrl}/images/HeroCamp.png`;
-    }
+    image = `${baseUrl}${await getSiteImagePath()}`;
   }
   
   return `
@@ -120,3 +81,4 @@ async function buildOgTags(post, req = null, pageMetadata = null) {
 
 // Remove the Express middleware and res.send interception logic
 export default buildOgTags;
+export { getSiteImagePath };

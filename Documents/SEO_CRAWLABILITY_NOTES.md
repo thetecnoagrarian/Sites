@@ -273,9 +273,9 @@ The original JSON-LD audit stopped before implementation because the earlier
 data model did not provide sufficiently reliable public facts for post
 authorship, publisher identity, or publication history. The later schema and
 editorial work now model those facts without inventing historical values, and
-reviewed Public Person bylines are deployed. The repository now contains a
-factual partial `BlogPosting` implementation for post-detail pages, but
-production has not received it.
+reviewed Public Person bylines are deployed. Production now contains the
+factual partial `BlogPosting` implementation for post-detail pages at
+`6be6ce9e61c9ee42dee900f6318d217ba00b86f0`.
 
 Supported factual data currently includes:
 
@@ -402,7 +402,7 @@ reader-value and evidence threshold. Its controlled operation completed on
 `2024-09-22`, reviewed at `2026-09-29T11:28:23Z`. It does not establish a
 publisher or modification fact, and the other 19 FFG posts remain unchanged.
 
-The undeployed repository implementation emits one safely serialized
+The deployed implementation emits one safely serialized
 `BlogPosting` object on post-detail pages only. Its required factual core is
 headline, canonical URL, and `mainEntityOfPage`; normalized description and a
 real post image are optional. It includes ordered reviewed Public Person
@@ -420,9 +420,9 @@ without reviewed publication facts omit `datePublished`.
 Homepage, About, category, and search pages remain without JSON-LD in this
 slice. The serializer escapes closing script sequences, `<`, `>`, `&`, and
 Unicode line separators U+2028 and U+2029 rather than constructing JSON-LD with
-string concatenation. The slice has not been deployed or verified against
-production. Possible future `WebSite` and `AboutPage` markup remains a
-separate decision.
+string concatenation. The slice was deployed and verified against production
+at `6be6ce9e61c9ee42dee900f6318d217ba00b86f0`. Possible future `WebSite` and
+`AboutPage` markup remains a separate decision.
 
 ## Search Console Interpretation
 
@@ -485,8 +485,15 @@ Use URL Inspection only for representative remaining examples after the known fi
 - Add a sanitized nginx canonical redirect template to the repo later.
 - Review whether canonical URL generation should be consolidated with Open Graph URL generation.
 - Add published/draft filtering to sitemap generation if the content model gains explicit publication state.
-- Treat the public date-model simplification as deployed at `26061b6`; do not
-  repeat its production rollout.
-- Perform a read-only production preflight before any deployment of the factual
-  partial `BlogPosting` slice; continue omitting unsupported publication and
-  modification dates rather than reconstructing the historical corpus.
+- Treat the public date-model simplification and factual partial `BlogPosting`
+  slice as deployed at `6be6ce9`; do not repeat their production rollout.
+- Continue omitting unsupported publication and modification dates rather than
+  reconstructing the historical corpus.
+- The current local working tree optimizes the Fruition Forest Garden homepage
+  and About hero with repository-local WebP display and social assets, factual
+  intrinsic dimensions, eager high-priority loading, and no public fallback to
+  the archival 19 MB PNG. It is not deployed; production remains at `6be6ce9`
+  pending a separate preflight and explicit authorization.
+  `HeroCamp.png` remains the unchanged tracked source image. No production LCP
+  or Core Web Vitals improvement is claimed; production measurement remains a
+  separate explicitly authorized step after deployment.

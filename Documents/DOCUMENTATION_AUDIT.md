@@ -21,22 +21,25 @@ The goals are:
 
 This audit is the current classification record and archive log. It does not authorize future cleanup or operational changes beyond an explicitly approved task.
 
-> Current-state checkpoint (2026-09-29): use
+> Current-state checkpoint (2026-10-01): use
 > `Documents/DEPLOYMENT_RUNBOOK.md` for production, capacity, and host-backup
 > state; `Documents/SEO_CRAWLABILITY_NOTES.md` for current SEO and structured-data
 > decisions, including the Event/conditional-Published public date policy and
 > intentional omission of post sitemap `lastmod`; and
 > `Documents/MONOREPO_CONTEXT.md` for the next project phase.
-> The date-policy implementation is deployed at `26061b6`: public `Posted` is
+> The date-policy implementation is deployed: public `Posted` is
 > gone, Event remains, conditional Published support is live, and post sitemap
 > entries omit `lastmod`. Corpus-wide publication recovery is abandoned; only
 > FFG post ID 3 currently has owner-supported reader value for a historical
 > publication date. Its controlled operation completed on 2026-09-29 with the
 > owner-attested date-only value `2024-09-22`; other historical publication
-> facts remain unestablished. The repository now contains an undeployed factual
-> partial `BlogPosting` implementation for detail pages. It uses
+> facts remain unestablished. The factual partial `BlogPosting` implementation
+> for detail pages is deployed and verified at `6be6ce9`. It uses
 > reviewed Public Person authors, explicit Person publisher facts, and reviewed
 > publication facts without Event/legacy timestamp fallbacks or `dateModified`.
+> The current local working tree also contains a narrow Fruition Forest Garden
+> hero optimization with repository-local WebP display/social assets and no
+> public use of the archival 19 MB PNG; it is not yet deployed.
 > Dated audit batches below remain historical classification records.
 
 ## 2. Current Documentation Landscape

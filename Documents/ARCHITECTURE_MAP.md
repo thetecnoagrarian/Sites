@@ -292,7 +292,8 @@ Common view folders:
 Both active main layouts conditionally render a pre-serialized
 `application/ld+json` block only when the post-detail route supplies one.
 Homepage, About, category, and search rendering do not supply it. This
-structured-data integration is currently local and undeployed.
+structured-data integration is deployed and verified at
+`6be6ce9e61c9ee42dee900f6318d217ba00b86f0`.
 
 CSS maintenance rule: avoid `!important` in committed styles. Use it only for temporary debugging, remove it before completion, and resolve lasting conflicts through selector specificity, cascade order, or refactoring.
 
@@ -300,7 +301,12 @@ CSS maintenance rule: avoid `!important` in committed styles. Use it only for te
 
 Confirmed differences visible from safe inspection:
 
-- Fruition Forest Garden has `src/utils/heroImageProcessor.js` and an admin hero-image view, suggesting site-specific hero image management.
+- Fruition Forest Garden has `src/utils/heroImageProcessor.js` and an admin
+  hero-image view for site-specific hero image management. The current local
+  working tree also adds a 1920-by-1440 WebP display asset and a 1200-by-630
+  WebP social crop, resolves their factual intrinsic dimensions at render time,
+  and excludes the archival 19 MB PNG from public fallbacks. This optimization
+  is present in repository source but is not yet deployed.
 - Fruition Forest Garden public images include `HeroCamp` assets and favicon subfolder assets.
 - The Tecnoagrarian has `src/database/seed.js`.
 - The Tecnoagrarian Open Graph logic uses hardcoded production-domain tags, while Fruition Forest Garden Open Graph logic can derive a base URL from the request and has hero-image fallback logic.

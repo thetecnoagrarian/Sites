@@ -34,6 +34,78 @@ const namedValues = (html, name) => (
 );
 const conventionalDescriptions = (html) => html.match(/<meta name="description" content="[^"]*">/g) || [];
 
+test.describe('FFG optimized hero delivery', () => {
+  const baseUrl = 'http://127.0.0.1:4000';
+  const optimizedHero = `${baseUrl}/images/HeroCamp.webp`;
+  const optimizedSocial = `${baseUrl}/images/HeroCamp-og.webp`;
+
+  for (const pageCase of [
+    { name: 'homepage', path: '/', selector: '.hero-image' },
+    { name: 'About', path: '/about', selector: '.about-image' }
+  ]) {
+    test(`${pageCase.name} uses the optimized eager hero with intrinsic dimensions`, async ({ page }) => {
+      const requestedImages = [];
+      page.on('request', (request) => {
+        if (request.resourceType() === 'image') requestedImages.push(request.url());
+      });
+
+      const heroResponse = page.waitForResponse((response) => response.url() === optimizedHero);
+      const response = await page.goto(`${baseUrl}${pageCase.path}`);
+      expect(response.status()).toBe(200);
+      expect((await heroResponse).status()).toBe(200);
+
+      const hero = page.locator(pageCase.selector);
+      await expect(hero).toHaveAttribute('src', '/images/HeroCamp.webp');
+      await expect(hero).toHaveAttribute('width', '1920');
+      await expect(hero).toHaveAttribute('height', '1440');
+      await expect(hero).toHaveAttribute('loading', 'eager');
+      await expect(hero).toHaveAttribute('fetchpriority', 'high');
+      await expect(hero).toHaveAttribute('decoding', 'async');
+
+      const geometry = await hero.evaluate((image) => ({
+        naturalWidth: image.naturalWidth,
+        naturalHeight: image.naturalHeight,
+        renderedWidth: image.getBoundingClientRect().width,
+        renderedHeight: image.getBoundingClientRect().height,
+        top: image.getBoundingClientRect().top,
+        viewportHeight: window.innerHeight,
+        objectFit: getComputedStyle(image).objectFit
+      }));
+      expect(geometry.naturalWidth).toBe(1920);
+      expect(geometry.naturalHeight).toBe(1440);
+      expect(geometry.renderedWidth).toBeGreaterThan(0);
+      expect(geometry.renderedHeight).toBeGreaterThan(0);
+      expect(geometry.top).toBeLessThan(geometry.viewportHeight);
+      if (pageCase.name === 'homepage') {
+        expect(geometry.objectFit).toBe('cover');
+      } else {
+        expect(geometry.renderedWidth / geometry.renderedHeight).toBeCloseTo(4 / 3, 1);
+      }
+
+      expect(requestedImages).toContain(optimizedHero);
+      expect(requestedImages.some((url) => url.endsWith('/images/HeroCamp.png'))).toBe(false);
+    });
+  }
+
+  test('homepage and About keep metadata semantics while using the optimized social image', async ({ request }) => {
+    for (const pageCase of [
+      { path: '/', canonical: `${baseUrl}/` },
+      { path: '/about', canonical: `${baseUrl}/about` }
+    ]) {
+      const response = await request.get(`${baseUrl}${pageCase.path}`);
+      expect(response.status()).toBe(200);
+      const html = await response.text();
+
+      expect(propertyValues(html, 'og:image')).toEqual([optimizedSocial]);
+      expect(namedValues(html, 'twitter:image')).toEqual([optimizedSocial]);
+      expect(html).toContain(`<link rel="canonical" href="${pageCase.canonical}">`);
+      expect(conventionalDescriptions(html)).toHaveLength(1);
+      expect(html).not.toContain('HeroCamp.png');
+      expect(html).not.toContain('application/ld+json');
+    }
+  });
+});
+
 for (const site of sites) {
   test.describe(`${site.name} About Open Graph metadata`, () => {
     test('About has one accurate Open Graph identity and preserves canonical and conventional description', async ({ request }) => {

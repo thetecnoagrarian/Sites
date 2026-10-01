@@ -58,9 +58,10 @@ Both The Tecnoagrarian and Fruition Forest Garden are live production sites.
 They retain distinct identities and content, while shared behavior should be
 kept in `blog-core` when it genuinely applies to both. The current verified
 production source checkpoint is commit
-`26061b6e6498d9ff72676e090869915ca5255cdd`. The historical-authorship
-backfill and subsequent public date-model simplification were separately
-authorized, deployed, and verified before this checkpoint.
+`6be6ce9e61c9ee42dee900f6318d217ba00b86f0`. The historical-authorship
+backfill, public date-model simplification, and factual partial `BlogPosting`
+slice were separately authorized, deployed, and verified before this
+checkpoint.
 
 ## 3. Shared `blog-core` Role
 
@@ -275,7 +276,7 @@ completed on 2026-09-29 and records the owner-attested date-only value
 `2024-09-22`, reviewed at `2026-09-29T11:28:23Z`. Event, legacy timestamps,
 authorship, publisher, and the other 19 FFG posts were preserved.
 
-The repository now contains an undeployed factual partial `BlogPosting`
+Production now contains the factual partial `BlogPosting`
 JSON-LD slice for post-detail pages. It uses the canonical post URL, headline, normalized
 description, and an optional real post image. Ordered Public Person authors are
 included only for `verified` or `owner_attested` authorship. A publisher is
@@ -286,8 +287,14 @@ historical example is FFG post ID 3 with `2024-09-22`. Other historical posts
 omit it. The structured data never substitutes Event Date, `created_at`,
 `updated_at`, or `modified_at`, and it does not emit `dateModified`. Homepage,
 category, and search pages remain without this JSON-LD. Safe serialization
-escapes script-breaking characters. This slice has not been deployed or
-verified against production.
+escapes script-breaking characters. This slice is deployed and verified at
+`6be6ce9e61c9ee42dee900f6318d217ba00b86f0`.
+
+The current local working tree contains a narrow Fruition Forest Garden hero
+optimization: repository-local 1920-by-1440 WebP display and 1200-by-630 WebP
+social assets, factual intrinsic dimensions, eager high-priority loading for
+the visible hero, and removal of the archival 19 MB PNG from public fallbacks.
+This source change is not yet deployed.
 
 ## 8. Open Questions
 
