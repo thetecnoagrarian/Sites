@@ -15,7 +15,8 @@ const config = {
     uploadsPath: process.env.UPLOADS_PATH || path.join(__dirname, 'public/uploads'),
     viewsPath: path.join(__dirname, 'views'),
     publicPath: path.join(__dirname, 'public'),
-    baseUrl: process.env.BASE_URL || 'https://www.fruitionforestgarden.com'
+    baseUrl: process.env.BASE_URL || 'https://www.fruitionforestgarden.com',
+    privateUploadPathPatterns: [/^\/hero\/[0-9a-f-]+\/\.source(?:\/|$)/]
 };
 
 async function startApp() {

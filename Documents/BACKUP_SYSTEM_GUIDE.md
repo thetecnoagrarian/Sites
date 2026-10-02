@@ -186,6 +186,10 @@ under `/opt/Sites/backups`:
 
 - Container storage is temporary staging only; it is not a retention location.
 - One run creates exactly one SQLite backup and one uploads archive.
+- The recursive uploads archive includes FFG seasonal hero state under
+  `uploads/hero`: `.current.json`, the selected UUID generation, its non-public
+  retained source, and both display/social WebP derivatives. Restore must keep
+  the manifest and its selected generation together.
 - The SQLite backup uses the database backup operation and must pass an
   integrity check before transfer.
 - The host copies only the two artifacts created by that run.

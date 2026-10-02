@@ -7,6 +7,7 @@ const TEST_ADMIN = {
 };
 
 const DOCKER_BIN = process.env.DOCKER_BIN || '/usr/local/bin/docker';
+const MODE_B_PROJECT = process.env.MODE_B_PROJECT || 'sites-local-test';
 
 const TEST_SITES = [
   {
@@ -50,7 +51,7 @@ const tempFileCount = (service) => Number(execFileSync(
   DOCKER_BIN,
   [
     'compose',
-    '-p', 'sites-local-test',
+    '-p', MODE_B_PROJECT,
     '-f', 'docker-compose.test.yml',
     'exec', '-T', service,
     'sh', '-c',
@@ -221,7 +222,7 @@ test('Fruition Forest Garden authenticated hero upload', async ({ page }) => {
 
   await test.step('valid hero image', async () => {
     await page.goto(`${site.baseURL}/admin/hero-image`);
-    await expect(page.locator('input[name="_csrf"]')).toHaveValue(/.+/);
+    await expect(page.locator('form.hero-upload-form input[name="_csrf"]')).toHaveValue(/.+/);
     const before = tempFileCount(site.service);
     await page.locator('input[name="heroImage"]').setInputFiles(imageFile('ffg-hero-valid.png'));
     await Promise.all([
@@ -229,13 +230,48 @@ test('Fruition Forest Garden authenticated hero upload', async ({ page }) => {
       page.locator('form.hero-upload-form').evaluate((form) => form.requestSubmit())
     ]);
     await expect(page).toHaveURL(`${site.baseURL}/admin/hero-image`);
-    expect(tempFileCount(site.service)).toBe(before + 1);
+    expect(tempFileCount(site.service)).toBe(before);
+  });
+
+  await test.step('missing multipart CSRF is rejected and cleaned', async () => {
+    const before = tempFileCount(site.service);
+    const response = await page.context().request.post(`${site.baseURL}/admin/hero-image/upload`, {
+      multipart: { heroImage: imageFile('ffg-hero-missing-csrf.png') },
+      maxRedirects: 0
+    });
+    expect(response.status()).toBe(403);
+    expect(tempFileCount(site.service)).toBe(before);
+  });
+
+  await test.step('invalid multipart CSRF is rejected and cleaned', async () => {
+    const before = tempFileCount(site.service);
+    const response = await page.context().request.post(`${site.baseURL}/admin/hero-image/upload`, {
+      multipart: {
+        _csrf: 'invalid-synthetic-token',
+        heroImage: imageFile('ffg-hero-invalid-csrf.png')
+      },
+      maxRedirects: 0
+    });
+    expect(response.status()).toBe(403);
+    expect(tempFileCount(site.service)).toBe(before);
   });
 
   await test.step('invalid hero MIME rejection', async () => {
     await page.goto(`${site.baseURL}/admin/hero-image`);
     const before = tempFileCount(site.service);
     await page.locator('input[name="heroImage"]').setInputFiles(invalidFile);
+    await Promise.all([
+      page.waitForNavigation(),
+      page.locator('form.hero-upload-form').evaluate((form) => form.requestSubmit())
+    ]);
+    await expect(page).toHaveURL(`${site.baseURL}/admin/hero-image`);
+    expect(tempFileCount(site.service)).toBe(before);
+  });
+
+  await test.step('configured hero byte-size limit is preserved', async () => {
+    await page.goto(`${site.baseURL}/admin/hero-image`);
+    const before = tempFileCount(site.service);
+    await page.locator('input[name="heroImage"]').setInputFiles(oversizedImage);
     await Promise.all([
       page.waitForNavigation(),
       page.locator('form.hero-upload-form').evaluate((form) => form.requestSubmit())

@@ -290,11 +290,19 @@ category, and search pages remain without this JSON-LD. Safe serialization
 escapes script-breaking characters. This slice is deployed and verified at
 `6be6ce9e61c9ee42dee900f6318d217ba00b86f0`.
 
-The current local working tree contains a narrow Fruition Forest Garden hero
-optimization: repository-local 1920-by-1440 WebP display and 1200-by-630 WebP
-social assets, factual intrinsic dimensions, eager high-priority loading for
-the visible hero, and removal of the archival 19 MB PNG from public fallbacks.
-This source change is not yet deployed.
+Fruition Forest Garden uses immutable repository-local WebP assets as its
+default hero: 1920-by-1440 for visible display and 1200-by-630 for social
+metadata. The archival 19 MB PNG is not a runtime fallback.
+
+The current repository implementation is not yet deployed. It adds a persistent
+seasonal-hero layer under the configured runtime uploads path at
+`uploads/hero`. A strictly validated `.current.json` selects one complete UUID
+generation containing a retained source beneath `.source`, a display WebP, and
+a social WebP. Homepage/About and site-level social metadata prefer that
+generation, while an explicit admin reset atomically removes the selection and
+returns immediately to the repository defaults. Container recreation and
+deployment must preserve this state through the existing data volume; neither
+operation is a reset mechanism.
 
 ## 8. Open Questions
 

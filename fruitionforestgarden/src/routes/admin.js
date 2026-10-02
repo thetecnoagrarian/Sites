@@ -4,9 +4,22 @@ import { promises as fs } from 'fs';
 import multer from 'multer';
 import { isAuthenticated, isAdmin, createEditorialAdminRouter } from '@ffg/blog-core';
 import Analytics from '../models/analytics.js';
-import { processHeroImage, getHeroImagePath } from '../utils/heroImageProcessor.js';
+import {
+    publishHeroImage,
+    resetHeroImage,
+    resolveHeroImage,
+    withHeroOperationLock
+} from '../utils/heroImageStore.js';
 
 const router = express.Router();
+
+const removeHeroTemp = async filePath => {
+    try {
+        await fs.unlink(filePath);
+    } catch (error) {
+        if (error.code !== 'ENOENT') console.error('Hero temp cleanup failed:', error);
+    }
+};
 
 // Top-level logger for all admin requests
 router.use((req, res, next) => {
@@ -285,13 +298,15 @@ router.post('/users/:id/delete', isAdmin, async (req, res) => {
 // GET route for hero image management page
 router.get('/hero-image', isAdmin, async (req, res) => {
     try {
-        const heroImagePath = await getHeroImagePath();
+        const heroImage = await resolveHeroImage(req.app.locals.uploadsPath);
         res.render('admin/hero-image', {
             title: 'Hero Image Management',
-            heroImagePath,
+            heroImagePath: heroImage?.path,
+            heroImagePersistent: heroImage?.persistent,
             success: req.flash('success'),
             error: req.flash('error'),
-            user: req.user
+            user: req.user,
+            csrfToken: req.csrfToken()
         });
     } catch (error) {
         console.error('Error loading hero image page:', error);
@@ -304,10 +319,16 @@ router.get('/hero-image', isAdmin, async (req, res) => {
 router.post('/hero-image/upload', isAdmin, (req, res) => {
     req.app.locals.upload.single('heroImage')(req, res, async function (err) {
         if (err instanceof multer.MulterError) {
-            req.flash('error', `File upload error: ${err.message}. Max size is 50MB.`);
+            if (req.file?.path) await removeHeroTemp(req.file.path);
+            console.error('Hero upload rejected by Multer:', err);
+            req.flash('error', err.code === 'LIMIT_FILE_SIZE'
+                ? 'File upload error: the image exceeds the 50MB limit.'
+                : 'File upload error. Upload exactly one JPEG, PNG, or WebP image.');
             return res.redirect('/admin/hero-image');
         } else if (err) {
-            req.flash('error', `File upload error: ${err.message}`);
+            if (req.file?.path) await removeHeroTemp(req.file.path);
+            console.error('Hero upload failed:', err);
+            req.flash('error', 'File upload failed. Please try again.');
             return res.redirect('/admin/hero-image');
         }
 
@@ -316,9 +337,16 @@ router.post('/hero-image/upload', isAdmin, (req, res) => {
             return res.redirect('/admin/hero-image');
         }
 
+        if (!req.verifyCsrfToken(req.body?._csrf)) {
+            await removeHeroTemp(req.file.path);
+            return res.status(403).json({ error: 'Invalid CSRF token' });
+        }
+
         try {
-            // Process the hero image
-            const result = await processHeroImage(req.file.path);
+            const result = await withHeroOperationLock(() => publishHeroImage({
+                inputPath: req.file.path,
+                uploadsPath: req.app.locals.uploadsPath
+            }));
             
             // Format file sizes for display
             const heroSizeMB = (result.heroSize / (1024 * 1024)).toFixed(2);
@@ -330,10 +358,23 @@ router.post('/hero-image/upload', isAdmin, (req, res) => {
             res.redirect('/admin/hero-image');
         } catch (error) {
             console.error('Error processing hero image:', error);
-            req.flash('error', `Failed to process hero image: ${error.message}`);
+            req.flash('error', 'Failed to process hero image. Confirm it is a JPEG, PNG, or WebP within the documented limits.');
             res.redirect('/admin/hero-image');
+        } finally {
+            await removeHeroTemp(req.file.path);
         }
     });
+});
+
+router.post('/hero-image/reset', isAdmin, async (req, res) => {
+    try {
+        await withHeroOperationLock(() => resetHeroImage(req.app.locals.uploadsPath));
+        req.flash('success', 'Hero image reset to the repository default.');
+    } catch (error) {
+        console.error('Error resetting hero image:', error);
+        req.flash('error', 'Failed to reset the hero image. Please try again.');
+    }
+    res.redirect('/admin/hero-image');
 });
 
 export default router; 

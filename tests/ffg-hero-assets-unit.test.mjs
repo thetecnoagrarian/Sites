@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile as execFileCallback } from 'node:child_process';
 import { copyFile, mkdtemp, rm, stat } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -72,17 +71,17 @@ test('FFG hero descriptors expose factual public paths and dimensions', async ()
 });
 
 test('FFG site metadata falls back from social WebP to display WebP to logo, never source PNG', async (t) => {
-  const fallbackDir = await mkdtemp(path.join(os.tmpdir(), 'ffg-hero-fallback-'));
+  const fallbackDir = await mkdtemp(path.join(repositoryRoot, 'tests/.tmp-ffg-hero-fallback-'));
   t.after(() => rm(fallbackDir, { recursive: true, force: true }));
 
   await copyFile(sourcePath, path.join(fallbackDir, 'HeroCamp.png'));
-  assert.equal(await getSiteImagePath(fallbackDir), '/images/FFGnewLogo.PNG');
+  assert.equal(await getSiteImagePath(null, fallbackDir), '/images/FFGnewLogo.PNG');
 
   await copyFile(heroPath, path.join(fallbackDir, 'HeroCamp.webp'));
-  assert.equal(await getSiteImagePath(fallbackDir), '/images/HeroCamp.webp');
+  assert.equal(await getSiteImagePath(null, fallbackDir), '/images/HeroCamp.webp');
 
   await copyFile(socialPath, path.join(fallbackDir, 'HeroCamp-og.webp'));
-  assert.equal(await getSiteImagePath(fallbackDir), '/images/HeroCamp-og.webp');
+  assert.equal(await getSiteImagePath(null, fallbackDir), '/images/HeroCamp-og.webp');
 });
 
 test('FFG social metadata keeps absolute production URLs and post-specific images', async () => {

@@ -489,11 +489,12 @@ Use URL Inspection only for representative remaining examples after the known fi
   slice as deployed at `6be6ce9`; do not repeat their production rollout.
 - Continue omitting unsupported publication and modification dates rather than
   reconstructing the historical corpus.
-- The current local working tree optimizes the Fruition Forest Garden homepage
-  and About hero with repository-local WebP display and social assets, factual
-  intrinsic dimensions, eager high-priority loading, and no public fallback to
-  the archival 19 MB PNG. It is not deployed; production remains at `6be6ce9`
-  pending a separate preflight and explicit authorization.
-  `HeroCamp.png` remains the unchanged tracked source image. No production LCP
-  or Core Web Vitals improvement is claimed; production measurement remains a
-  separate explicitly authorized step after deployment.
+- FFG's repository WebP display/social assets remain immutable defaults, with
+  factual intrinsic dimensions, eager high-priority visible loading, and no
+  archival PNG fallback. The current repository implementation adds a
+  not-yet-deployed persistent seasonal-hero generation in the existing uploads
+  volume. Its
+  generation-specific URLs avoid stale long-lived upload caches; Homepage,
+  About, and site-level social metadata fall back to the repository WebPs if
+  the selection is missing or invalid. No production LCP or Core Web Vitals
+  improvement is claimed; measurement remains a separate authorized step.

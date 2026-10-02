@@ -37,9 +37,11 @@ This audit is the current classification record and archive log. It does not aut
 > for detail pages is deployed and verified at `6be6ce9`. It uses
 > reviewed Public Person authors, explicit Person publisher facts, and reviewed
 > publication facts without Event/legacy timestamp fallbacks or `dateModified`.
-> The current local working tree also contains a narrow Fruition Forest Garden
-> hero optimization with repository-local WebP display/social assets and no
-> public use of the archival 19 MB PNG; it is not yet deployed.
+> Fruition Forest Garden's repository-local WebP display/social defaults omit
+> the archival PNG at runtime. The current repository implementation adds a
+> not-yet-deployed persistent seasonal-hero store under
+> the existing uploads volume, with atomic generation selection and explicit
+> reset-to-default behavior.
 > Dated audit batches below remain historical classification records.
 
 ## 2. Current Documentation Landscape

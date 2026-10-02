@@ -385,6 +385,24 @@ The existing `express.static()` setup serves these directories at the site URL r
 
 `/uploads` remains the writable runtime-upload path. It is appropriate for runtime uploads, but it is not the preferred location for permanent downloadable assets that should be reproducible after a fresh build from repository state.
 
+Fruition Forest Garden's seasonal hero is an intentional runtime-state
+exception to the permanent-asset rule. The repository implementation is not yet
+deployed. It stores its manifest, retained current source, and display/social
+derivatives beneath `/app/data/uploads/hero` through the existing configured
+uploads path and data volume. A rebuild or service recreation must preserve the
+volume and must not remove or replace `.current.json`. Reset is an explicit
+admin action. Repository `HeroCamp.webp` and `HeroCamp-og.webp` remain immutable
+defaults.
+
+Rollback compatibility limitation: an older FFG application image that
+predates the persistent resolver will ignore the stored manifest and display
+its repository hero even though the uploads volume still retains seasonal
+state. Re-deploying compatible code can make that retained selection active
+again. After the feature's first successful production deployment, that first
+compatible image should become the preferred behavioral rollback floor. If an
+operator intends a permanent default, use the compatible admin reset before
+rollback; do not delete volume content as a substitute.
+
 Use this normal verification sequence for a permanent downloadable asset:
 
 1. Place it under the appropriate site `src/public` tree.
@@ -461,6 +479,10 @@ Current production architecture:
 - Source code is expected to live in Git and is not part of backup output.
 - The host scheduler takes one atomic lock under the host backup root, streams the tracked container backup script into each container, and reserves one fixed temporary staging directory per container.
 - The container script creates exactly `blog.db` and `uploads.tar.gz`, uses SQLite's backup operation, verifies database integrity, and verifies the upload archive.
+- Because `uploads.tar.gz` recursively archives the configured uploads tree, it
+  includes FFG seasonal hero `.current.json`, the selected generation, its
+  retained `.source`, and both WebP derivatives without changing the backup
+  format.
 - The host script copies only those two artifacts into a host staging directory, verifies nonzero output, archive readability, and matching container/host checksums, then atomically promotes one `backup-set-<RUN_ID>` directory.
 - Only after host promotion succeeds does the host script delete the two temporary container artifacts and remove the empty staging directory.
 - Copy, checksum, archive, or cleanup failure returns nonzero, preserves staging for review, skips retention, and prevents another set from accumulating at the same container path.

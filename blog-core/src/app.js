@@ -59,6 +59,7 @@ const buildSitemapXml = (urls) => {
  * @param {string} config.publicPath - Path to public directory (optional)
  * @param {string} config.baseUrl - Public canonical base URL for the site (optional)
  * @param {Object} config.handlebarsHelpers - Additional Handlebars helpers (optional)
+ * @param {RegExp[]} config.privateUploadPathPatterns - Upload URL paths to return as 404 (optional)
  * @returns {express.Application} - Configured Express app
  */
 export function createBlogApp(config) {
@@ -70,7 +71,8 @@ export function createBlogApp(config) {
         viewsPath,
         publicPath,
         baseUrl,
-        handlebarsHelpers = {}
+        handlebarsHelpers = {},
+        privateUploadPathPatterns = []
     } = config;
     const canonicalBaseUrl = normalizeBaseUrl(baseUrl);
 
@@ -281,6 +283,20 @@ export function createBlogApp(config) {
         next();
     });
     
+    // Site-specific retained source material can be explicitly excluded from
+    // both the public tree and the separately mounted uploads tree.
+    if (privateUploadPathPatterns.length > 0) {
+        app.use('/uploads', (req, res, next) => {
+            let requestPath;
+            try { requestPath = decodeURIComponent(req.path); }
+            catch { return res.sendStatus(404); }
+            if (privateUploadPathPatterns.some(pattern => pattern.test(requestPath))) {
+                return res.sendStatus(404);
+            }
+            next();
+        });
+    }
+
     app.use(express.static(staticPath, {
         maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0, // Reduced from 30d during active development
         immutable: false // Disabled during active development to allow cache-busting

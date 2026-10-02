@@ -301,12 +301,14 @@ CSS maintenance rule: avoid `!important` in committed styles. Use it only for te
 
 Confirmed differences visible from safe inspection:
 
-- Fruition Forest Garden has `src/utils/heroImageProcessor.js` and an admin
-  hero-image view for site-specific hero image management. The current local
-  working tree also adds a 1920-by-1440 WebP display asset and a 1200-by-630
-  WebP social crop, resolves their factual intrinsic dimensions at render time,
-  and excludes the archival 19 MB PNG from public fallbacks. This optimization
-  is present in repository source but is not yet deployed.
+- Fruition Forest Garden has `src/utils/heroImageProcessor.js`, the focused
+  `src/utils/heroImageStore.js`, and an admin hero-image view. Immutable
+  repository WebPs are the defaults and the archival PNG is never a runtime
+  fallback. The current repository, not-yet-deployed seasonal layer stores one
+  manifest-selected UUID generation under `<uploadsPath>/hero`, retains the
+  decoded-format source beneath a non-public `.source` directory, and publishes
+  generation-specific display/social WebP URLs. Upload and reset share an
+  in-process queue; only an atomic manifest replacement changes active state.
 - Fruition Forest Garden public images include `HeroCamp` assets and favicon subfolder assets.
 - The Tecnoagrarian has `src/database/seed.js`.
 - The Tecnoagrarian Open Graph logic uses hardcoded production-domain tags, while Fruition Forest Garden Open Graph logic can derive a base URL from the request and has hero-image fallback logic.
@@ -382,6 +384,13 @@ Runtime/user-generated uploads:
 - `fruitionforestgarden/src/public/uploads/`
 - `thetecnoagrarian/src/public/uploads/`
 - production `/app/data/uploads`
+
+FFG seasonal hero state belongs under `<uploadsPath>/hero`. Its minimal
+`.current.json` contains only a validated server-generated generation UUID.
+The selected generation contains `.source/current-source.<decoded-extension>`,
+`current-hero.webp`, and `current-hero-og.webp`. Only the two derivatives are
+public. No directory scan chooses an older generation when the manifest or
+selected derivative is invalid.
 
 Treat `src/public/uploads/` as runtime/user-generated data even though it lives below `src/public/`. Do not inspect or summarize upload contents unless explicitly approved for a specific task.
 

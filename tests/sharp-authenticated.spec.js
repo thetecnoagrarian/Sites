@@ -9,7 +9,8 @@ const TEST_ADMIN = {
 };
 
 const DOCKER_BIN = process.env.DOCKER_BIN || '/usr/local/bin/docker';
-const COMPOSE_ARGS = ['compose', '-p', 'sites-local-test', '-f', 'docker-compose.test.yml'];
+const MODE_B_PROJECT = process.env.MODE_B_PROJECT || 'sites-local-test';
+const COMPOSE_ARGS = ['compose', '-p', MODE_B_PROJECT, '-f', 'docker-compose.test.yml'];
 const RUN_ID = Date.now();
 
 const TEST_SITES = [
@@ -239,7 +240,7 @@ test('Fruition Forest Garden authenticated Sharp hero processing', async ({ page
 
   await test.step('hero and Open Graph outputs are valid WebP images', async () => {
     await page.goto(`${site.baseURL}/admin/hero-image`);
-    await expect(page.locator('input[name="_csrf"]')).toHaveValue(/.+/);
+    await expect(page.locator('form.hero-upload-form input[name="_csrf"]')).toHaveValue(/.+/);
     await page.locator('input[name="heroImage"]').setInputFiles(heroInput);
     await Promise.all([
       page.waitForNavigation(),
@@ -247,21 +248,26 @@ test('Fruition Forest Garden authenticated Sharp hero processing', async ({ page
     ]);
     await expect(page).toHaveURL(`${site.baseURL}/admin/hero-image`);
 
-    const metadata = containerMetadata(
-      site.service,
-      '/app/fruitionforestgarden/src/public/images',
-      ['HeroCamp.webp', 'HeroCamp-og.webp']
-    );
+    const generation = containerJson(site.service, `
+      import { readFile } from 'node:fs/promises';
+      console.log(await readFile('/app/data/uploads/hero/.current.json', 'utf8'));
+    `).generation;
+    const generationDir = `/app/data/uploads/hero/${generation}`;
+    const metadata = containerMetadata(site.service, generationDir, ['current-hero.webp', 'current-hero-og.webp']);
     expect(metadata).toEqual([
-      { filename: 'HeroCamp.webp', format: 'webp', width: 1920, height: 960 },
-      { filename: 'HeroCamp-og.webp', format: 'webp', width: 1200, height: 630 }
+      { filename: 'current-hero.webp', format: 'webp', width: 1920, height: 960 },
+      { filename: 'current-hero-og.webp', format: 'webp', width: 1200, height: 630 }
     ]);
 
-    for (const filename of ['HeroCamp.webp', 'HeroCamp-og.webp']) {
-      const response = await page.request.get(`${site.baseURL}/images/${filename}`);
+    for (const filename of ['current-hero.webp', 'current-hero-og.webp']) {
+      const response = await page.request.get(`${site.baseURL}/uploads/hero/${generation}/${filename}`);
       expect(response.status()).toBe(200);
       expect(response.headers()['content-type']).toContain('image/webp');
     }
+    const source = await page.request.get(
+      `${site.baseURL}/uploads/hero/${generation}/.source/current-source.jpg`
+    );
+    expect(source.status()).toBe(404);
   });
 
   await test.step('corrupt hero input leaves valid outputs in place', async () => {
@@ -273,16 +279,20 @@ test('Fruition Forest Garden authenticated Sharp hero processing', async ({ page
     ]);
     await expect(page).toHaveURL(`${site.baseURL}/admin/hero-image`);
 
+    const generation = containerJson(site.service, `
+      import { readFile } from 'node:fs/promises';
+      console.log(await readFile('/app/data/uploads/hero/.current.json', 'utf8'));
+    `).generation;
     const metadata = containerMetadata(
       site.service,
-      '/app/fruitionforestgarden/src/public/images',
-      ['HeroCamp.webp', 'HeroCamp-og.webp']
+      `/app/data/uploads/hero/${generation}`,
+      ['current-hero.webp', 'current-hero-og.webp']
     );
     expect(metadata.every((output) => output.format === 'webp')).toBe(true);
 
     const corruptBase = path.parse(corruptImage.name).name;
     const retainedSources = containerFiles(site.service, '/app/data/uploads/temp', corruptBase);
-    console.log(`[sharp cleanup observation] ffg corrupt hero source files retained: ${retainedSources.length}`);
+    expect(retainedSources).toHaveLength(0);
   });
 
   const health = await page.request.get(`${site.baseURL}/health`);

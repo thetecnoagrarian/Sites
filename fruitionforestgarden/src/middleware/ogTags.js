@@ -1,4 +1,4 @@
-import { getHeroOgImage } from '../utils/heroImageProcessor.js';
+import { resolveHeroSocialImage } from '../utils/heroImageStore.js';
 
 export const SITE_DESCRIPTION = 'A blog about our adventure building our homestead on a undeveloped 20 acres in Michigan\'s Upper Peninsula.';
 
@@ -23,8 +23,8 @@ function getBaseUrl(req) {
 
 // Resolve the tracked/admin-managed WebP social image without falling back to
 // the archival 19 MB source PNG.
-async function getSiteImagePath(imagesDir = null) {
-  const image = await getHeroOgImage(imagesDir);
+async function getSiteImagePath(uploadsPath = null, imagesDir = null) {
+  const image = await resolveHeroSocialImage(uploadsPath, imagesDir);
   return image?.path || '/images/FFGnewLogo.PNG';
 }
 
@@ -61,7 +61,7 @@ async function buildOgTags(post, req = null, pageMetadata = null) {
   
   // For homepage or if no post image, use hero OG image
   if (!image) {
-    image = `${baseUrl}${await getSiteImagePath()}`;
+    image = `${baseUrl}${await getSiteImagePath(req?.app?.locals?.uploadsPath)}`;
   }
   
   return `
