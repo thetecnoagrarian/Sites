@@ -250,8 +250,8 @@ CI caution:
 
 ### Relevant Scripts
 
-- `scripts/backup.sh` - creates one verified database/uploads set in an explicit temporary staging directory; the local hardening candidate adds a bounded SQLite busy timeout and lock-only retry while preserving final-failure evidence. It does not retain or delete backup history.
-- `scripts/backup-host.sh` - host-side orchestration for both containers or one explicitly selected site, exact-set transfer and verification, temporary staging cleanup after successful copy, persistent per-site failure markers, and scheduled-set-only retention in the local hardening candidate.
+- `scripts/backup.sh` - creates one verified database/uploads set in an explicit temporary staging directory; implementation commit `88bc59e` adds a bounded SQLite busy timeout and lock-only retry while preserving final-failure evidence. It does not retain or delete backup history.
+- `scripts/backup-host.sh` - host-side orchestration for both containers or one explicitly selected site, exact-set transfer and verification, temporary staging cleanup after successful copy, persistent per-site failure markers, and scheduled-set-only retention as implemented by `88bc59e`.
 - `scripts/setup-backups.sh` - legacy backup setup helper that involves SSH/SCP/cron concepts. It is not part of the new-flow rollout and must not be rerun without separate review and approval.
 - `scripts/sync-local-prod.sh` - local production-like Docker sync helper. Approval required before execution because it stops/builds/starts containers.
 - `scripts/cleanup-disk-space.sh` - server disk cleanup helper. High risk; approval required before execution.
@@ -473,19 +473,28 @@ Needs Review: confirm whether nginx config in this repo is deployed as-is or use
 
 ## 7. Backup and Restore Concepts
 
-Current production architecture:
+Production backup architecture and dated rollout record:
+
+Dated backup-hardening rollout record:
+
+- Implementation commit: `88bc59e472b44147c6c4e05c929fe7a5a2573970`.
+- Production status at the 2026-11-03 preflight:
+  `5ddd651a56e7da508ee4c90bc38c9a1c41ccca69`.
+- Deployment status at that preflight: implementation was committed and pushed,
+  while production rollout still required separate authorization. The preflight
+  determined that rollout would require neither an application image rebuild nor
+  a container restart.
 
 - Runtime databases and uploads are the main backup targets.
 - Source code is expected to live in Git and is not part of backup output.
 - The host scheduler takes one atomic lock under the host backup root, streams the tracked container backup script into each container, and reserves one fixed temporary staging directory per container.
 - The container script creates exactly `blog.db` and `uploads.tar.gz`, uses SQLite's backup operation, verifies database integrity, and verifies the upload archive.
-- Production revision `5ddd651a56e7da508ee4c90bc38c9a1c41ccca69`
-  still invokes SQLite with zero busy timeout and no retry. The local
-  source-controlled hardening candidate is not deployed: it uses a 30-second
-  busy timeout, at most three attempts, two seconds of backoff, and retries only
-  busy/locked errors. Validation caps those settings at 30 seconds and two
-  seconds respectively, making the lock-wait/retry budget at most 94 seconds.
-  Non-lock SQLite failures stop immediately.
+- At the 2026-11-03 preflight, production revision `5ddd651` invoked SQLite with
+  zero busy timeout and no retry. Implementation commit `88bc59e` adds a
+  30-second busy timeout, at most three attempts, two seconds of backoff, and
+  retries only busy/locked errors. Validation caps those settings at 30 seconds
+  and two seconds respectively, making the lock-wait/retry budget at most 94
+  seconds. Non-lock SQLite failures stop immediately.
 - Because `uploads.tar.gz` recursively archives the configured uploads tree, it
   includes FFG seasonal hero `.current.json`, the selected generation, its
   retained `.source`, and both WebP derivatives without changing the backup
@@ -493,17 +502,17 @@ Current production architecture:
 - The host script copies only those two artifacts into a host staging directory, verifies nonzero output, archive readability, and matching container/host checksums, then atomically promotes one `backup-set-<RUN_ID>` directory.
 - Only after host promotion succeeds does the host script delete the two temporary container artifacts and remove the empty staging directory.
 - Copy, checksum, archive, or cleanup failure returns nonzero, preserves staging for review, skips retention, and prevents another set from accumulating at the same container path.
-- The local hardening candidate also preserves the final SQLite error file,
+- Implementation commit `88bc59e` also preserves the final SQLite error file,
   writes `<BACKUP_ROOT>/<SITE>/BACKUP_FAILURE`, emits a structured marker log,
-  and clears that site's marker only after a later verified site backup. This
-  alert lifecycle is not production-active until separately deployed. A
+  and clears that site's marker only after a later verified site backup. A
   global-lock or other pre-site failure has no active site for a per-site marker
   and is reported only through its nonzero exit and log.
-- Production retention at revision `5ddd651` broadly matches `backup-set-*` and
-  can therefore select named recovery anchors. Until hardening deploys, every
-  approved manual run must inventory candidates and use a one-run retention
-  safeguard when preservation is required.
-- The local hardening candidate narrows retention to the exact scheduled shape
+- At the 2026-11-03 preflight, production retention at revision `5ddd651`
+  broadly matched `backup-set-*` and could therefore select named recovery
+  anchors. Manual runs during that recorded pre-rollout period required a
+  candidate inventory and one-run retention safeguard when preservation was
+  required.
+- Implementation commit `88bc59e` narrows retention to the exact scheduled shape
   `backup-set-YYYY-MM-DD_HH-MM-SS` and validates that its date and time are
   possible. Named migration, authorship, publication, recovery, suffixed, and
   arbitrary operation sets are excluded. Age still uses the managed directory
@@ -540,9 +549,11 @@ authorized TTA-only recovery recorded the evidence, removed only the reviewed
 diagnostic blockers, used a one-run retention safeguard, and produced the fully
 verified `backup-set-2026-11-03_11-36-tta-recovery` set. It confirmed absent
 staging/lock, unchanged cron, zero TTA restarts, and unchanged FFG identity and
-backup inventory. Continuity was restored. The local timeout/retry, marker, and
-retention-matcher changes remain undeployed pending commit, push, and a separate
-production preflight.
+backup inventory. Continuity was restored. At the later 2026-11-03 production
+preflight, the timeout/retry, marker, and retention-matcher implementation had
+been committed and pushed as `88bc59e`, while production remained at `5ddd651`
+pending a separately authorized rollout. That is a dated preflight record, not
+a claim about production state after 2026-11-03.
 
 Current verification boundary:
 

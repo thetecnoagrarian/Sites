@@ -192,14 +192,15 @@ under `/opt/Sites/backups`:
   the manifest and its selected generation together.
 - The SQLite backup uses the database backup operation and must pass an
   integrity check before transfer.
-- The source-controlled hardening candidate gives each SQLite backup attempt a
+- Implementation commit `88bc59e` gives each SQLite backup attempt a
   30-second busy timeout and permits at most three attempts with two seconds of
   backoff. Only SQLite busy/locked failures are retried. A non-lock SQLite
   failure stops immediately. Configuration validation caps the timeout at
   30 seconds and backoff at two seconds, so the complete lock-wait/retry budget
   is at most 94 seconds (three timeouts plus two backoffs), excluding ordinary
-  backup and verification work. This behavior is not production-active until a
-  separately approved deployment and live verification complete.
+  backup and verification work. At the 2026-11-03 production preflight, this
+  implementation was committed and pushed while production remained at
+  `5ddd651`; rollout still required separate authorization at that preflight.
 - Before a retry, the helper removes only that attempt's incomplete staged
   database and error file; it never removes the outer staging directory. If the
   final attempt fails, the last staged database (if SQLite created one) and
@@ -277,7 +278,10 @@ retention safeguard, and produced the verified
 `backup-set-2026-11-03_11-36-tta-recovery` set. Staging and the host lock were
 clear afterward; FFG, cron, existing recovery anchors, and application restart
 state were unchanged. TTA backup continuity was restored. This operational
-milestone does not by itself deploy the repository hardening candidate above.
+milestone did not itself deploy the repository hardening. At the later
+2026-11-03 production preflight, commit `88bc59e` was still awaiting a
+separately authorized rollout while production remained at `5ddd651`. This is a
+dated status record and makes no claim about a later deployment outcome.
 
 The host location remains on the production machine. That is sufficient as the
 canonical local copy and survives container recreation, but it is not an

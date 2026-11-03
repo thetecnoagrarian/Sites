@@ -133,11 +133,14 @@ These areas may be important for operations and recovery, but they should not be
 
 Backup continuity checkpoint (2026-11-03): a fresh verified TTA-only recovery
 restored TTA backup continuity, cleared its preserved staging/lock obstruction,
-and left FFG untouched. The current source-controlled hardening candidate adds a
-bounded SQLite busy timeout with lock-only retries, persistent per-site failure
-markers, and retention limited to exact timestamp-named scheduled backup sets.
-Those changes are local and undeployed; production remains at the separately
-recorded deployed commit until an explicitly authorized rollout.
+and left FFG untouched. Implementation commit `88bc59e` adds a bounded SQLite
+busy timeout with lock-only retries, persistent per-site failure markers, and
+retention limited to exact timestamp-named scheduled backup sets. At the later
+2026-11-03 production preflight, that commit had been pushed and awaited a
+separately authorized rollout while production remained at `5ddd651`. The
+preflight determined that rollout would require neither an application image
+rebuild nor a container restart. This is a dated status record, not a claim
+about later production state.
 
 ### Documentation as Source of Truth
 
