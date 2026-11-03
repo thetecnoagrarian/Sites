@@ -192,6 +192,18 @@ under `/opt/Sites/backups`:
   the manifest and its selected generation together.
 - The SQLite backup uses the database backup operation and must pass an
   integrity check before transfer.
+- The source-controlled hardening candidate gives each SQLite backup attempt a
+  30-second busy timeout and permits at most three attempts with two seconds of
+  backoff. Only SQLite busy/locked failures are retried. A non-lock SQLite
+  failure stops immediately. Configuration validation caps the timeout at
+  30 seconds and backoff at two seconds, so the complete lock-wait/retry budget
+  is at most 94 seconds (three timeouts plus two backoffs), excluding ordinary
+  backup and verification work. This behavior is not production-active until a
+  separately approved deployment and live verification complete.
+- Before a retry, the helper removes only that attempt's incomplete staged
+  database and error file; it never removes the outer staging directory. If the
+  final attempt fails, the last staged database (if SQLite created one) and
+  `.sqlite-backup-error.log` remain as diagnostic evidence.
 - The host copies only the two artifacts created by that run.
 - An atomic host lock serializes the complete FFG/TTA run so two schedulers or
   operators cannot interleave site backups.
@@ -202,9 +214,19 @@ under `/opt/Sites/backups`:
 - A failed transfer or verification preserves one staging set for diagnosis,
   returns a failure, skips retention, and blocks the next run from creating
   another set at the same path.
-- Retention belongs to the canonical local host location and applies only to
-  the new managed backup-set layout. Legacy backups remain outside automated
-  cleanup until separately reviewed and approved.
+- A site failure creates or refreshes `<BACKUP_ROOT>/<SITE>/BACKUP_FAILURE` and
+  emits a searchable `BACKUP_FAILURE_MARKER` log record. The marker contains a
+  non-secret site, run identity, UTC failure time, summary, and operator-action
+  hint. It is cleared only after that site later completes the verified backup
+  path; a retention failure recreates it. A failure before any site becomes
+  active, including global-lock acquisition failure, cannot create a
+  site-specific marker and remains visible through the nonzero exit and log.
+- Retention belongs to the canonical local host location. The hardened matcher
+  accepts only calendar-valid timestamp-only scheduled names in the exact shape
+  `backup-set-YYYY-MM-DD_HH-MM-SS`. It rejects impossible dates/times as well as
+  suffixes. Named migration, authorship, publication, recovery, and arbitrary
+  operation sets are excluded by default, as are legacy layouts. No existing
+  set is renamed.
 - With the 28-day default, age is evaluated from each managed set directory's
   modification time in complete 24-hour periods. `find -mtime +28` does not
   select a set until its completed age bucket exceeds 28, so a newly promoted
@@ -215,6 +237,47 @@ granting the container write access to the retained host archive. A dedicated
 Docker volume or bind mount for `/app/backups` is therefore not the selected
 design: it would relocate the growth but would not eliminate duplicate local
 retention or whole-tree transfers.
+
+The host script continues to support a deliberately scoped one-site operation
+through `BACKUP_SITES=<SITE>:<CONTAINER>`. It uses the same global lock,
+container helper, transfer checks, atomic promotion, cleanup, marker lifecycle,
+and site-specific retention path as a scheduled multi-site run. One-site use is
+still a production mutation and requires explicit authorization.
+
+### Preserved-staging recovery procedure
+
+The persistent marker is an alert surface, not permission to clean up. When a
+site has `BACKUP_FAILURE` or preserved staging:
+
+1. Confirm the affected site, run identity, application health, latest verified
+   set, free disk, scheduler state, and absence of an active backup process.
+2. Inspect the global host lock, the run-specific host staging directory, and
+   the fixed container staging directory read-only. Record paths, ownership,
+   modes, timestamps, sizes, and meaningful checksums.
+3. Classify each artifact as recoverable data, diagnostic evidence, or reviewed
+   disposable residue. Unexpected content is a stop condition.
+4. With separate destructive authorization, remove only the exact reviewed
+   blocking files/directories. Do not use a broad backup-root glob.
+5. Run one site through the normal host pipeline when that is the smallest
+   recovery scope. If the deployed retention matcher has not yet been hardened,
+   use a one-run high retention value after inventorying every existing set.
+6. If SQLite exhausts its bounded retries, preserve the new evidence and stop;
+   do not repeatedly clear staging or automatically stop the application.
+7. On success, verify nonzero artifacts, database integrity and foreign keys,
+   schema/migrations where applicable, archive readability, transfer checksums,
+   atomic finalization, absent staging/lock, and marker clearance.
+8. Confirm the scheduler and scripts remain unchanged, and record a sanitized
+   result. Any code or documentation rollout remains a separate gate.
+
+On 2026-10-25, one transient zero-timeout SQLite lock left diagnostic-only TTA
+staging. That preserved staging correctly blocked the 2026-11-01 weekly run.
+On 2026-11-03, a separately authorized recovery recorded the evidence, removed
+only the reviewed blockers, used the normal TTA-only pipeline with a one-run
+retention safeguard, and produced the verified
+`backup-set-2026-11-03_11-36-tta-recovery` set. Staging and the host lock were
+clear afterward; FFG, cron, existing recovery anchors, and application restart
+state were unchanged. TTA backup continuity was restored. This operational
+milestone does not by itself deploy the repository hardening candidate above.
 
 The host location remains on the production machine. That is sufficient as the
 canonical local copy and survives container recreation, but it is not an

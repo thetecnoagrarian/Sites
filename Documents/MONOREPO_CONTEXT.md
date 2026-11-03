@@ -131,6 +131,14 @@ Runtime/generated state should not be treated as source:
 
 These areas may be important for operations and recovery, but they should not be read, summarized, modified, deleted, or committed casually.
 
+Backup continuity checkpoint (2026-11-03): a fresh verified TTA-only recovery
+restored TTA backup continuity, cleared its preserved staging/lock obstruction,
+and left FFG untouched. The current source-controlled hardening candidate adds a
+bounded SQLite busy timeout with lock-only retries, persistent per-site failure
+markers, and retention limited to exact timestamp-named scheduled backup sets.
+Those changes are local and undeployed; production remains at the separately
+recorded deployed commit until an explicitly authorized rollout.
+
 ### Documentation as Source of Truth
 
 `AGENTS.md` identifies `Documents/` and `AGENTS.md` as the primary documentation areas. The former broad master document is archived at `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` for historical context and is not current operational authority. For Codex migration work, documentation should be created under `Documents/`.

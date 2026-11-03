@@ -100,7 +100,7 @@ Batch 3 moved two superseded documents into new archive categories after transfe
 | Reviewed document | Classification | Basis |
 |---|---|---|
 | `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` | `CONSOLIDATE_THEN_ARCHIVE` | Focused docs supersede its broad operational role; its unique CSS maintenance rule moved to the architecture map. |
-| `Documents/BACKUP_SYSTEM_GUIDE.md` | `KEEP_ACTIVE` | It is now placeholder-only planning, and tracked backup architecture still covers database and upload state; live execution details remain unverified. |
+| `Documents/BACKUP_SYSTEM_GUIDE.md` | `KEEP_ACTIVE` | Active public-safe backup architecture and recovery guidance. Live production behavior was audited and TTA continuity was restored on 2026-11-03; the source-controlled timeout/retry, failure-marker, and scheduled-only retention hardening remains undeployed pending a separate rollout. |
 | `Documents/ANALYTICS_CLEANUP_GUIDE.md` | `KEEP_ACTIVE` | It is now placeholder-only planning, and the tracked analytics models, middleware, routes, and cleanup script still exist. |
 | `Documents/DEPENDENCY_SECURITY_REMEDIATION_PLAN.md` | `KEEP_ACTIVE` | Its staged model still covers unresolved dependency families; the current-use note points to the remediation log for present status. |
 | `Documents/archive/dependencies/TARGETED_DEPENDENCY_UPDATE_PLAN.md` | `ARCHIVE_NOW` | The first targeted pass is complete and its current evidence and remaining risks are recorded in active dependency docs. |
@@ -145,7 +145,7 @@ This section supersedes older status notes in this audit where they conflict wit
 | `Documents/DEPENDENCY_REMEDIATION_LOG.md` | Chronological remediation and production verification log | Keep tracked as a log, but do not treat as the single current-status source. |
 | `Documents/DEPENDENCY_AUDIT_RESULTS.md` | Dependency evidence/reference | Keep as evidence. |
 | `Documents/DEPENDENCY_SECURITY_REMEDIATION_PLAN.md` | Dependency remediation plan | Keep as plan/reference. |
-| `Documents/BACKUP_SYSTEM_GUIDE.md` | Placeholder-only backup planning reference | Keep active; live schedules, paths, and restore readiness still require operator verification. |
+| `Documents/BACKUP_SYSTEM_GUIDE.md` | Active public-safe backup architecture and recovery guide | Keep active; live behavior was audited and TTA continuity was restored on 2026-11-03, while the source-controlled hardening remains undeployed pending a separate rollout. |
 | `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Placeholder-only analytics retention and cleanup planning reference | Keep active; any data mutation requires separate approval and live-state verification. |
 | `Documents/DOCUMENTATION_AUDIT.md` | Documentation classification and cleanup plan | Keep active and refresh during cleanup. |
 
@@ -258,7 +258,10 @@ Use to preserve why things changed, not necessarily to control current operation
 - `Documents/USERNAME_PASSWORD_UPDATE_GUIDE.md`
 - `Documents/archive/troubleshooting/DIRECTORY_AUTO_CREATION_FIX.md`
 
-Use cautiously. The active backup and analytics guides are placeholder-only planning references; they do not authorize production operations. Credential-adjacent documents still require human safety review.
+Use cautiously. The active backup guide records public-safe architecture, audited
+behavior, and recovery guidance but does not authorize production operations.
+The analytics guide remains placeholder-only planning. Credential-adjacent
+documents still require human safety review.
 
 ## 4. Active Source-of-Truth Recommendations
 
@@ -431,7 +434,12 @@ Current production-like and isolated local workflow guidance lives in `Documents
 - `Documents/DEPLOYMENT_RUNBOOK.md`
 - `Documents/BACKUP_SYSTEM_GUIDE.md`
 
-The runbook controls safety boundaries. The backup guide supports placeholder-only planning, while live scheduling, restore, and cleanup actions remain high-risk and separately approval-gated.
+The runbook controls safety boundaries. The backup guide is the active
+public-safe architecture and preserved-staging recovery reference. It records
+the 2026-11-03 TTA continuity milestone and distinguishes deployed behavior from
+the local timeout/retry, failure-marker, and scheduled-only retention candidate.
+Live scheduling, backup creation, restore, staging removal, retention, and other
+cleanup actions remain high-risk and separately approval-gated.
 
 ### High-Risk Actions Requiring Approval
 

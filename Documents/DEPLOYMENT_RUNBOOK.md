@@ -250,8 +250,8 @@ CI caution:
 
 ### Relevant Scripts
 
-- `scripts/backup.sh` - creates one verified database/uploads set in an explicit temporary staging directory; it does not retain or delete backup history.
-- `scripts/backup-host.sh` - host-side orchestration for both containers, exact-set transfer and verification, temporary staging cleanup after successful copy, and retention of the new host-managed set layout.
+- `scripts/backup.sh` - creates one verified database/uploads set in an explicit temporary staging directory; the local hardening candidate adds a bounded SQLite busy timeout and lock-only retry while preserving final-failure evidence. It does not retain or delete backup history.
+- `scripts/backup-host.sh` - host-side orchestration for both containers or one explicitly selected site, exact-set transfer and verification, temporary staging cleanup after successful copy, persistent per-site failure markers, and scheduled-set-only retention in the local hardening candidate.
 - `scripts/setup-backups.sh` - legacy backup setup helper that involves SSH/SCP/cron concepts. It is not part of the new-flow rollout and must not be rerun without separate review and approval.
 - `scripts/sync-local-prod.sh` - local production-like Docker sync helper. Approval required before execution because it stops/builds/starts containers.
 - `scripts/cleanup-disk-space.sh` - server disk cleanup helper. High risk; approval required before execution.
@@ -479,6 +479,13 @@ Current production architecture:
 - Source code is expected to live in Git and is not part of backup output.
 - The host scheduler takes one atomic lock under the host backup root, streams the tracked container backup script into each container, and reserves one fixed temporary staging directory per container.
 - The container script creates exactly `blog.db` and `uploads.tar.gz`, uses SQLite's backup operation, verifies database integrity, and verifies the upload archive.
+- Production revision `5ddd651a56e7da508ee4c90bc38c9a1c41ccca69`
+  still invokes SQLite with zero busy timeout and no retry. The local
+  source-controlled hardening candidate is not deployed: it uses a 30-second
+  busy timeout, at most three attempts, two seconds of backoff, and retries only
+  busy/locked errors. Validation caps those settings at 30 seconds and two
+  seconds respectively, making the lock-wait/retry budget at most 94 seconds.
+  Non-lock SQLite failures stop immediately.
 - Because `uploads.tar.gz` recursively archives the configured uploads tree, it
   includes FFG seasonal hero `.current.json`, the selected generation, its
   retained `.source`, and both WebP derivatives without changing the backup
@@ -486,7 +493,23 @@ Current production architecture:
 - The host script copies only those two artifacts into a host staging directory, verifies nonzero output, archive readability, and matching container/host checksums, then atomically promotes one `backup-set-<RUN_ID>` directory.
 - Only after host promotion succeeds does the host script delete the two temporary container artifacts and remove the empty staging directory.
 - Copy, checksum, archive, or cleanup failure returns nonzero, preserves staging for review, skips retention, and prevents another set from accumulating at the same container path.
-- Retention is host-owned, defaults to 28 days, and applies only to the new `backup-set-*` layout. Age uses the managed directory modification time in complete 24-hour periods; `find -mtime +28` selects a set only after its completed age bucket exceeds 28. Existing legacy backups are deliberately excluded until a separate cleanup is explicitly approved.
+- The local hardening candidate also preserves the final SQLite error file,
+  writes `<BACKUP_ROOT>/<SITE>/BACKUP_FAILURE`, emits a structured marker log,
+  and clears that site's marker only after a later verified site backup. This
+  alert lifecycle is not production-active until separately deployed. A
+  global-lock or other pre-site failure has no active site for a per-site marker
+  and is reported only through its nonzero exit and log.
+- Production retention at revision `5ddd651` broadly matches `backup-set-*` and
+  can therefore select named recovery anchors. Until hardening deploys, every
+  approved manual run must inventory candidates and use a one-run retention
+  safeguard when preservation is required.
+- The local hardening candidate narrows retention to the exact scheduled shape
+  `backup-set-YYYY-MM-DD_HH-MM-SS` and validates that its date and time are
+  possible. Named migration, authorship, publication, recovery, suffixed, and
+  arbitrary operation sets are excluded. Age still uses the managed directory
+  modification time in complete 24-hour periods;
+  `find -mtime +28` selects an eligible scheduled set only after its completed
+  age bucket exceeds 28. Existing legacy backups remain excluded.
 - A dedicated `/app/backups` volume is not part of the target. It would move bytes out of the writable layer but preserve same-host duplication, whole-tree copying, and split retention ownership.
 - Managed sets are retained under `/opt/Sites/backups`; legacy backup material
   remains preserved and outside automated cleanup.
@@ -501,10 +524,25 @@ Current production architecture:
 Fail-closed operator recovery:
 
 1. Stop or pause any scheduled invocation and confirm no backup-host process is still active.
-2. Inspect the host lock at `/opt/Sites/backups/.backup-run.lock`, any per-site `.staging-backup-set-<RUN_ID>` directory, and the fixed container staging directory without deleting them.
-3. Reconcile or preserve any staged artifacts before cleanup. An ordinary script failure releases the host lock but intentionally leaves staging to block the next run.
+2. Inspect the per-site `BACKUP_FAILURE` marker when present, the host lock at `/opt/Sites/backups/.backup-run.lock`, any per-site `.staging-backup-set-<RUN_ID>` directory, and the fixed container staging directory without deleting them.
+3. Record exact metadata and classify every staged artifact before cleanup. An ordinary script failure releases the host lock but intentionally leaves staging to block the next run.
 4. If an abrupt kill left only a stale, empty host lock, remove that exact lock with `rmdir /opt/Sites/backups/.backup-run.lock` only after confirming no run is active. Do not use a recursive removal command for the lock.
-5. Treat removal of container or host staging artifacts as a separate backup-deletion decision. Do not resume the schedule until the failed set is understood and staging has been deliberately reconciled.
+5. Treat removal of container or host staging artifacts as a separate backup-deletion decision. Remove only exact reviewed blockers; never use a broad backup-root glob.
+6. Prefer the existing `BACKUP_SITES=<SITE>:<CONTAINER>` mode for a scoped recovery when the other site does not need another backup. Use the normal lock, helper, transfer, verification, promotion, and cleanup flow.
+7. If the deployed retention matcher is still broad, inventory all candidates and use a one-run high `BACKUP_RETENTION_DAYS` safeguard. This is not a substitute for deploying the scheduled-name matcher.
+8. Verify the new set, database, archive, checksums, absent staging/lock, marker lifecycle, unchanged scheduler/scripts, and unaffected other site before declaring continuity restored.
+9. If bounded retries are exhausted, preserve the new evidence and stop. Do not automatically stop the application or repeatedly erase failure evidence.
+
+TTA continuity recovery checkpoint: a transient SQLite lock under the deployed
+zero-timeout helper on 2026-10-25 preserved a zero-byte staged database; that
+fixed staging path blocked the 2026-11-01 run. On 2026-11-03, a separately
+authorized TTA-only recovery recorded the evidence, removed only the reviewed
+diagnostic blockers, used a one-run retention safeguard, and produced the fully
+verified `backup-set-2026-11-03_11-36-tta-recovery` set. It confirmed absent
+staging/lock, unchanged cron, zero TTA restarts, and unchanged FFG identity and
+backup inventory. Continuity was restored. The local timeout/retry, marker, and
+retention-matcher changes remain undeployed pending commit, push, and a separate
+production preflight.
 
 Current verification boundary:
 
