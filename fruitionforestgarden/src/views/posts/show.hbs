@@ -23,13 +23,15 @@
         <sl-carousel class="post-carousel" navigation loop id="post-carousel">
             {{#each post.imageList}}
             <sl-carousel-item>
-                <img src="{{medium}}" 
-                     alt="{{../post.title}}" 
-                     class="lightbox-trigger post-image"
-                     data-full-img="{{large}}"
-                     data-caption="{{caption}}"
-                     data-index="{{@index}}"
-                     loading="lazy">
+                <div class="post-carousel-image-frame">
+                    <img src="{{medium}}"
+                         alt="{{../post.title}}"
+                         class="lightbox-trigger post-image"
+                         data-full-img="{{large}}"
+                         data-caption="{{caption}}"
+                         data-index="{{@index}}"
+                         loading="lazy">
+                </div>
             </sl-carousel-item>
             {{/each}}
         </sl-carousel>
@@ -169,6 +171,70 @@
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.post-carousel-image-frame {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.post-carousel-image-frame .post-image {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Keep navigation beside the image on larger screens. On small phones, give
+   the image the full carousel width and move navigation over its edges. */
+@media (max-width: 480px) {
+    .post-carousel {
+        --sl-spacing-medium: 0;
+        --aspect-ratio: 4 / 3;
+    }
+
+    .post-carousel::part(base) {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: 1fr;
+        grid-template-areas: "slides";
+        gap: 0;
+    }
+
+    .post-carousel::part(scroll-container) {
+        grid-area: slides;
+        grid-auto-columns: 100%;
+        width: 100%;
+    }
+
+    .post-carousel::part(navigation-button) {
+        position: absolute;
+        top: 50%;
+        z-index: 2;
+        transform: translateY(-50%);
+        background: rgba(0, 0, 0, 0.45);
+        padding: 0.75rem;
+    }
+
+    .post-carousel::part(navigation-button--previous) {
+        left: 0.5rem;
+    }
+
+    .post-carousel::part(navigation-button--next) {
+        right: 0.5rem;
+    }
+
+    .post-carousel sl-carousel-item,
+    .post-carousel-image-frame {
+        width: 100%;
+    }
+
+    .post-carousel-image-frame .post-image {
+        object-fit: contain;
+    }
 }
 
 .post-content {
