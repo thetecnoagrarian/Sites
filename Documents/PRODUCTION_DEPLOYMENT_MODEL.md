@@ -83,6 +83,23 @@ Production deployment uses the production server checkout and `docker-compose.pr
 
 Older local Docker sync docs may still be useful as local testing references, but they are not the production deployment authority.
 
+## Production Ingress Boundary
+
+Host nginx is the intended public ingress boundary. The production Compose
+file publishes FFG port `4000` and TTA port `4002` only on IPv4 loopback
+(`127.0.0.1`) and IPv6 loopback (`::1`). nginx continues to reach the services
+through `localhost:4000` and `localhost:4002`, while direct public access to
+those application ports is intentionally prohibited.
+
+This is a host-binding restriction, not a Docker-network/nginx redesign. Both
+loopback families remain published because host `localhost` resolution is
+dual-stack. Deploying a binding-only change requires recreating each affected
+container with its existing image; it does not require an image rebuild or
+nginx reload. Use a TTA-first sequential rollout, verify both loopback paths and
+the absence of IPv4 and IPv6 wildcard listeners, then proceed separately to
+FFG. Rollback restores the prior broad binding in Compose and recreates only
+the affected service.
+
 ## Authentication Model
 
 There are separate trust paths:

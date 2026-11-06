@@ -98,6 +98,9 @@ Purpose:
 - Sets production environment variables.
 - Defines named data and log volumes.
 - Defines service health checks.
+- Publishes FFG port `4000` and TTA port `4002` on IPv4 loopback
+  (`127.0.0.1`) and IPv6 loopback (`::1`) only so host nginx remains the sole
+  public ingress path.
 
 Live production use:
 
@@ -446,7 +449,10 @@ Confirmed runtime paths inside containers:
 
 nginx relationship:
 
-- nginx proxies HTTP application traffic to site upstreams.
+- Host nginx is the intended public ingress boundary and proxies application
+  traffic through `localhost:4000` for FFG and `localhost:4002` for TTA.
+- Docker publishes those application ports on IPv4 and IPv6 loopback only;
+  direct public access to ports `4000` and `4002` is intentionally prohibited.
 - nginx may serve static CSS, JS, images, and uploads through aliases.
 - TLS certificate paths exist in nginx config, but certificate files/private keys must not be inspected.
 
@@ -468,6 +474,24 @@ Live-verified operator facts:
 - Production Compose file: root `docker-compose.prod.yml`.
 - Production Compose implementation: standalone `docker-compose`.
 - Build and recreation remain separate, site-specific, approval-required steps.
+
+Loopback-only ingress rollout:
+
+- The Compose-only binding change requires recreation of each application
+  container but no image rebuild and no nginx reload.
+- Roll out TTA first and verify it before separately recreating FFG, preserving
+  the other site's container throughout each step.
+- After each recreation, require both `127.0.0.1` and `::1` localhost requests
+  to succeed and confirm that neither `0.0.0.0` nor the IPv6 wildcard address
+  is listening on the application port.
+- Also confirm the public HTTPS path remains healthy and direct public access
+  to the application port is unavailable over every published address family.
+- Roll back an affected service by restoring its prior broad Compose port
+  binding, validating the rendered Compose configuration, and recreating only
+  that service with its existing image. No image or database rollback is part
+  of this binding-only reversal.
+- This model keeps nginx on its existing host-local upstreams; it does not
+  redesign nginx to use Docker service names or remove host port publication.
 
 Needs Review: confirm whether nginx config in this repo is deployed as-is or used as a reference.
 

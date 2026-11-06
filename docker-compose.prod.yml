@@ -24,7 +24,8 @@ services:
       - RATE_LIMIT_MAX_REQUESTS=100
       - TRUSTED_IPS=${TRUSTED_IPS}
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
+      - "[::1]:4000:4000"
     volumes:
       - ffg_data:/app/data
       - ffg_logs:/app/logs
@@ -61,7 +62,8 @@ services:
       - RATE_LIMIT_MAX_REQUESTS=100
       - TRUSTED_IPS=${TRUSTED_IPS}
     ports:
-      - "4002:4002"
+      - "127.0.0.1:4002:4002"
+      - "[::1]:4002:4002"
     volumes:
       - tta_data:/app/data
       - tta_logs:/app/logs

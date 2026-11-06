@@ -99,7 +99,15 @@ The development Compose file `docker-compose.yml` uses site-specific development
 
 ### Production Deployment Concept
 
-Production is documented as Docker Compose based. The production Compose file builds both site services with `docker/Dockerfile.prod.site`, passes the site directory and port as build arguments, uses named volumes for runtime data/logs, and defines health checks.
+Production is documented as Docker Compose based. The production Compose file
+builds both site services with `docker/Dockerfile.prod.site`, passes the site
+directory and port as build arguments, uses named volumes for runtime data/logs,
+and defines health checks. Host nginx is the intended public ingress boundary.
+FFG port `4000` and TTA port `4002` remain host-published only on IPv4 loopback
+(`127.0.0.1`) and IPv6 loopback (`::1`) so nginx can continue proxying through
+`localhost` while direct public access to the application ports is prohibited.
+This preserves the existing host-nginx design rather than moving nginx onto the
+Docker network.
 
 Deployment affects live services and must remain explicitly user-approved. Codex should not deploy, restart production services, run remote commands, alter server state, or run Docker commands unless the user asks for that specific action.
 

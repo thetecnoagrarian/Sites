@@ -319,9 +319,9 @@ Confirmed differences visible from safe inspection:
 
 Confirmed and inferred request flow:
 
-1. External request reaches nginx or another reverse proxy.
+1. External production request reaches host nginx, the intended public ingress boundary.
 2. nginx proxies to the relevant site service/container or serves selected static paths directly.
-3. Docker Compose maps the site service to its configured port.
+3. Docker Compose maps the site service to its configured host port on IPv4 and IPv6 loopback only.
 4. The site `src/app.js` starts an Express app through `createBlogApp(config)`.
 5. Shared middleware handles security headers, sessions, CSRF, parsing, static files, uploads, bot protection, rate limiting, and user attachment.
 6. Site-specific middleware adds analytics tracking.
@@ -331,7 +331,9 @@ Confirmed and inferred request flow:
 10. Views render Handlebars templates from the site `src/views/` folder.
 11. Static source assets come from `src/public/`; runtime uploads are served from the configured upload path.
 
-Inferred: production traffic likely flows through nginx/reverse proxy to Dockerized site containers, while local flows may use direct localhost ports or local Compose networking depending on the selected workflow.
+Production traffic flows through host nginx to loopback-published Dockerized
+site services. Local flows may use direct localhost ports or local Compose
+networking depending on the selected workflow.
 
 ## 7. Database and Runtime State
 
@@ -431,9 +433,16 @@ Both services:
 - Use production environment settings.
 - Reference `.env` as an env file without exposing its contents.
 - Define named data and log volumes.
-- Expose site-specific ports.
+- Publish their site-specific application ports to the production host on IPv4
+  loopback (`127.0.0.1`) and IPv6 loopback (`::1`) only.
 - Join a production network.
 - Define HTTP health checks.
+
+Host nginx is the intended public ingress boundary. It continues to proxy to
+the applications through `localhost:4000` and `localhost:4002`; direct public
+access to those ports is intentionally prohibited. Preserving both loopback
+families matches the host's dual-stack `localhost` resolution. This boundary
+does not redesign nginx to use Docker service names or remove host publication.
 
 ### Backup Orchestration
 
