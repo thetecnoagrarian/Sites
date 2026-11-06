@@ -27,7 +27,8 @@ Inferred: the intended architecture is a shared application shell plus site-spec
 - `thetecnoagrarian/` - The Tecnoagrarian site package. Contains parallel site app structure, routes, views, public assets, middleware, analytics model, scripts, and site-level Docker files.
 - `Documents/` - project documentation and Codex migration documentation.
 - `docker/` - shared Docker build assets, including `docker/Dockerfile.prod.site`.
-- `nginx/` - nginx reverse-proxy/static-file configuration.
+- `nginx/` - public-safe nginx architecture notes and sanitized examples; live
+  production nginx configuration is host-managed and is not tracked here.
 - `scripts/` - repository-level operational scripts. Contents were not inspected for this map unless explicitly allowed elsewhere.
 - `tests/` - Playwright end-to-end tests.
 - `.github/` - GitHub Actions workflow configuration.
@@ -304,11 +305,13 @@ Confirmed differences visible from safe inspection:
 - Fruition Forest Garden has `src/utils/heroImageProcessor.js`, the focused
   `src/utils/heroImageStore.js`, and an admin hero-image view. Immutable
   repository WebPs are the defaults and the archival PNG is never a runtime
-  fallback. The current repository, not-yet-deployed seasonal layer stores one
-  manifest-selected UUID generation under `<uploadsPath>/hero`, retains the
-  decoded-format source beneath a non-public `.source` directory, and publishes
-  generation-specific display/social WebP URLs. Upload and reset share an
-  in-process queue; only an atomic manifest replacement changes active state.
+  fallback. The deployed seasonal layer stores one manifest-selected UUID
+  generation under `<uploadsPath>/hero`, retains the decoded-format source
+  beneath a non-public `.source` directory, and publishes generation-specific
+  display/social WebP URLs. Upload and reset share an in-process queue; only an
+  atomic manifest replacement changes active state. The state is backed by the
+  existing data volume, is included in recursive uploads backups, and survives
+  application image replacement and container recreation.
 - Fruition Forest Garden public images include `HeroCamp` assets and favicon subfolder assets.
 - The Tecnoagrarian has `src/database/seed.js`.
 - The Tecnoagrarian Open Graph logic uses hardcoded production-domain tags, while Fruition Forest Garden Open Graph logic can derive a base URL from the request and has hero-image fallback logic.
@@ -319,11 +322,11 @@ Confirmed differences visible from safe inspection:
 
 Confirmed and inferred request flow:
 
-1. External production request reaches host nginx, the intended public ingress boundary.
-2. nginx proxies to the relevant site service/container or serves selected static paths directly.
+1. External production request reaches host nginx, the sole public ingress and TLS boundary.
+2. nginx proxies to the relevant site service through its host-local upstream.
 3. Docker Compose maps the site service to its configured host port on IPv4 and IPv6 loopback only.
 4. The site `src/app.js` starts an Express app through `createBlogApp(config)`.
-5. Shared middleware handles security headers, sessions, CSRF, parsing, static files, uploads, bot protection, rate limiting, and user attachment.
+5. Shared Express middleware handles security headers, sessions, CSRF, parsing, static files, uploads, bot protection, rate limiting, and user attachment.
 6. Site-specific middleware adds analytics tracking.
 7. Site routes handle public, auth, and admin requests.
 8. Routes/controllers call shared `@ffg/blog-core` models and utilities.
@@ -392,7 +395,9 @@ FFG seasonal hero state belongs under `<uploadsPath>/hero`. Its minimal
 The selected generation contains `.source/current-source.<decoded-extension>`,
 `current-hero.webp`, and `current-hero-og.webp`. Only the two derivatives are
 public. No directory scan chooses an older generation when the manifest or
-selected derivative is invalid.
+selected derivative is invalid. Express mediation prevents the retained
+`.source` file from being served publicly. The whole hero tree is persistent
+volume-backed runtime content and is included in the normal uploads archive.
 
 Treat `src/public/uploads/` as runtime/user-generated data even though it lives below `src/public/`. Do not inspect or summarize upload contents unless explicitly approved for a specific task.
 
@@ -446,12 +451,9 @@ does not redesign nginx to use Docker service names or remove host publication.
 
 ### Backup Orchestration
 
-FFG and TTA share the same backup scripts and scheduler. Production currently
-retains backup artifacts under unmounted `/app/backups` before copying the
-entire retained tree to a host path. This is the confirmed source of FFG's
-approximately 950 MB writable layer. The local repository now contains a
-replacement architecture that is not active until an approved production
-rollout:
+FFG and TTA share the same deployed backup scripts and weekly host scheduler.
+The host-managed architecture retains verified sets under the host backup root;
+container storage is temporary staging only:
 
 - `scripts/backup.sh` creates one verified set in an explicit temporary
   staging directory and owns no retention policy.
@@ -461,10 +463,14 @@ rollout:
 - One atomic host lock serializes the full two-site workflow. An ordinary
   failure releases the lock but preserves staging; an abrupt process kill can
   leave a stale lock that deliberately blocks later runs pending review.
-- A failed run preserves one staging set, returns nonzero, and blocks repeated
-  accumulation.
-- The host owns 28-day retention for the new managed layout; legacy backup
-  layouts are excluded from automatic cleanup.
+- A failed site preserves one staging set, records a failure marker, returns a
+  nonzero overall result, and blocks repeated accumulation. The other configured
+  site is still attempted, but retention is skipped if either site fails.
+- SQLite backup uses a bounded busy timeout with lock-only retry. Final failure
+  evidence is preserved for diagnosis.
+- The host owns 28-day retention for exact timestamp-named scheduled sets;
+  named/manual/recovery anchors and legacy layouts are excluded from automatic
+  cleanup.
 - The host location is durable across container replacement but remains on the
   production host. No implemented secondary/off-host copy was found.
 
@@ -486,13 +492,26 @@ Open question: confirm whether this is now the preferred local verification work
 
 ### Nginx
 
-Confirmed: `nginx/blog.conf` defines upstreams for both site services, redirects HTTP to HTTPS, configures SSL certificate paths, proxies application requests, and aliases static paths for CSS, JS, images, and uploads.
+Confirmed: active production nginx is a host systemd service and is not
+installed from a tracked repository config. It terminates public TLS and
+canonical redirects, then proxies to `localhost:4000` for FFG and
+`localhost:4002` for TTA. Docker publishes both application ports on
+`127.0.0.1` and `::1` only. Express serves application static files and uploads;
+there is no active production nginx `/uploads` alias.
 
-Do not inspect certificate files or private keys.
+`nginx/README.md` records this boundary.
+`nginx/templates/canonical-host-redirects.example.conf` is a sanitized example
+only. Certificate paths, private host details, and live configuration remain
+outside tracked source and must be discovered read-only before approved
+recovery work.
 
 ### Workflow Review Needed
 
-Root-level Compose files and site-level Docker/Compose files coexist. The canonical workflow for local development, local production-like testing, and production deployment should be clarified in `Documents/DEPLOYMENT_RUNBOOK.md`.
+Root-level Compose files and site-level Docker/Compose files coexist. Root
+`docker-compose.prod.yml` is the established production authority. The
+canonical workflows for local development, local-production-like testing, and
+site-specific standalone operation remain open and are tracked in
+`Documents/DEPLOYMENT_RUNBOOK.md`.
 
 ## 10. Testing and CI
 
@@ -602,8 +621,10 @@ Requires explicit user approval:
 
 ## 13. Open Questions
 
-- Which Compose file is canonical for local development, local production-like testing, and production deployment?
-- Do site-level Docker/Compose files remain current, or are root-level Compose files authoritative?
+- Which Compose file is canonical for local development, local production-like
+  testing, and site-specific standalone operation? Root
+  `docker-compose.prod.yml` is the established production authority.
+- Do site-level Docker/Compose files remain current for any standalone workflow?
 - Should `docker-compose.yml` use `UPLOADS_PATH` instead of `UPLOAD_PATH`, or is the current default-path behavior intentional?
 - Is `fruitionforestgarden/src/app.js` default port `3001` intentional when root local Compose maps the service to port `3000` through environment?
 - Should the older site-local schema/initializer files be retired in a separate cleanup task after their remaining callers are verified?

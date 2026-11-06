@@ -12,7 +12,8 @@ Sensitive files are listed by path only and were not opened.
 - `thetecnoagrarian/` - The Tecnoagrarian site package.
 - `Documents/` - project documentation and operational notes.
 - `docker/` - shared Docker build assets.
-- `nginx/` - nginx configuration.
+- `nginx/` - public-safe nginx architecture notes and sanitized examples; active
+  production configuration is host-managed and not installed from this tree.
 - `scripts/` - repository-level operational scripts.
 - `tests/` - Playwright end-to-end tests.
 - `.github/` - GitHub workflow configuration.
@@ -96,7 +97,9 @@ Repository-level Docker/deployment files:
 - `docker-compose.prod.yml`
 - `docker-compose.local-prod.yml`
 - `docker/Dockerfile.prod.site`
-- `nginx/blog.conf`
+- `nginx/README.md`
+- `nginx/templates/canonical-host-redirects.example.conf` - sanitized example
+  only; not active production configuration.
 
 Site-level Docker/deployment files:
 
@@ -245,7 +248,10 @@ These should not be treated as source-of-truth application or documentation sour
 
 ## 11. Open Questions and Confusing Areas
 
-- There are root-level Docker Compose files and site-level Docker Compose files. Needs review: which files are canonical for local development, production, and local production simulation.
+- There are root-level Docker Compose files and site-level Docker Compose files.
+  Root `docker-compose.prod.yml` is the established production authority. Needs
+  review: which files are canonical for local development, local-production
+  simulation, and site-specific standalone operation.
 - There are root scripts and site scripts with operational names. Needs review: which are safe day-to-day commands versus deployment, backup, reset, or server-affecting commands.
 - Both sites have `uploads/` and `backups/` folders. Needs review: confirm whether these are entirely runtime/local data and should be excluded from source-oriented documentation.
 - Credential-adjacent documentation exists under `Documents/`. Needs review: future docs should reference only placeholders, variable names, and safe paths unless explicitly approved.

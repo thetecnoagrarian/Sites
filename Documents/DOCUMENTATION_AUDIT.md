@@ -21,12 +21,14 @@ The goals are:
 
 This audit is the current classification record and archive log. It does not authorize future cleanup or operational changes beyond an explicitly approved task.
 
-> Current-state checkpoint (2026-10-01): use
-> `Documents/DEPLOYMENT_RUNBOOK.md` for production, capacity, and host-backup
-> state; `Documents/SEO_CRAWLABILITY_NOTES.md` for current SEO and structured-data
-> decisions, including the Event/conditional-Published public date policy and
-> intentional omission of post sitemap `lastmod`; and
-> `Documents/MONOREPO_CONTEXT.md` for the next project phase.
+> Documentation-health checkpoint (2026-11-06): use `AGENTS.md` for safety and
+> authorization, `Documents/MONOREPO_CONTEXT.md` for orientation,
+> `Documents/ARCHITECTURE_MAP.md` for topology and trust boundaries,
+> `Documents/PRODUCTION_DEPLOYMENT_MODEL.md` for deployment concepts,
+> `Documents/DEPLOYMENT_RUNBOOK.md` for executable gates and rollback,
+> `Documents/BACKUP_SYSTEM_GUIDE.md` for backup/restore architecture, and
+> `Documents/SEO_CRAWLABILITY_NOTES.md` for SEO-specific behavior. This audit is
+> a dated documentation-health record, not runtime authority.
 > The date-policy implementation is deployed: public `Posted` is
 > gone, Event remains, conditional Published support is live, and post sitemap
 > entries omit `lastmod`. Corpus-wide publication recovery is abandoned; only
@@ -38,10 +40,14 @@ This audit is the current classification record and archive log. It does not aut
 > reviewed Public Person authors, explicit Person publisher facts, and reviewed
 > publication facts without Event/legacy timestamp fallbacks or `dateModified`.
 > Fruition Forest Garden's repository-local WebP display/social defaults omit
-> the archival PNG at runtime. The current repository implementation adds a
-> not-yet-deployed persistent seasonal-hero store under
-> the existing uploads volume, with atomic generation selection and explicit
-> reset-to-default behavior.
+> the archival PNG at runtime. Its deployed persistent seasonal-hero store uses
+> the existing uploads volume, atomic generation selection, Express-protected
+> retained source, backup coverage, and explicit reset-to-default behavior.
+> Backup hardening commit `88bc59e` is also deployed; the November 3 preflight
+> passages remain dated evidence of its then-pending rollout, not current status.
+> Production ingress is host nginx to loopback-only application ports, with
+> application static files and uploads served through Express. Tracked nginx
+> material is reference/example material only.
 > Dated audit batches below remain historical classification records.
 
 ## 2. Current Documentation Landscape
@@ -51,7 +57,7 @@ This audit is the current classification record and archive log. It does not aut
 | `AGENTS.md` | Active source of truth | Active | Highest-priority repo instruction file | High importance, low content risk | Read first for every task. Contains safety, secret, Git, testing, deployment, and migration rules. |
 | `Documents/REPO_INVENTORY.md` | Inventory / orientation | Active | Keep as repo map and safe path inventory | Low | Useful for quick orientation and sensitive path-only listings. |
 | `Documents/MONOREPO_CONTEXT.md` | Orientation / context | Active | Keep as high-level project context | Low | Explains why both live sites share the monorepo, how `blog-core` fits, and the current next-work checkpoint. |
-| `Documents/ARCHITECTURE_MAP.md` | Architecture map | Active | Keep as architecture source for future edits | Medium | Captures code/config structure and known mismatches. Should be refreshed after architecture changes. |
+| `Documents/ARCHITECTURE_MAP.md` | Architecture map | Active | Keep as topology, persistence, and trust-boundary authority | Medium | Captures code/config structure and known mismatches. Should be refreshed after architecture changes. |
 | `Documents/ENVIRONMENT_AND_SECRETS_MAP.md` | Environment and secrets map | Active | Keep as secret-boundary source | High importance, medium content risk | Correctly avoids values and documents variable mismatches. Needs refresh after env template changes. |
 | `Documents/DEPLOYMENT_RUNBOOK.md` | Operational runbook | Active but cautious | Keep as active deployment planning doc | High | Safe placeholder-first runbook. Production actions still require explicit approval. |
 | `Documents/CODEX_WORKFLOW.md` | Codex workflow | Active | Keep as active Codex operating procedure | Medium | Defines startup, scope, audit, commit, dependency, and deployment boundaries. |
@@ -60,7 +66,7 @@ This audit is the current classification record and archive log. It does not aut
 | `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` | Broad project history | Archived | Preserve as historical context only | High | Current guidance is distributed across focused docs; sensitive-adjacent and stale operational detail must not control current work. |
 | `Documents/archive/troubleshooting/LOCAL_SETUP_QUICKSTART.md` | Local production-like setup history | Archived | Preserve as historical setup context | Medium | Current local production-like and isolated testing guidance lives in the runbook. |
 | `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` | Local Docker workflow history | Archived | Preserve as historical setup context | High | Contains superseded direct Docker/deployment instructions and is not current authority. |
-| `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup architecture and planning guide | Active but cautious | Keep as the application-backup architecture reference | High | Records the current host-managed model and future off-host/restore gates; it does not authorize backup, restore, or deletion actions. |
+| `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup architecture and planning guide | Active but cautious | Keep as the application-backup architecture reference | High | Records the deployed host-managed hardening and future off-host/restore gates; it does not authorize backup, restore, or deletion actions. |
 | `Documents/GITHUB_AUTHENTICATION_SETUP.md` | GitHub auth reference | Needs Review | Sensitive-adjacent reference or historical setup note | High | Contains account, SSH, key path, and auth workflow details. Do not reproduce private details in future docs. |
 | `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md` | Cleanup/troubleshooting history | Archived | Preserve as migration-era cleanup context | High | Destructive cleanup instructions must not be treated as current operational guidance. |
 | `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Analytics cleanup planning guide | Active but cautious | Keep as placeholder-only planning reference | High | Tracked analytics models, middleware, routes, and cleanup script still exist. The guide does not authorize database mutation or claim live state. |
@@ -112,11 +118,11 @@ Batch 3 moved two superseded documents into new archive categories after transfe
 
 Tracked Markdown under `Documents/` changed from 20 active and 7 archived files to 18 active and 9 archived files. This is a 33.3% reduction from the original 27-document active baseline. `Documents/BACKUP_SYSTEM_GUIDE.md` and `Documents/ANALYTICS_CLEANUP_GUIDE.md` remain active as placeholder-only planning references; neither authorizes production operations. Unresolved dependency evidence also remains active.
 
-### 2D. Current Cleanup Classification Update - 2026-06-12
+### 2D. Historical Cleanup Classification Update - 2026-06-12
 
 This update reflects later dependency remediation, logging redaction, CSP cleanup, Search Console fixes, `/index.html` redirect work, and live nginx non-www-to-www canonical redirects.
 
-Current confirmed context from recent documentation and operator-provided state:
+Context confirmed for that dated update:
 
 - `origin/main` is synchronized at `ec9d67f Redirect index.html to homepage`.
 - `/index.html` now redirects to `/` on both public sites.
@@ -126,7 +132,9 @@ Current confirmed context from recent documentation and operator-provided state:
 - Logging redaction cleanup is deployed and documented.
 - Some live nginx changes happened directly on the server and should be documented only in sanitized, public-safe form.
 
-This section supersedes older status notes in this audit where they conflict with the current state.
+This section is preserved as historical classification evidence. The newer
+documentation-health checkpoint at the top of this file controls when facts
+conflict.
 
 #### Public Tracked Docs To Keep Active
 
@@ -145,7 +153,7 @@ This section supersedes older status notes in this audit where they conflict wit
 | `Documents/DEPENDENCY_REMEDIATION_LOG.md` | Chronological remediation and production verification log | Keep tracked as a log, but do not treat as the single current-status source. |
 | `Documents/DEPENDENCY_AUDIT_RESULTS.md` | Dependency evidence/reference | Keep as evidence. |
 | `Documents/DEPENDENCY_SECURITY_REMEDIATION_PLAN.md` | Dependency remediation plan | Keep as plan/reference. |
-| `Documents/BACKUP_SYSTEM_GUIDE.md` | Active public-safe backup architecture and recovery guide | Keep active; live behavior was audited and TTA continuity was restored on 2026-11-03. The later same-day preflight recorded hardening commit `88bc59e` awaiting separately authorized rollout while production remained at `5ddd651`. |
+| `Documents/BACKUP_SYSTEM_GUIDE.md` | Active public-safe backup architecture and recovery guide | Keep active; live behavior was audited and TTA continuity was restored on 2026-11-03. The later same-day preflight recorded hardening commit `88bc59e` awaiting separately authorized rollout while production remained at `5ddd651`; that hardening was subsequently deployed. |
 | `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Placeholder-only analytics retention and cleanup planning reference | Keep active; any data mutation requires separate approval and live-state verification. |
 | `Documents/DOCUMENTATION_AUDIT.md` | Documentation classification and cleanup plan | Keep active and refresh during cleanup. |
 
@@ -186,55 +194,38 @@ These files were identified by path and ignore metadata only. They were not open
 | `Documents/_MDC_NOTES.md` | `.git/info/exclude` | Keep private/local notes only. |
 | `Documents/SECRETS.md` | `.gitignore` | Keep ignored and off-limits. |
 
-#### Sanitized nginx Documentation Gap
+#### Sanitized nginx Documentation Gap — Closed 2026-11-06
 
-Current gap: live nginx non-www-to-www canonical redirects are part of current production behavior, but the public tracked docs should not contain private server details, exact private paths, credential material, or certificate/key contents.
+`nginx/templates/canonical-host-redirects.example.conf` now provides the
+sanitized example. `nginx/README.md` records that production nginx is
+host-managed, repository material is reference/example-only, applications are
+loopback-bound, and static/upload requests pass through Express. The retired
+`nginx/blog.conf` was dead and inconsistent with that model.
 
-Recommendation:
+Private server details, live certificate paths, credential material,
+certificate/key contents, and operator access data remain intentionally outside
+tracked source.
 
-- Add a sanitized nginx canonical redirect template later.
-- Preferred path: `nginx/templates/canonical-host-redirects.example.conf`.
-- Acceptable docs-only alternative: `Documents/NGINX_CANONICAL_REDIRECT_TEMPLATE.md`.
-- Use placeholders such as `[DOMAIN]`, `[WWW_DOMAIN]`, and `[CERT_PATH]`.
-- Redact or omit live server IPs, private usernames, private key paths, certificate contents, cookie values, session values, CSRF values, and private operator commands.
+## 3. Source-of-Truth Hierarchy
 
-## 3. Proposed Source-of-Truth Hierarchy
+The primary authority map is maintained in `Documents/CODEX_WORKFLOW.md`:
 
-This hierarchy is proposed, not final.
+| Responsibility | Primary authority |
+|---|---|
+| Safety and authorization | `AGENTS.md` |
+| Project orientation | `Documents/MONOREPO_CONTEXT.md` |
+| Topology and trust boundaries | `Documents/ARCHITECTURE_MAP.md` |
+| Deployment concepts | `Documents/PRODUCTION_DEPLOYMENT_MODEL.md` |
+| Executable deployment gates and rollback | `Documents/DEPLOYMENT_RUNBOOK.md` |
+| Backup and restore | `Documents/BACKUP_SYSTEM_GUIDE.md` |
+| SEO-specific behavior | `Documents/SEO_CRAWLABILITY_NOTES.md` |
+| Dated documentation health | `Documents/DOCUMENTATION_AUDIT.md` |
+| Repository path map | `Documents/REPO_INVENTORY.md` |
 
-### Highest Priority Safety / Instruction Layer
-
-- `AGENTS.md`
-- `Documents/CODEX_WORKFLOW.md`
-- `Documents/AGENT_ORCHESTRATION_WORKFLOW.md`
-
-Use for task boundaries, secret policy, Codex behavior, audit expectations, Git control, and approval requirements.
-
-### Orientation / Context Layer
-
-- `Documents/REPO_INVENTORY.md`
-- `Documents/MONOREPO_CONTEXT.md`
-- `Documents/ARCHITECTURE_MAP.md`
-
-Use for repo structure, package relationships, shared versus site-specific boundaries, runtime state, and architecture mapping.
-
-### Environment / Deployment Layer
-
-- `Documents/ENVIRONMENT_AND_SECRETS_MAP.md`
-- `Documents/PRODUCTION_DEPLOYMENT_MODEL.md`
-- `Documents/DEPLOYMENT_RUNBOOK.md`
-- private/local-only `Documents/LINODE_DEPLOYMENT_RUNBOOK.md`, path-only
-- `Documents/ENVIRONMENT_TEMPLATE.md` if validated
-
-Use for environment-variable names, secret classification, placeholder handling, deployment planning, production model, and high-risk operational boundaries.
-
-Current interpretation:
-
-- `Documents/PRODUCTION_DEPLOYMENT_MODEL.md` should be the public-safe production model.
-- `Documents/DEPLOYMENT_RUNBOOK.md` should remain the agent-safety and placeholder-oriented deployment planning doc.
-- `Documents/LINODE_DEPLOYMENT_RUNBOOK.md` is ignored/private and may be the exact operator runbook, but it must stay path-only in public docs unless sanitized.
-- `Documents/archive/deployment/DEPLOYMENT_DISCOVERY.md` is historical/transitional rather than active deployment authority.
-- Local Docker docs are local testing references, not production deployment authority.
+`Documents/ENVIRONMENT_AND_SECRETS_MAP.md` remains the structural environment
+and secret-boundary reference. Private operator material stays path-only in
+public documentation. Archived and dated records preserve history but do not
+override the current primary authority.
 
 ### Migration / History Layer
 
@@ -351,18 +342,25 @@ Possible consolidation targets:
 
 Do not consolidate anything until the user approves a separate cleanup task.
 
-## 7. Known Conflicts and Mismatches
+## 7. Known Conflicts, Resolutions, and Mismatches
 
 Known issues from safe docs/config inspection:
 
 - `UPLOAD_PATH` vs `UPLOADS_PATH`: root `docker-compose.yml` uses `UPLOAD_PATH`, while production/local-production Compose and app docs point to `UPLOADS_PATH`.
 - `DATABASE_URL` vs `DATABASE_PATH`: site examples documented in the environment map use `DATABASE_URL`, while active source/Compose references use `DATABASE_PATH`.
 - Node baseline is now aligned: active package manifests require Node `>=24.0.0 <25`, while Docker and CI use exact Node `24.19.0` on Alpine 3.23 for Docker.
-- Root Compose files versus site-level Docker/Compose files: both exist; canonical workflow remains Needs Review.
+- Root Compose files versus site-level Docker/Compose files: root
+  `docker-compose.prod.yml` is the established production authority; canonical
+  local-development, local-production-like, and site-specific standalone paths
+  remain Needs Review.
 - Local development workflow versus local production-like workflow: `docker-compose.yml`, `docker-compose.local-prod.yml`, local npm scripts, and older local docs describe different paths.
-- `nginx/blog.conf`: checked-in nginx config may be source of truth or reference only. Needs Review against actual deployment without inspecting private server state.
+- Nginx provenance is resolved: active configuration is host-managed;
+  `nginx/README.md` is the tracked architecture reference and the canonical-host
+  template is example-only. The dead `nginx/blog.conf` was retired.
 - CI tolerance: workflow tolerates some missing/failing lint, unit, E2E, and audit steps, so CI passing should not be overstated.
-- Deployment/runbook uncertainty: exact production deploy path, service names, command style, and nginx relationship remain Needs Review.
+- The production checkout, root Compose authority, service names, manual command
+  style, and host-nginx relationship are documented. Operators must still
+  rediscover live state during every authorized preflight.
 - Environment template variables: some variables appear stale, future-facing, or not directly referenced by inspected source/Compose.
 - The active shared schema and model use `posts.body`. Older site-local schema files are not the active initialization path. A separately authorized read-only production inventory found two supported historical shared-schema variants that the original exact-DDL migration matcher rejected. The semantic-recognition revision preserves their distinct baseline identities while still rejecting material drift; production deployment remains a separate reviewed gate.
 - User password schema mismatch: `password` versus `password_hash` is recorded in `ARCHITECTURE_MAP.md` and needs review without inspecting runtime database files.
@@ -518,22 +516,26 @@ Revisit Cursor residue only if a missing rule, prompt, or decision cannot be rec
 - Git history if explicitly approved
 - website/admin review with the user
 
-## 13. Documentation Cleanup Plan
+## 13. Remaining Documentation Work
 
-Proposed staged plan:
+The 2026-11-06 reconciliation closed the active nginx provenance, sanitized
+template, hero rollout, backup-hardening rollout, and ingress-boundary items.
+Remaining work should stay in separate scoped tasks:
 
-1. Update this documentation audit with the latest cleanup classification.
-2. Update `Documents/PRODUCTION_DEPLOYMENT_MODEL.md` with public-safe current production facts: `/index.html` redirect, nginx non-www-to-www redirects, and Search Console redirect interpretation.
-3. Update `Documents/SEO_CRAWLABILITY_NOTES.md` so sitemap/canonical, `/index.html`, and non-www redirect status are current.
-4. Add a sanitized nginx canonical redirect template or placeholder-only documentation.
-5. Review tracked credential-adjacent docs with the human operator before any archive, rename, or public consolidation.
-6. Resolve source-of-truth conflicts in active docs.
-7. Consolidate historical docs into `Documents/PROJECT_HISTORY.md`, `Documents/HISTORICAL_NOTES.md`, or an archive folder.
-8. Update `AGENTS.md` only if cleanup reveals a durable rule that belongs in the highest-priority instruction layer.
-9. Continue dependency/security remediation as a separate full-audit workflow.
-10. Create a deployment operator checklist only when repeated deployments make it worth the extra artifact.
+1. Design off-host application-backup storage and its verification model.
+2. Complete a safe environment-variable/template alignment review without
+   reading or exposing secret values.
+3. Run a fresh dependency audit before using dated dependency evidence for new
+   remediation decisions.
+4. Complete an explicitly authorized authenticated restore rehearsal; existing
+   isolated evidence does not cover authenticated workflows or off-host loss.
+5. Resolve the canonical local-development, local-production-like, and
+   site-specific standalone Compose relationships. Root
+   `docker-compose.prod.yml` is already the production authority.
+6. Consider archive banners and historical-runbook extraction separately; do
+   not mix them into operational corrections.
 
-This plan does not authorize cleanup. Each stage should be a separate scoped task.
+This list records gaps and does not authorize implementation or production work.
 
 ## 14. Do-Not-Touch List for Future Cleanup
 
@@ -557,24 +559,20 @@ Sensitive paths may be listed when needed, but contents must not be opened or re
 
 ## 15. Recommended Next Tasks
 
-1. Commit this `Documents/DOCUMENTATION_AUDIT.md` update after light audit.
-2. Update `Documents/PRODUCTION_DEPLOYMENT_MODEL.md` with the current public-safe production deployment and nginx canonical redirect state.
-3. Update `Documents/SEO_CRAWLABILITY_NOTES.md` with current Search Console/crawlability status.
-4. Create a sanitized nginx canonical redirect template under `nginx/templates/` or a docs-only equivalent.
-5. Human-review tracked credential-adjacent docs before any public cleanup.
-6. Resolve the highest-value documentation conflicts.
-7. Archive or consolidate historical docs only after active docs are current.
-8. Continue dependency/security remediation as a separate full-audit workflow.
+1. Perform a documentation-only production preflight before fast-forwarding this
+   reconciliation commit. No runtime-consumed file changes are expected.
+2. Keep off-host backup, authenticated restore testing, environment alignment,
+   dependency auditing, Compose clarification, and archive hygiene as separate
+   authorized workstreams.
+3. Human-review tracked credential-adjacent docs before any public cleanup.
 
 ## 16. Open Questions
 
-- Which docs are truly active source-of-truth?
-- Which operational docs are current versus historical?
-- Which Compose workflow is canonical?
+- Which Compose workflow is canonical for local development,
+  local-production-like testing, and site-specific standalone use?
 - Should generated/runtime cleanup happen before or after dependency remediation?
 - How should actual website review findings be folded into docs?
 - Should older operational docs be redacted before being kept long-term?
 - Should `Documents/ENVIRONMENT_TEMPLATE.md` be replaced by per-site examples or one canonical template?
 - Should tracked credential-adjacent docs be sanitized, made private-only, or archived?
-- Should the sanitized nginx canonical redirect template live under `nginx/templates/` or `Documents/`?
 - Should private operator runbooks remain only in `.git/info/exclude`, or should there be a documented private-doc convention?

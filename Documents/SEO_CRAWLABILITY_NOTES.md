@@ -17,6 +17,10 @@ Current confirmed state:
 - CSP `form-action` cleanup is deployed; production now relies on same-origin form submission.
 - `/index.html` now redirects to `/` on both sites.
 - Non-www HTTP and HTTPS variants now redirect to HTTPS `www` at the nginx edge for both sites.
+- Production nginx is host-managed and proxies to loopback-only applications.
+  `nginx/templates/canonical-host-redirects.example.conf` is the existing
+  sanitized example, not live configuration; `nginx/README.md` records the
+  boundary without private host or certificate details.
 - The Tecnoagrarian domain-property sitemap was submitted on 2026-09-14 and
   reported `Success` with 12 discovered pages. This confirms sitemap processing,
   not indexing of every discovered URL.
@@ -482,7 +486,9 @@ Use URL Inspection only for representative remaining examples after the known fi
 - Wait roughly 2-7 days for Google recrawl and Search Console validation to update before treating remaining rows as new defects.
 - Do not click `Validate Fix` repeatedly. Recheck representative examples first.
 - Inspect only specific remaining bad URLs if Search Console continues reporting them after recrawl.
-- Add a sanitized nginx canonical redirect template to the repo later.
+- Keep the existing sanitized canonical-host redirect example aligned with the
+  documented redirect intent; never treat it as automatically installed live
+  configuration.
 - Review whether canonical URL generation should be consolidated with Open Graph URL generation.
 - Add published/draft filtering to sitemap generation if the content model gains explicit publication state.
 - Treat the public date-model simplification and factual partial `BlogPosting`
@@ -491,10 +497,11 @@ Use URL Inspection only for representative remaining examples after the known fi
   reconstructing the historical corpus.
 - FFG's repository WebP display/social assets remain immutable defaults, with
   factual intrinsic dimensions, eager high-priority visible loading, and no
-  archival PNG fallback. The current repository implementation adds a
-  not-yet-deployed persistent seasonal-hero generation in the existing uploads
-  volume. Its
+  archival PNG fallback. The deployed persistent seasonal-hero generation uses
+  the existing uploads volume. Its
   generation-specific URLs avoid stale long-lived upload caches; Homepage,
   About, and site-level social metadata fall back to the repository WebPs if
-  the selection is missing or invalid. No production LCP or Core Web Vitals
-  improvement is claimed; measurement remains a separate authorized step.
+  the selection is missing or invalid. Express serves the public derivatives
+  and protects the retained `.source` path; production does not use a direct
+  nginx uploads alias. No production LCP or Core Web Vitals improvement is
+  claimed; measurement remains a separate authorized step.

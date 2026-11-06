@@ -56,12 +56,11 @@ Inferred: shared behavior such as application wiring, rendering conventions, aut
 
 Both The Tecnoagrarian and Fruition Forest Garden are live production sites.
 They retain distinct identities and content, while shared behavior should be
-kept in `blog-core` when it genuinely applies to both. The current verified
-production source checkpoint is commit
-`6be6ce9e61c9ee42dee900f6318d217ba00b86f0`. The historical-authorship
-backfill, public date-model simplification, and factual partial `BlogPosting`
-slice were separately authorized, deployed, and verified before this
-checkpoint.
+kept in `blog-core` when it genuinely applies to both. The historical-authorship
+backfill, public date-model simplification, factual partial `BlogPosting`, FFG
+seasonal hero, scheduled-backup hardening, and loopback ingress restrictions
+were separately authorized, deployed, and verified. Live commit and runtime
+state must still be rediscovered during each production preflight.
 
 ## 3. Shared `blog-core` Role
 
@@ -102,12 +101,15 @@ The development Compose file `docker-compose.yml` uses site-specific development
 Production is documented as Docker Compose based. The production Compose file
 builds both site services with `docker/Dockerfile.prod.site`, passes the site
 directory and port as build arguments, uses named volumes for runtime data/logs,
-and defines health checks. Host nginx is the intended public ingress boundary.
+and defines health checks. Host nginx is the sole public ingress, TLS, and
+canonical-redirect boundary.
 FFG port `4000` and TTA port `4002` remain host-published only on IPv4 loopback
 (`127.0.0.1`) and IPv6 loopback (`::1`) so nginx can continue proxying through
 `localhost` while direct public access to the application ports is prohibited.
 This preserves the existing host-nginx design rather than moving nginx onto the
-Docker network.
+Docker network. Nginx proxies requests to the applications; Express serves
+application static files and uploads, including enforcement of protected upload
+paths. Production has no direct nginx `/uploads` alias.
 
 Deployment affects live services and must remain explicitly user-approved. Codex should not deploy, restart production services, run remote commands, alter server state, or run Docker commands unless the user asks for that specific action.
 
@@ -121,9 +123,12 @@ The Docker model appears to have three layers:
 
 `docker/Dockerfile.prod.site` is a shared multi-stage production Dockerfile parameterized by site directory and site port. It installs production dependencies, copies shared and site source, creates runtime directories, configures a non-root user, and runs the selected site app.
 
-The active production and development Dockerfiles use the immutable official Node `24.19.0` Alpine 3.23 multi-architecture image reference. CI also uses Node `24.19.0`, and active package engines enforce the Node 24 major. The Node 24 production migration and native Linux musl AMD64 validation gate were completed; the dormant one-time `multiarch` builder was later retired after confirming it had no current production or rollback dependency. The active production builder is `mybuilder`.
+The active production and development Dockerfiles use the immutable official Node `24.19.0` Alpine 3.23 multi-architecture image reference. CI also uses Node `24.19.0`, and active package engines enforce the Node 24 major. The Node 24 production migration and native Linux musl AMD64 validation gate were completed; the dormant one-time `multiarch` builder was later retired after confirming it had no current production or rollback dependency. Builder identity remains a live preflight discovery item.
 
-Needs review: the canonical relationship among root-level and site-level Compose files should be documented in a future deployment runbook.
+Needs review: the canonical relationship among root-level and site-level Compose
+files remains unresolved for local development, local-production-like testing,
+and site-specific standalone use. Root `docker-compose.prod.yml` is the
+established production authority.
 
 ### Runtime State
 
@@ -147,12 +152,14 @@ retention limited to exact timestamp-named scheduled backup sets. At the later
 2026-11-03 production preflight, that commit had been pushed and awaited a
 separately authorized rollout while production remained at `5ddd651`. The
 preflight determined that rollout would require neither an application image
-rebuild nor a container restart. This is a dated status record, not a claim
-about later production state.
+rebuild nor a container restart. This is a dated preflight record. The
+hardening was subsequently deployed; bounded lock-only retry, persistent failure
+markers, evidence preservation, site-isolated continuation, and exact
+scheduled-set retention are the current production model.
 
 ### Documentation as Source of Truth
 
-`AGENTS.md` identifies `Documents/` and `AGENTS.md` as the primary documentation areas. The former broad master document is archived at `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` for historical context and is not current operational authority. For Codex migration work, documentation should be created under `Documents/`.
+`AGENTS.md` identifies `Documents/` and `AGENTS.md` as the primary documentation areas. The former broad master document is archived at `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` for historical context and is not current operational authority. `Documents/CODEX_WORKFLOW.md` owns the primary authority map; secondary documents should summarize and link rather than redefine operational facts.
 
 Documentation should preserve workflows, architectural context, and safety boundaries without exposing secrets. If docs conflict with code, record the conflict instead of guessing.
 
@@ -214,7 +221,7 @@ It preserves:
 
 Future Codex sessions should read this file early, after `AGENTS.md`, when working on architecture, documentation, deployment runbooks, environment mapping, or multi-site refactors.
 
-## 7. Current Next Work
+## 7. Deployed Editorial and SEO Model
 
 The repository now contains the schema and shared-model foundation for
 **Structured Data Prerequisite: Public Author and Publication Model**. Public
@@ -313,21 +320,23 @@ Fruition Forest Garden uses immutable repository-local WebP assets as its
 default hero: 1920-by-1440 for visible display and 1200-by-630 for social
 metadata. The archival 19 MB PNG is not a runtime fallback.
 
-The current repository implementation is not yet deployed. It adds a persistent
-seasonal-hero layer under the configured runtime uploads path at
+The deployed persistent seasonal-hero layer lives under the configured runtime
+uploads path at
 `uploads/hero`. A strictly validated `.current.json` selects one complete UUID
 generation containing a retained source beneath `.source`, a display WebP, and
 a social WebP. Homepage/About and site-level social metadata prefer that
 generation, while an explicit admin reset atomically removes the selection and
-returns immediately to the repository defaults. Container recreation and
-deployment must preserve this state through the existing data volume; neither
-operation is a reset mechanism.
+returns immediately to the repository defaults. Express prevents public access
+to the retained source. The recursive uploads backup includes the manifest and
+selected generation. Container recreation and deployment preserve this state
+through the existing data volume; neither operation is a reset mechanism.
 
 ## 8. Open Questions
 
-- Which Compose file is canonical for each workflow: local development, local production-like testing, production deployment, and site-specific standalone operation?
-- Do the site-level Compose files remain current, or are root-level Compose files now authoritative?
+- Which Compose file is canonical for local development, local production-like
+  testing, and site-specific standalone operation? Root
+  `docker-compose.prod.yml` is the established production authority.
+- Do the site-level Compose files remain current for any standalone workflow?
 - Which operational scripts are safe for routine local use, and which are deployment, backup, reset, or server-affecting commands?
-- Which reviewed-safe operational docs should be treated as current source of truth versus historical notes?
 - Should dependency/security remediation be a later phase after documentation, architecture mapping, and workflow documentation are complete?
 - Should generated artifacts and runtime folders be cleaned, ignored, or archived outside the repo? Do not perform cleanup without explicit approval.

@@ -10,6 +10,27 @@ Codex should help with documentation, architecture mapping, focused code review,
 
 This repo contains two related blog sites, shared blog-core code, Docker/deployment files, scripts, tests, and operational documentation. That mix makes clear workflow boundaries important.
 
+### Documentation authority map
+
+Use one primary document for each kind of fact. Secondary documents should
+summarize and link rather than redefine operational behavior:
+
+| Question | Primary authority |
+|---|---|
+| Safety, authorization, and secret boundaries | `AGENTS.md` |
+| Project orientation and current high-level context | `Documents/MONOREPO_CONTEXT.md` |
+| Source topology, persistence, and trust boundaries | `Documents/ARCHITECTURE_MAP.md` |
+| Production deployment concepts | `Documents/PRODUCTION_DEPLOYMENT_MODEL.md` |
+| Executable gates, commands, verification, and rollback | `Documents/DEPLOYMENT_RUNBOOK.md` |
+| Backup and restore architecture | `Documents/BACKUP_SYSTEM_GUIDE.md` |
+| SEO-specific behavior and decisions | `Documents/SEO_CRAWLABILITY_NOTES.md` |
+| Dated documentation health and classification | `Documents/DOCUMENTATION_AUDIT.md` |
+| Repository path inventory | `Documents/REPO_INVENTORY.md` |
+
+When documents conflict, inspect the current source/configuration and classify
+the conflict. Do not let a dated audit record or archived note override its
+current primary authority.
+
 ## 2. Required Startup Routine
 
 Every Codex session should begin by:
@@ -268,7 +289,7 @@ Deployment-related files requiring caution:
 - `docker-compose.prod.yml`
 - `docker-compose.local-prod.yml`
 - `docker/Dockerfile.prod.site`
-- `nginx/blog.conf`
+- `nginx/README.md` and sanitized examples under `nginx/templates/`
 - `.github/workflows/ci-cd.yml`
 - operational scripts under `scripts/`
 - start/stop/restart shell scripts
@@ -469,9 +490,10 @@ Dependency/security remediation should remain separate from documentation migrat
 
 ## 16. Open Questions
 
-- Which root or site-level Compose files are canonical for each workflow?
+- Which root or site-level Compose files are canonical for local development,
+  local-production-like testing, and site-specific standalone use? Root
+  `docker-compose.prod.yml` is the established production authority.
 - Should `UPLOAD_PATH` be standardized to `UPLOADS_PATH`?
 - Should `DATABASE_URL` examples be replaced with `DATABASE_PATH`?
-- Which reviewed-safe operational docs are current versus historical?
 - Should generated/runtime folders be cleaned or only ignored?
 - Should CI failure tolerance be tightened after documentation migration?

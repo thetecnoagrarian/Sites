@@ -38,7 +38,8 @@ Confirmed production model from safe files:
 - Root production Compose file at `docker-compose.prod.yml`.
 - Site services use Docker named volumes for runtime data and logs.
 - Environment variables are supplied through Compose and an env file path.
-- nginx is configured as a reverse proxy and static-file front end.
+- Host nginx is the public ingress, TLS, and canonical-redirect layer. Express
+  serves application static files and uploads behind that boundary.
 - Backups are intended to cover runtime database and uploads data.
 
 Canonical change workflow:
@@ -56,14 +57,17 @@ GitHub is source control plus advisory CI. Pushing to GitHub does not deploy pro
 
 Live production use was verified on 2026-08-24 at `/opt/Sites` with the root `docker-compose.prod.yml` and the standalone `docker-compose` command. Service names must still be taken from the checked-in Compose file and confirmed for each approved deployment.
 
-### Current Production And Capacity Checkpoint
+### Dated 2026 Infrastructure Capacity Checkpoint
 
-As of production commit `f3fe658c1989634fe1d3fba4b20c8928e42571a8`:
+This records the completed 2026 host-capacity expansion. It is historical
+evidence, not a statement of the current production commit, free disk, health,
+or builder state. Discover all live values during each authorized preflight.
 
-- Production is on branch `main` at `/opt/Sites` and is reached operationally
+- At the checkpoint, production used branch `main` at `/opt/Sites` and was reached
+  operationally
   through the established `sites-production` SSH alias. This records the alias
   name only; SSH configuration details remain private.
-- Deployment is manual and operator-controlled through the standalone
+- Deployment remains manual and operator-controlled through the standalone
   `docker-compose` workflow. GitHub CI remains advisory and does not deploy.
 - The host is an Ubuntu 24.04 Linode with 2 GB RAM, 1 CPU, and 50 GB storage,
   expanded from the previous 1 GB RAM, 1 CPU, and 25 GB storage plan.
@@ -71,11 +75,12 @@ As of production commit `f3fe658c1989634fe1d3fba4b20c8928e42571a8`:
   layer. Swap remains on `/dev/sdb`.
 - The cold provider resize with Auto Resize Disk expanded both the block device
   and filesystem successfully; no manual `resize2fs` action was required.
-- The post-resize checkpoint had approximately 26 GiB free, 44% filesystem
-  utilization, and 12% inode use. Routine production Docker builds are again
-  operationally safe at that capacity.
-- `mybuilder` is the active Buildx builder. Its cache is recomputable and should
-  not be pruned routinely merely because it exists.
+- Immediately after the resize, the checkpoint recorded approximately 26 GiB
+  free, 44% filesystem utilization, and 12% inode use. These figures are not a
+  substitute for a live capacity check.
+- `mybuilder` was the active Buildx builder at the checkpoint. Builder identity
+  must be rediscovered before a build; cache is recomputable and should not be
+  pruned routinely merely because it exists.
 - The dormant `multiarch` builder and its dedicated state volume were retired
   through normal builder removal after a read-only dependency audit found no
   application, current-image, or rollback-image dependency. No global Docker
@@ -192,24 +197,22 @@ The validated access chain is high level by design: Codex reaches the local 1Pas
 
 Deferred security, dependency, OS-maintenance, backup/restore, and cleanup work remains in its existing workstreams. None is part of the completed Node 24 migration.
 
-### `nginx/blog.conf`
+### `nginx/`
 
 Purpose:
 
-- Defines upstreams for both site services.
-- Redirects HTTP to HTTPS.
-- Proxies app requests to site services.
-- Aliases static CSS, JS, images, and uploads.
-- References certificate paths.
+- `nginx/README.md` documents the durable host-nginx boundary.
+- `nginx/templates/canonical-host-redirects.example.conf` is a sanitized
+  canonical-host redirect example only.
+- No tracked nginx file is automatically installed as active production
+  configuration.
 
 Safety:
 
-- Do not inspect certificate files or private keys.
-- Use `[DOMAIN]` and `[CERT_PATH]` placeholders in docs.
-
-Needs Review:
-
-- Confirm whether this checked-in nginx file matches current production nginx configuration.
+- Active production nginx is host-managed as a systemd service. Inspect its live
+  configuration read-only before proposing recovery changes.
+- Do not copy live certificate paths, private host details, certificate files,
+  or private keys into tracked source. Use placeholders in documentation.
 
 ### `.dockerignore`
 
@@ -389,20 +392,22 @@ The existing `express.static()` setup serves these directories at the site URL r
 `/uploads` remains the writable runtime-upload path. It is appropriate for runtime uploads, but it is not the preferred location for permanent downloadable assets that should be reproducible after a fresh build from repository state.
 
 Fruition Forest Garden's seasonal hero is an intentional runtime-state
-exception to the permanent-asset rule. The repository implementation is not yet
-deployed. It stores its manifest, retained current source, and display/social
+exception to the permanent-asset rule. The deployed implementation stores its
+manifest, retained current source, and display/social
 derivatives beneath `/app/data/uploads/hero` through the existing configured
 uploads path and data volume. A rebuild or service recreation must preserve the
 volume and must not remove or replace `.current.json`. Reset is an explicit
-admin action. Repository `HeroCamp.webp` and `HeroCamp-og.webp` remain immutable
+admin action. Express serves the public derivatives while blocking the retained
+`.source` path. The normal uploads archive includes the manifest and selected
+generation. Repository `HeroCamp.webp` and `HeroCamp-og.webp` remain immutable
 defaults.
 
 Rollback compatibility limitation: an older FFG application image that
 predates the persistent resolver will ignore the stored manifest and display
 its repository hero even though the uploads volume still retains seasonal
 state. Re-deploying compatible code can make that retained selection active
-again. After the feature's first successful production deployment, that first
-compatible image should become the preferred behavioral rollback floor. If an
+again. The first compatible production image is the preferred behavioral
+rollback floor. If an
 operator intends a permanent default, use the compatible admin reset before
 rollback; do not delete volume content as a substitute.
 
@@ -425,6 +430,21 @@ Shared `blog-core` participates in static-serving behavior but does not currentl
 Deployment boundary: local Mode B validation proves the candidate image behaves correctly; live verification proves the currently deployed production image contains the asset. Mode B success is not evidence that production has already been updated.
 
 ## 6. Production Workflow
+
+### Deployment decision matrix
+
+Confirm the actual execution path and affected site before using this matrix;
+it selects the normal technical action but never grants deployment approval.
+
+| Change type | Typical production action | Image rebuild | Container recreation | Migration |
+|---|---|---:|---:|---:|
+| Host-executed tracked script, including the scheduled host backup path | Fast-forward the checkout and verify the scheduler invokes the tracked path | No | No | No |
+| Image-baked source, template, CSS, JavaScript, or permanent public asset | Fast-forward, build the affected site image, then recreate that service with the new image | Yes | Yes | No, unless separately required |
+| Compose-only runtime binding or configuration wiring | Fast-forward, validate rendered Compose, then recreate only the affected service with its existing image | No | Yes | No |
+| Migration or runtime-data change | Take the required recovery checkpoint, inspect/plan, then explicitly apply the approved migration or data operation before incompatible code starts | Only if accompanying code requires it | Only if accompanying runtime/code requires it | Yes, when the approved change includes one |
+
+Database/data work is a separate gate. A source fast-forward, image build, or
+container recreation must never be treated as implicit migration authorization.
 
 Confirmed from `docker-compose.prod.yml`:
 
@@ -449,12 +469,17 @@ Confirmed runtime paths inside containers:
 
 nginx relationship:
 
-- Host nginx is the intended public ingress boundary and proxies application
-  traffic through `localhost:4000` for FFG and `localhost:4002` for TTA.
+- Host nginx is the sole public ingress, TLS, and canonical-redirect boundary
+  and proxies application traffic through `localhost:4000` for FFG and
+  `localhost:4002` for TTA.
 - Docker publishes those application ports on IPv4 and IPv6 loopback only;
   direct public access to ports `4000` and `4002` is intentionally prohibited.
-- nginx may serve static CSS, JS, images, and uploads through aliases.
-- TLS certificate paths exist in nginx config, but certificate files/private keys must not be inspected.
+- Requests for application static files and uploads pass through Express. There
+  is no active production nginx `/uploads` alias; this mediation preserves the
+  application-level denial of retained hero `.source` content.
+- Live nginx configuration, TLS certificate paths, and private host details are
+  host-managed and remain outside tracked source. Certificate files/private
+  keys must not be inspected.
 
 Approval-required production deployment example:
 
@@ -493,11 +518,12 @@ Loopback-only ingress rollout:
 - This model keeps nginx on its existing host-local upstreams; it does not
   redesign nginx to use Docker service names or remove host port publication.
 
-Needs Review: confirm whether nginx config in this repo is deployed as-is or used as a reference.
+`nginx/README.md` is the tracked architecture reference. The sanitized template
+under `nginx/templates/` is example-only and is not installed automatically.
 
 ## 7. Backup and Restore Concepts
 
-Production backup architecture and dated rollout record:
+Current production backup architecture and dated rollout record:
 
 Dated backup-hardening rollout record:
 
@@ -508,6 +534,9 @@ Dated backup-hardening rollout record:
   while production rollout still required separate authorization. The preflight
   determined that rollout would require neither an application image rebuild nor
   a container restart.
+- The hardening was subsequently deployed. The bounded retry, failure-marker,
+  evidence-preservation, site-isolated continuation, and exact scheduled-set
+  retention behavior below is the current production model.
 
 - Runtime databases and uploads are the main backup targets.
 - Source code is expected to live in Git and is not part of backup output.
@@ -531,6 +560,9 @@ Dated backup-hardening rollout record:
   and clears that site's marker only after a later verified site backup. A
   global-lock or other pre-site failure has no active site for a per-site marker
   and is reported only through its nonzero exit and log.
+- A failure for one configured site does not prevent the host script from
+  attempting the other configured site. The overall run returns nonzero and
+  skips retention if either site fails.
 - At the 2026-11-03 preflight, production retention at revision `5ddd651`
   broadly matched `backup-set-*` and could therefore select named recovery
   anchors. Manual runs during that recorded pre-rollout period required a
@@ -562,7 +594,9 @@ Fail-closed operator recovery:
 4. If an abrupt kill left only a stale, empty host lock, remove that exact lock with `rmdir /opt/Sites/backups/.backup-run.lock` only after confirming no run is active. Do not use a recursive removal command for the lock.
 5. Treat removal of container or host staging artifacts as a separate backup-deletion decision. Remove only exact reviewed blockers; never use a broad backup-root glob.
 6. Prefer the existing `BACKUP_SITES=<SITE>:<CONTAINER>` mode for a scoped recovery when the other site does not need another backup. Use the normal lock, helper, transfer, verification, promotion, and cleanup flow.
-7. If the deployed retention matcher is still broad, inventory all candidates and use a one-run high `BACKUP_RETENTION_DAYS` safeguard. This is not a substitute for deploying the scheduled-name matcher.
+7. The deployed matcher selects only exact timestamp-named scheduled sets and
+   excludes named/manual/recovery anchors. Inventory every candidate before any
+   separately authorized retention or cleanup action.
 8. Verify the new set, database, archive, checksums, absent staging/lock, marker lifecycle, unchanged scheduler/scripts, and unaffected other site before declaring continuity restored.
 9. If bounded retries are exhausted, preserve the new evidence and stop. Do not automatically stop the application or repeatedly erase failure evidence.
 
@@ -577,9 +611,10 @@ backup inventory. Continuity was restored. At the later 2026-11-03 production
 preflight, the timeout/retry, marker, and retention-matcher implementation had
 been committed and pushed as `88bc59e`, while production remained at `5ddd651`
 pending a separately authorized rollout. That is a dated preflight record, not
-a claim about production state after 2026-11-03.
+a claim that rollout was still pending later. The hardening was subsequently
+deployed and is the current model described above.
 
-Current verification boundary:
+Verification boundary:
 
 1. Preserve all existing managed and legacy backup artifacts.
 2. The 2026-09-20 read-only census confirmed the Sunday 02:00 UTC schedule,
@@ -1126,8 +1161,10 @@ Do not overstate CI guarantees. Passing CI does not equal deployment approval, e
 
 ## 12. Known Deployment Risks and Open Questions
 
-- Which Compose file is canonical for local development, local production-like testing, and production deployment?
-- Do site-level Docker/Compose files remain current, or are root-level Compose files authoritative?
+- Which Compose file is canonical for local development, local production-like
+  testing, and site-specific standalone operation? Root
+  `docker-compose.prod.yml` is the established production authority.
+- Do site-level Docker/Compose files remain current for any standalone workflow?
 - Should `UPLOAD_PATH` in `docker-compose.yml` be changed to `UPLOADS_PATH`?
 - Should site examples using `DATABASE_URL` be aligned with `DATABASE_PATH`?
 - Node `24.19.0` is aligned across active Docker and CI paths, while package engines enforce `>=24.0.0 <25`.
@@ -1136,7 +1173,6 @@ Do not overstate CI guarantees. Passing CI does not equal deployment approval, e
 - Trusted-IP/default-origin behavior should be environment-driven and placeholder-documented.
 - Off-host replication and authenticated admin restore testing remain separate from the verified isolated and quiesced restore paths.
 - Confirm whether `.dockerignore` exclusions match current deployment expectations.
-- Confirm whether nginx config in this repo is source of truth or historical/reference config.
 
 ## 13. Codex Rules for Future Deployment Work
 

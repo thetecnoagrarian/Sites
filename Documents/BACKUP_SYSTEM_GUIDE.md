@@ -184,6 +184,9 @@ The host-managed architecture applies equally to Fruition Forest Garden and The
 Tecnoagrarian and is the current production model. Managed sets are retained
 under `/opt/Sites/backups`:
 
+- The host scheduler invokes the tracked host orchestration path weekly, Sunday
+  at 02:00 UTC. Treat that as the intended schedule and re-discover the live
+  scheduler before relying on it during recovery.
 - Container storage is temporary staging only; it is not a retention location.
 - One run creates exactly one SQLite backup and one uploads archive.
 - The recursive uploads archive includes FFG seasonal hero state under
@@ -201,6 +204,8 @@ under `/opt/Sites/backups`:
   backup and verification work. At the 2026-11-03 production preflight, this
   implementation was committed and pushed while production remained at
   `5ddd651`; rollout still required separate authorization at that preflight.
+  The hardening was subsequently deployed, and the bounded behavior described
+  here is the current production model.
 - Before a retry, the helper removes only that attempt's incomplete staged
   database and error file; it never removes the outer staging directory. If the
   final attempt fails, the last staged database (if SQLite created one) and
@@ -222,6 +227,9 @@ under `/opt/Sites/backups`:
   path; a retention failure recreates it. A failure before any site becomes
   active, including global-lock acquisition failure, cannot create a
   site-specific marker and remains visible through the nonzero exit and log.
+- A failure for one configured site does not prevent the host script from
+  attempting the other configured site. The overall run still returns nonzero,
+  and retention is skipped for the run when any site fails.
 - Retention belongs to the canonical local host location. The hardened matcher
   accepts only calendar-valid timestamp-only scheduled names in the exact shape
   `backup-set-YYYY-MM-DD_HH-MM-SS`. It rejects impossible dates/times as well as
@@ -260,8 +268,10 @@ site has `BACKUP_FAILURE` or preserved staging:
 4. With separate destructive authorization, remove only the exact reviewed
    blocking files/directories. Do not use a broad backup-root glob.
 5. Run one site through the normal host pipeline when that is the smallest
-   recovery scope. If the deployed retention matcher has not yet been hardened,
-   use a one-run high retention value after inventorying every existing set.
+   recovery scope. The deployed matcher protects named/manual/recovery anchors
+   by selecting only exact timestamp-named scheduled sets; still inventory the
+   affected site's sets before any separately authorized retention or cleanup
+   action.
 6. If SQLite exhausts its bounded retries, preserve the new evidence and stop;
    do not repeatedly clear staging or automatically stop the application.
 7. On success, verify nonzero artifacts, database integrity and foreign keys,
@@ -281,7 +291,9 @@ state were unchanged. TTA backup continuity was restored. This operational
 milestone did not itself deploy the repository hardening. At the later
 2026-11-03 production preflight, commit `88bc59e` was still awaiting a
 separately authorized rollout while production remained at `5ddd651`. This is a
-dated status record and makes no claim about a later deployment outcome.
+dated preflight record. The hardening was subsequently deployed; its timeout,
+retry, evidence-preservation, failure-marker, and scheduled-set retention
+behavior is the current production model described above.
 
 The host location remains on the production machine. That is sufficient as the
 canonical local copy and survives container recreation, but it is not an
