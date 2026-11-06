@@ -583,8 +583,9 @@ Dated backup-hardening rollout record:
   recreation but remain on the production host.
 - Linode provider backups are enabled, and a successful provider backup was
   confirmed before the storage expansion. Provider backups provide a separate
-  host-level recovery layer; they do not replace application-aware backup sets,
-  an off-host copy, or a tested restore procedure.
+  host-level recovery layer; they do not replace application-aware backup sets
+  or an off-host copy, and their cross-host recovery path remains separately
+  unproven.
 
 Fail-closed operator recovery:
 
@@ -630,10 +631,11 @@ Verification boundary:
 
 Off-host application backup remains recommended. Its absence is not an
 independent Migration Gate B blocker only when the migration window has a fresh
-verified quiesced host-managed recovery set, the full application restore remains
-demonstrated, the provider backup is verified acceptably current and available,
-and the owner explicitly accepts correlated-host loss risk. If any condition is
-missing, abort the migration window.
+verified quiesced host-managed recovery set, compatible application-restore
+evidence has been reverified for that window, the provider backup is verified
+acceptably current and available, and the owner explicitly accepts
+correlated-host loss risk. If any condition is missing, abort the migration
+window.
 
 Rollback concept:
 
@@ -660,6 +662,25 @@ High-risk restore boundary:
 
 Do not execute restore, prune, delete, or cleanup commands without explicit approval.
 
+Application-aware recovery gate:
+
+- `Documents/BACKUP_SYSTEM_GUIDE.md` is the canonical authority for the detailed
+  disposable restore procedure and dated recovery evidence; do not duplicate
+  its operational sequence here.
+- Never restore directly over production data without separate explicit
+  authorization for the exact target, overwrite scope, and rollback plan.
+- Verify source backup hashes and establish compatible immutable-image evidence
+  before copying restored state.
+- Restore into fresh isolated volumes first, without production volumes,
+  environment, network membership, or host ports, and verify database, content,
+  media, and site-specific behavior before considering any cutover.
+- Treat rehearsal and live recovery as different authorization classes. A
+  successful disposable rehearsal proves reconstruction compatibility; it does
+  not authorize production cutover.
+- The dated November 6, 2026 rehearsal passed for both TTA and FFG while leaving
+  production unchanged. Off-host, cross-host, authenticated-administrator, and
+  live-cutover recovery remain open.
+
 Approval-required backup example:
 
 ```bash
@@ -676,15 +697,18 @@ runtime volume, fixing ownership/permissions if needed, restarting affected serv
 verifying application behavior.
 ```
 
-The restore source of record is the verified host-managed set, not retained `/app/backups`
-contents inside a container. A production restore procedure and off-host copy remain separate
-approval-required workstreams.
+The restore source of record is the verified host-managed set, not retained
+`/app/backups` contents inside a container. A live production restore/cutover
+procedure and off-host copy remain separate approval-required workstreams.
 
 Database integrity, archive readability, and transfer checksum verification alone
-are not a restore test. The 2026-09-18 isolated application restore passed for
-both sites; off-host replication and a production-volume restore remain separate work.
+are not a restore test. The September 18 and November 6, 2026 isolated
+application restores passed for both sites; off-host replication and a
+production-volume restore remain separate work.
 
-Do not convert this concept into a live restore procedure until the user explicitly approves a restore-planning task.
+Do not treat the disposable rehearsal procedure as authorization for a live
+restore or cutover. Live recovery requires its own explicit planning and
+execution approval.
 
 ## 8. Deployment Preflight Checklist
 

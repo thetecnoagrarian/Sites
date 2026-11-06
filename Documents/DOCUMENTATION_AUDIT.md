@@ -45,6 +45,12 @@ This audit is the current classification record and archive log. It does not aut
 > retained source, backup coverage, and explicit reset-to-default behavior.
 > Backup hardening commit `88bc59e` is also deployed; the November 3 preflight
 > passages remain dated evidence of its then-pending rollout, not current status.
+> On November 6, 2026, sequential disposable application-aware restores passed
+> for both TTA and FFG using known-good immutable images, fresh volumes, and
+> read-only source backup sets; production remained unchanged. This closes the
+> same-host application-restore proof gap. Off-host survival, cross-host
+> reconstruction, live cutover, and authenticated-administrator recovery remain
+> open.
 > Production ingress is host nginx to loopback-only application ports, with
 > application static files and uploads served through Express. Tracked nginx
 > material is reference/example material only.
@@ -66,7 +72,7 @@ This audit is the current classification record and archive log. It does not aut
 | `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` | Broad project history | Archived | Preserve as historical context only | High | Current guidance is distributed across focused docs; sensitive-adjacent and stale operational detail must not control current work. |
 | `Documents/archive/troubleshooting/LOCAL_SETUP_QUICKSTART.md` | Local production-like setup history | Archived | Preserve as historical setup context | Medium | Current local production-like and isolated testing guidance lives in the runbook. |
 | `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` | Local Docker workflow history | Archived | Preserve as historical setup context | High | Contains superseded direct Docker/deployment instructions and is not current authority. |
-| `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup architecture and planning guide | Active but cautious | Keep as the application-backup architecture reference | High | Records the deployed host-managed hardening and future off-host/restore gates; it does not authorize backup, restore, or deletion actions. |
+| `Documents/BACKUP_SYSTEM_GUIDE.md` | Backup architecture and recovery guide | Active but cautious | Keep as the canonical application-backup and disposable-restore reference | High | Records deployed host-managed hardening, the proven same-host application-aware restore procedure/evidence, and still-open off-host/live-cutover gates; it does not authorize backup, restore, or deletion actions. |
 | `Documents/GITHUB_AUTHENTICATION_SETUP.md` | GitHub auth reference | Needs Review | Sensitive-adjacent reference or historical setup note | High | Contains account, SSH, key path, and auth workflow details. Do not reproduce private details in future docs. |
 | `Documents/archive/deployment/POST_LAUNCH_CLEANUP.md` | Cleanup/troubleshooting history | Archived | Preserve as migration-era cleanup context | High | Destructive cleanup instructions must not be treated as current operational guidance. |
 | `Documents/ANALYTICS_CLEANUP_GUIDE.md` | Analytics cleanup planning guide | Active but cautious | Keep as placeholder-only planning reference | High | Tracked analytics models, middleware, routes, and cleanup script still exist. The guide does not authorize database mutation or claim live state. |
@@ -385,7 +391,11 @@ Needs Review items:
 
 - `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` contains sensitive-adjacent and stale operational detail. It is archived history and must not control current work.
 - `Documents/archive/troubleshooting/LOCAL_DOCKER_SYNC_GUIDE.md` preserves superseded setup and deployment examples as historical context.
-- `Documents/BACKUP_SYSTEM_GUIDE.md` is placeholder-only planning. Live backup schedules, exact runtime state, and restore readiness remain unverified and require operator review before action.
+- `Documents/BACKUP_SYSTEM_GUIDE.md` is the active public-safe backup and
+  disposable-recovery authority. The November 6, 2026 application-aware restore
+  proof passed for both sites, while live state must still be rediscovered and
+  every backup, restore, cutover, or cleanup action remains separately
+  approval-gated.
 - `Documents/ANALYTICS_CLEANUP_GUIDE.md` is placeholder-only planning. Any analytics deletion remains a separately approved, backup-gated production action.
 - `Documents/GITHUB_AUTHENTICATION_SETUP.md` includes account and SSH key configuration details. Treat as sensitive-adjacent.
 - `Documents/USERNAME_PASSWORD_UPDATE_GUIDE.md` includes admin identifier and password rotation workflow details. Treat as sensitive-adjacent and approval-required.
@@ -433,10 +443,15 @@ Current production-like and isolated local workflow guidance lives in `Documents
 - `Documents/BACKUP_SYSTEM_GUIDE.md`
 
 The runbook controls safety boundaries. The backup guide is the active
-public-safe architecture and preserved-staging recovery reference. It records
-the 2026-11-03 TTA continuity milestone and distinguishes production behavior
-observed at that day's preflight from timeout/retry, failure-marker, and
-scheduled-only retention implementation commit `88bc59e`.
+public-safe architecture, preserved-staging recovery, and canonical disposable
+restore reference. It records the 2026-11-03 TTA continuity milestone and the
+November 6, 2026 sequential restore proof: both TTA and FFG reconstructed from
+known-good images plus database/uploads backups, booted successfully, and left
+production unchanged. That proof closes same-host application-aware restore
+readiness, but not off-host survival, cross-host reconstruction, live cutover,
+or authenticated-administrator recovery. It also distinguishes production
+behavior observed at the November 3 preflight from timeout/retry,
+failure-marker, and scheduled-only retention implementation commit `88bc59e`.
 Live scheduling, backup creation, restore, staging removal, retention, and other
 cleanup actions remain high-risk and separately approval-gated.
 

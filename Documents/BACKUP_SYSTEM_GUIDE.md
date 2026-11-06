@@ -1,9 +1,11 @@
 # Backup System Guide
 
-This guide is a public-safe backup and restore planning document for the project.
-It intentionally uses placeholders only. Real hosts, users, paths, secrets,
-archive names, credentials, certificates, and operator command history must stay
-in private ignored notes or a password manager.
+This guide is the public-safe authority for application-backup architecture,
+disposable restore rehearsals, and recovery planning for the project. It uses
+placeholders for private operational details. Real hosts, users, paths, secrets,
+credentials, certificates, and private operator command history must stay in
+ignored notes or a password manager. Dated backup-set and rehearsal identifiers
+may appear only as sanitized historical evidence.
 
 ## 1. Purpose
 
@@ -307,7 +309,8 @@ and the owner explicitly accepts the correlated-host loss risk. Otherwise,
 abort the migration window.
 
 These creation-time integrity, archive, and checksum checks establish transfer
-integrity only. They are not evidence of a completed restore test.
+integrity only. By themselves, they are not evidence of a completed restore
+test; the dated application-aware evidence is recorded in Section 10.
 
 Legacy backup material remains preserved and outside automated cleanup. Do not
 delete it without a separate, explicitly approved restore-readiness and cleanup
@@ -322,10 +325,124 @@ confirmed before the 2026 storage expansion. That provider snapshot layer is
 useful for host-level recovery but does not replace these application-aware
 sets, a future off-host copy, or restore-test evidence.
 
-## 10. Restore-Test Planning
+## 10. Canonical Disposable Restore Procedure and Evidence
 
 Restore testing should happen in a safe target, never directly over production
 without explicit approval.
+
+### Canonical disposable application-aware restore rehearsal
+
+This procedure validates recoverability without authorizing a live restore or
+cutover. Original backup artifacts remain read-only, and the rehearsal must not
+mount production volumes, production environment files, or a production
+network. Never use Docker prune or broad cleanup globs; record exact disposable
+resource names and remove only those resources after a successful test.
+
+1. Select one complete, known-good site backup set containing `blog.db` and
+   `uploads.tar.gz`.
+2. Record and verify the source artifacts' SHA-256 values before any copy or
+   extraction.
+3. Create one deterministic, filesystem-safe run identifier.
+4. Derive unique, run-specific application/helper names, data and log volumes,
+   and temporary evidence paths.
+5. Mount the selected backup directory read-only in a disposable helper.
+6. Copy `blog.db` into the unique data volume.
+7. Extract `uploads.tar.gz` into that volume without preserving archive
+   ownership, after confirming that the archive contains no unsafe paths.
+8. Assign only the disposable restored data to application UID/GID `1001` and
+   apply private file/directory modes.
+9. Before application boot, require the restored database SHA-256 to equal the
+   selected source database SHA-256.
+10. Before boot, record database integrity and foreign-key results, migration
+    IDs/checksums and pending state, baseline/schema recognition, relevant
+    tables, post/user counts, authentication-column presence, nonempty password
+    hashes, expected content identity, and restored upload count/size.
+11. Resolve and record an exact known-good immutable application image that is
+    compatible with the restored schema and backup format; do not rebuild or
+    retag it as part of the rehearsal.
+12. Start the disposable application with unique data/log volumes and without
+    production volumes, environment, or network membership.
+13. Use `--network none` and publish no host ports. All application checks must
+    run through internal loopback with `docker exec` or an equivalent isolated
+    mechanism.
+14. Provide only test values for required settings, including `PORT`,
+    `SITE_PORT`, `DATABASE_PATH=/app/data/blog.db`,
+    `UPLOADS_PATH=/app/data/uploads`, `NODE_ENV=production`, a random test-only
+    session secret, and `BASE_URL=https://restore.invalid`. Do not enable
+    external integrations.
+15. Keep the application root read-only where practical. If startup requires
+    the relative temporary upload path `./uploads/temp/`, provide an isolated
+    tmpfs at that runtime path or its required parent; do not weaken volume,
+    network, or secret isolation.
+16. Inspect the running container and require the exact image ID, network mode
+    `none`, no port bindings, and only the intended run-specific persistent
+    volumes. Confirm that host listeners did not change.
+17. Verify health, homepage, representative post/content, representative
+    restored media, unauthenticated admin behavior, and absence of fatal
+    startup, schema, permission, or native-addon errors.
+18. Perform the site-specific checks below.
+19. On success, remove only the exact disposable containers, volumes, and
+    temporary evidence/env files. On failure, stop and preserve evidence until
+    cleanup is separately reviewed and authorized.
+20. Recompute the original backup-artifact hashes and require them to match the
+    pre-test values.
+21. Reconfirm production container/image/start identities, health/restarts,
+    listeners, Git, scheduler, backup lock/staging/markers, and other relevant
+    isolation evidence are unchanged.
+
+The pre-boot database hash is the artifact-integrity checkpoint. After the
+application starts, health/content requests can legitimately write disposable
+session and analytics rows, so post-boot byte identity is not expected. After
+boot, use integrity/foreign-key checks, migration/schema state, logical content
+comparison, and working application behavior as recovery evidence. Do not
+misclassify expected disposable session/analytics writes as source-backup
+mutation.
+
+### Site-specific recovery checks
+
+TTA recovery requires its SQLite database and recursive uploads archive.
+Repository-backed public files are supplied by the selected application image,
+not the runtime backup, so absence of a repository-baked PDF or other static
+asset from `uploads.tar.gz` is expected. Verify at least one representative
+baked asset through the isolated application in addition to restored content
+and media.
+
+FFG recovery requires its SQLite database, recursive uploads, and a coherent
+seasonal-hero state. Require a valid `uploads/hero/.current.json`, a valid UUIDv4
+selected generation, its retained source beneath `.source`, a decodable display
+WebP no wider than 1920 pixels, and a 1200-by-630 social WebP. Verify the
+display/social URLs and homepage/social metadata references through the
+isolated application, and require the corresponding retained `.source` URL to
+remain denied by Express.
+
+### November 6, 2026 disposable restore evidence
+
+Run `restore-20261106-41ec8a8` restored both sites sequentially into fresh
+disposable data/log volumes using the immutable production application images
+that were current for that dated test. TTA restored from
+`backup-set-2026-11-03_11-36-tta-recovery`; FFG restored from
+`backup-set-2026-11-01_02-00-01`. Both pre-boot database hashes matched their
+source artifacts, integrity and foreign-key checks passed, migrations `0000`
+and `0001` were recognized with none pending, authentication records survived,
+uploads restored, and both applications booted healthy. Representative pages,
+posts, uploads, and unauthenticated admin redirects passed.
+
+TTA also served its repository/image-baked PDF successfully, confirming that
+the backup correctly reconstructs runtime state while the selected image
+supplies permanent repository assets. FFG restored hero generation
+`a9c55e6b-374d-407d-bf48-df4fe340cff1`; its retained source decoded at
+4000-by-3000, display WebP at 1920-by-1440, and social WebP at 1200-by-630.
+Metadata referenced that generation, display/social URLs succeeded, and the
+retained source URL remained denied. Original backup hashes and all production
+container/image/start identities remained unchanged, and exact disposable
+cleanup completed before the next site and after the run. TTA: **PASS**. FFG:
+**PASS**.
+
+This dated result establishes same-host, application-aware reconstruction with
+known-good images. It is not a timeless claim about current images, containers,
+hero selection, or latest backup sets.
+
+### Earlier restore evidence
 
 On 2026-09-18, both sites completed an isolated application restore rehearsal
 from the verified September 17 managed backup sets using the then-current
@@ -368,13 +485,38 @@ quiesced recovery point created only after writer exclusion; and the full
 application restore rehearsal proves that a verified database/uploads pair can
 reconstruct a working isolated application.
 
-The helper's data mount must remain read-only, but its ephemeral container root
-and staging directory must be writable: Docker transfer from a read-only root
-with tmpfs staging was not reliable in this environment. The verified design
-writes only temporary staging in the helper and retained output in the existing
-host-managed destination. The rehearsal used AMD64 production images under local
-ARM64 emulation, did not test authenticated editor flows, did not stop a
-production container, and does not establish off-host recovery.
+In that September stopped-site backup-helper rehearsal, the helper's data mount
+had to remain read-only while its ephemeral container root and staging directory
+remained writable: Docker transfer from a read-only root with tmpfs staging was
+not reliable in that environment. That distinct helper design wrote only
+temporary staging in the helper and retained output in the existing host-managed
+destination. The rehearsal used AMD64 production images under local ARM64
+emulation, did not test authenticated editor flows, did not stop a production
+container, and did not establish off-host recovery.
+
+### Established proof, remaining gaps, and future hardening
+
+The November 6 result, together with the creation-time controls, establishes
+that the current two-artifact backup format can reconstruct both application
+states with a compatible known-good image: databases and uploads restore,
+authentication records survive, applications boot, representative content and
+media work, TTA baked assets remain image-sourced, FFG hero state remains
+coherent, and the production-isolation procedure works.
+
+It does **not** establish off-host durability, recovery on a different server,
+recovery when a compatible image is missing, DNS/TLS/nginx reconstruction, live
+production cutover, authenticated administrator-login recovery, or recovery of
+data newer than the selected dated backups. Keep the status explicit:
+
+- Backup creation: proven.
+- Same-host application-aware restore: proven.
+- Off-host survival and recovery: not yet proven.
+
+As future hardening, each backup set could carry a durable manifest containing
+artifact SHA-256 values, creation timestamp/run ID, migration/schema metadata,
+backup format/version, and compatible application/image metadata. Current
+backup sets do **not** persist such a manifest; this is a design option, not
+implemented behavior, and changing backup output remains a separate task.
 
 Before a restore test:
 

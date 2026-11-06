@@ -157,6 +157,15 @@ hardening was subsequently deployed; bounded lock-only retry, persistent failure
 markers, evidence preservation, site-isolated continuation, and exact
 scheduled-set retention are the current production model.
 
+Recovery-proof checkpoint (2026-11-06): known-good immutable application image
+plus SQLite database and uploads backup successfully reconstructed both sites in
+fresh isolated volumes, and both applications passed representative runtime
+checks without changing production. Backup creation and same-host
+application-aware restore are proven. Off-host survival/recovery remains
+unresolved; cross-host reconstruction, live cutover, and authenticated
+administrator recovery were not established by that test. Detailed procedure
+and evidence live in `Documents/BACKUP_SYSTEM_GUIDE.md`.
+
 ### Documentation as Source of Truth
 
 `AGENTS.md` identifies `Documents/` and `AGENTS.md` as the primary documentation areas. The former broad master document is archived at `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` for historical context and is not current operational authority. `Documents/CODEX_WORKFLOW.md` owns the primary authority map; secondary documents should summarize and link rather than redefine operational facts.
