@@ -180,6 +180,79 @@ Recommended concepts:
 
 Do not document real storage endpoints or account details in this file.
 
+### Owner-controlled offline repository backup
+
+The owner-controlled offline repository backup protects the source-development
+system separately from production application-aware backups, Linode Backup
+Service, and site-data restore procedures. Its recovery scope is Git history
+and refs plus the complete working tree, including hidden, ignored, and local
+project files, documentation, scripts, source, Docker/Compose material, nginx
+references, and repository configuration. It does **not** replace SQLite or
+uploads backups and does not close the off-host website-data recovery gap.
+
+Because ignored/local files may contain sensitive configuration, keep the SSD
+and its backup artifacts access-controlled. Do not commit the snapshot or bundle
+to the repository.
+
+Canonical manual procedure:
+
+1. Verify the source repository exists, record its branch and HEAD, and require
+   a clean worktree.
+2. Verify the owner-controlled SSD is mounted, writable, and has sufficient
+   free space.
+3. Inspect `.git` for relevant `*.lock` files. Stop if any exist; do not silently
+   exclude a lock or copy while a Git operation may be active.
+4. Choose a new dated snapshot beneath `<LOCAL_BACKUP_DIR>` and stop rather than
+   overwrite it if that exact destination already exists.
+5. Copy the complete repository tree with macOS `openrsync` archive mode
+   (`-a`), preserving ordinary timestamps and POSIX permissions. Do not use
+   `-E`, `--delete`, sudo, or source permission/ownership changes.
+6. Exclude only the proven transient Git/macOS paths listed below. Include
+   ordinary Git objects, `.git`, hidden files, ignored files, and local files.
+7. Create a sibling Git bundle from the source with `git bundle create
+   <BUNDLE_PATH> --all`.
+8. Verify the snapshot's `.git`, branch, HEAD, clean status, and basic Git
+   integrity.
+9. Compare source/destination file counts and logical file bytes, then run an
+   `openrsync -a --checksum --dry-run` with the same exclusions. Require zero
+   remaining ordinary-file changes.
+10. Run `git bundle verify <BUNDLE_PATH>` and record the included refs and
+    bundle size.
+11. When practical, clone the bundle into one unique temporary Mac path, verify
+    its HEAD/history and Git integrity, then remove only that exact temporary
+    clone.
+12. Reconfirm the source HEAD, branch, clean worktree, and staged-file state are
+    unchanged.
+13. Treat the new snapshot and bundle as known-good only after every applicable
+    verification passes.
+
+Use these filesystem-copy exclusions:
+
+- `.git/fsmonitor--daemon.ipc`: transient Unix socket, not repository history.
+- `.git/._fsmonitor--daemon.ipc`: AppleDouble side effect, not repository data.
+- `.git/fsmonitor--daemon/`: transient daemon/cookie state, recreated when
+  needed.
+- `._*`: disposable AppleDouble metadata sidecars.
+- `.DS_Store`: disposable Finder metadata.
+
+Ordinary loose/packed Git objects must **not** be excluded. The November 7,
+2026 first attempt showed why `-E` is prohibited: `openrsync -E` invoked macOS
+copyfile/resource-fork handling against transient fsmonitor/macOS metadata and
+the copy failed. This was not repository corruption. `git fsck --full` passed,
+all objects were owner-readable, and no chmod, chown, or sudo repair was needed.
+
+The successful November 7, 2026 evidence used `openrsync -a` with the exclusions
+above, a separate `git bundle --all`, matching source/destination file counts
+and logical bytes, a zero-change checksum dry run, successful snapshot Git
+inspection, successful `git bundle verify`, and a successful temporary clone
+from the bundle. This is dated historical evidence, not a claim about current
+mount state, capacity, or newest backup.
+
+Keep this workflow manual for now. Create a new dated snapshot after major
+infrastructure milestones and otherwise roughly monthly. Do not overwrite the
+newest known-good snapshot until its replacement verifies. Automation, mount or
+power scheduling, and retention/deletion policy remain separate future choices.
+
 ### Repository Target Architecture
 
 The host-managed architecture applies equally to Fruition Forest Garden and The
