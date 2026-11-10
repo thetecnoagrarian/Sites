@@ -170,6 +170,10 @@ and evidence live in `Documents/BACKUP_SYSTEM_GUIDE.md`.
 
 `AGENTS.md` identifies `Documents/` and `AGENTS.md` as the primary documentation areas. The former broad master document is archived at `Documents/archive/history/MASTER_PROJECT_DOCUMENTATION.md` for historical context and is not current operational authority. `Documents/CODEX_WORKFLOW.md` owns the primary authority map; secondary documents should summarize and link rather than redefine operational facts.
 
+`Documents/CODEX_WORKFLOW.md` also owns the native-first,
+dependency-aware technology-selection process used for new capabilities and
+substantial changes. This context document does not duplicate that policy.
+
 Documentation should preserve workflows, architectural context, and safety boundaries without exposing secrets. If docs conflict with code, record the conflict instead of guessing.
 
 ## 5. Codex Working Context

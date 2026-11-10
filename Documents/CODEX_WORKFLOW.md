@@ -24,6 +24,7 @@ summarize and link rather than redefine operational behavior:
 | Executable gates, commands, verification, and rollback | `Documents/DEPLOYMENT_RUNBOOK.md` |
 | Backup and restore architecture | `Documents/BACKUP_SYSTEM_GUIDE.md` |
 | SEO-specific behavior and decisions | `Documents/SEO_CRAWLABILITY_NOTES.md` |
+| Technology selection and dependency-aware design | `Documents/CODEX_WORKFLOW.md` |
 | Dated documentation health and classification | `Documents/DOCUMENTATION_AUDIT.md` |
 | Repository path inventory | `Documents/REPO_INVENTORY.md` |
 
@@ -410,7 +411,61 @@ Migration principle:
 - Preserve Cursor-era knowledge without copying secrets.
 - Turn unclear items into Open Questions.
 
-## 12. Dependency Remediation Boundary
+## 12. Technology Selection: Native-First, Dependency-Aware
+
+Use a native-first, dependency-aware process for new capabilities and for
+existing functionality that is being substantially changed, replaced, or
+expanded. Prefer the lowest layer in the stack that satisfies the requirement
+without creating disproportionate complexity:
+
+`native platform -> small project-owned code -> existing dependency -> new dependency`
+
+This is a decision heuristic, not an absolute ordering. Browser and platform
+capabilities continue to evolve, and project-owned code also carries design,
+accessibility, testing, security, and maintenance costs. A higher-level
+dependency is appropriate when it demonstrably produces lower lifecycle cost
+or risk.
+
+Native browser or platform capabilities are preferred when practical because
+they can provide a smaller dependency surface, fewer transitive dependencies
+and upgrade chains, lower supply-chain exposure, less migration pressure when
+libraries are abandoned or superseded, easier understanding and long-term
+ownership, closer alignment with standards, and less operator dependence on
+external maintainers. These benefits do not make native or custom code
+automatically better.
+
+A library may be the more durable choice when it materially reduces
+implementation complexity, accessibility or security risk, standards or
+testing burden, ongoing maintenance, or specialized domain complexity. Examples
+may include sophisticated accessibility widgets, cryptography, parsers, and
+rich editors; the category is not exhaustive.
+
+Use this four-stage selection process:
+
+1. **Define the problem.** State the capability actually required and separate
+   it from any preferred tool or implementation. Do not select technology
+   before the requirement is understood.
+2. **Evaluate alternatives.** Explicitly consider native browser/platform
+   functionality, a small project-owned implementation, dependencies already
+   present in the repository, and new third-party libraries or frameworks. Do
+   not assume either an existing library or a new package is preferable.
+3. **Challenge the recommendation.** Evaluate maintenance history and current
+   status, licensing, direct and transitive dependency burden, introduced
+   complexity, accessibility, security, testing, migration and exit cost,
+   standards interoperability, proportionality to the requirement, and whether
+   project-owned code would truly remain simpler over its lifecycle. Apply the
+   same skepticism to dependency-heavy and custom-code proposals.
+4. **Implement and document.** Implement the smallest durable solution, test
+   behavior and accessibility as appropriate, and record why it was selected,
+   its meaningful tradeoffs, and important alternatives rejected. Preserve the
+   decision rationale, not only installation or configuration instructions.
+
+Existing dependencies should not be removed solely because this principle was
+adopted. Reassess whether a dependency still earns its place when its
+functionality is substantially changed, replaced, or expanded. Avoid dependency
+churn for its own sake.
+
+## 13. Dependency Remediation Boundary
 
 Dependency remediation is a later phase.
 
@@ -433,7 +488,7 @@ Known context:
   Future runtime or native-dependency changes must rerun the permanent native
   AMD64 deployment-candidate gate before production deployment.
 
-## 13. Deployment Boundary
+## 14. Deployment Boundary
 
 Codex may document deployment concepts.
 
@@ -461,7 +516,7 @@ Deployment requires:
 
 Passing tests or CI does not imply deployment approval.
 
-## 14. Failure and Stop Conditions
+## 15. Failure and Stop Conditions
 
 Codex should stop and ask if:
 
@@ -478,7 +533,7 @@ Codex should stop and ask if:
 
 When source and docs conflict, document the conflict or ask the user. Do not guess.
 
-## 15. Recommended Next Tasks
+## 16. Recommended Next Tasks
 
 Next safe tasks:
 
@@ -488,7 +543,7 @@ Next safe tasks:
 
 Dependency/security remediation should remain separate from documentation migration and should start with review, not automatic fixes.
 
-## 16. Open Questions
+## 17. Open Questions
 
 - Which root or site-level Compose files are canonical for local development,
   local-production-like testing, and site-specific standalone use? Root
