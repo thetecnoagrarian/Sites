@@ -16,6 +16,10 @@ const templatePath = path.join(
 
 const handlebars = Handlebars.create();
 handlebars.registerPartial('layouts/main', '{{> @partial-block}}');
+handlebars.registerPartial(
+  'public-byline',
+  fs.readFileSync(path.join(path.dirname(templatePath), '..', 'partials', 'public-byline.hbs'), 'utf8')
+);
 handlebars.registerHelper('formatDate', (value) => String(value || ''));
 handlebars.registerHelper('json', (value) => JSON.stringify(value));
 
