@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import Post from './post.js';
 import PostPublication, { REVIEW_STATES } from './post-publication.js';
 import { getDatabase } from './db.js';
+import { normalizeBodyGallery, serializeBodyGallery, storedBodyGalleryKey } from './body-gallery.js';
 
 const asArray = value => Array.isArray(value) ? value : (value == null ? [] : [value]);
 const integerId = (value, label) => {
@@ -53,7 +54,9 @@ function normalizeContent(content, previous = null) {
         ? previous.created_at : date;
     return {
         title, body, description, excerpt, images: content.images,
-        captions: content.captions, created_at
+        captions: content.captions, created_at,
+        ...(Object.hasOwn(content, 'body_gallery')
+            ? { body_gallery: normalizeBodyGallery(content.body_gallery) } : {})
     };
 }
 
@@ -93,6 +96,7 @@ function publicFacts(state) {
         title: post.title, body: post.body, description: post.description ?? '',
         excerpt: post.excerpt ?? '', images: JSON.parse(post.images || '[]'),
         captions: JSON.parse(post.captions || '[]'), created_at: post.created_at,
+        body_gallery: storedBodyGalleryKey(post.body_gallery),
         categories, authors, publisher: post.publisher_public_person_id,
         published_at: post.published_at, published_on: post.published_on
     };
@@ -296,12 +300,14 @@ export function createEditorialService({ now = () => new Date().toISOString() } 
                 if (!same({
                     title: content.title, body: content.body, description: content.description,
                     excerpt: content.excerpt, images: content.images,
-                    captions: content.captions, created_at: content.created_at
+                    captions: content.captions, created_at: content.created_at,
+                    body_gallery: Object.hasOwn(content, 'body_gallery')
+                        ? serializeBodyGallery(content.body_gallery) : oldContent.body_gallery
                 }, {
                     title: oldContent.title, body: oldContent.body,
                     description: oldContent.description, excerpt: oldContent.excerpt,
                     images: oldContent.images, captions: oldContent.captions,
-                    created_at: oldContent.created_at
+                    created_at: oldContent.created_at, body_gallery: oldContent.body_gallery
                 })) {
                     Post.update(id, { ...content, author_id: before.post.author_id });
                 }

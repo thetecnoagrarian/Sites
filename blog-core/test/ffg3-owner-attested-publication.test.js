@@ -3,27 +3,32 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import test from 'node:test';
+import test, { after } from 'node:test';
 
 import Database from 'better-sqlite3';
 
-import {
+import { createHistoricalOperationContext } from './helpers/historical-operation-context.js';
+
+const historical = await createHistoricalOperationContext(after);
+const withGalleryMigration = await createHistoricalOperationContext(after, { includeBodyGallery: true });
+const { createMigrationRunner: createGalleryMigrationRunner, publication: galleryRegistryPublication } = withGalleryMigration;
+const { createMigrationRunner } = historical;
+const {
     applyFfg3OwnerAttestedPublication,
     dryRunFfg3OwnerAttestedPublication,
     ffg3OwnerAttestedPublicationPolicy
-} from '../src/database/ffg3-owner-attested-publication.js';
-import {
+} = historical.publication;
+const {
     applyHistoricalAuthorshipBackfill,
     historicalAuthorshipBackfillPolicy
-} from '../src/database/historical-authorship-backfill.js';
-import { createMigrationRunner } from '../src/database/migrations.js';
+} = historical.authorship;
 
 const reviewedAt = '2026-09-29T18:30:00Z';
 const authorshipReviewedAt = '2026-09-25T07:45:03Z';
 const manifestPath = join(import.meta.dirname, '..', 'src', 'database', 'manifests',
     'historical-authorship-owner-attestation-v1.json');
-const cliPath = join(import.meta.dirname, '..', 'src', 'database',
-    'ffg3-owner-attested-publication-cli.js');
+const cliPath = historical.publicationCli;
+const galleryRegistryCliPath = withGalleryMigration.publicationCli;
 
 function fixture(t) {
     const directory = mkdtempSync(join(import.meta.dirname, '.ffg3-publication-'));
@@ -166,18 +171,22 @@ test('an exact repeat is a no-op and preserves the first controlled review time'
 });
 
 test('unexpected publication or identity state blocks before mutation', (t) => {
-    for (const sql of [
-        "UPDATE posts SET published_on = '2024-09-21', publication_review_state = 'owner_attested', publication_reviewed_at = '2026-09-29T18:00:00Z' WHERE id = 3",
-        "UPDATE posts SET slug = 'changed' WHERE id = 3",
-        "UPDATE posts SET modified_at = '2026-09-29T18:00:00Z' WHERE id = 3"
+    for (const [sql, diagnostic] of [
+        ["UPDATE posts SET published_on = '2024-09-21', publication_review_state = 'owner_attested', publication_reviewed_at = '2026-09-29T18:00:00Z' WHERE id = 3",
+            /publication state is neither pristine nor the exact intended applied state/],
+        ["UPDATE posts SET slug = 'changed' WHERE id = 3", /slug is "changed"; expected/],
+        ["UPDATE posts SET modified_at = '2026-09-29T18:00:00Z' WHERE id = 3", /modified_at must be null/]
     ]) {
         const databasePath = fixture(t);
         const db = new Database(databasePath);
         db.exec(sql);
         db.close();
         const before = digest(databasePath);
+        const result = dryRunFfg3OwnerAttestedPublication({ databasePath });
+        assert.equal(result.status, 'blocked');
+        assert.match(result.errors.join('\n'), diagnostic);
         assert.throws(() => applyFfg3OwnerAttestedPublication({ databasePath, reviewedAt }),
-            /blocked|expected|must be null/);
+            diagnostic);
         assert.equal(digest(databasePath), before);
     }
 });
@@ -194,4 +203,58 @@ test('a failure after the guarded update rolls back data and exact trigger SQL',
     }), /synthetic publication failure/);
     assert.deepEqual(state(databasePath), before);
     assert.equal(dryRunFfg3OwnerAttestedPublication({ databasePath }).status, 'ready');
+});
+
+test('publication tool rejects pending 0002 for the migration diagnostic without writes', (t) => {
+    const databasePath = fixture(t);
+    assert.deepEqual(createGalleryMigrationRunner().inspect(databasePath).pending, ['0002_body_gallery']);
+    const before = digest(databasePath);
+    const options = { databasePath, reviewedAt };
+    const diagnostic = /Database identity check failed:\n- pending migrations: 0002_body_gallery$/;
+    assert.throws(() => galleryRegistryPublication.dryRunFfg3OwnerAttestedPublication(options), diagnostic);
+    assert.throws(() => galleryRegistryPublication.applyFfg3OwnerAttestedPublication(options), diagnostic);
+    const child = spawnSync(process.execPath, [galleryRegistryCliPath,
+        '--database', databasePath, '--site', 'ffg'], { encoding: 'utf8' });
+    assert.equal(child.status, 1, child.stderr);
+    assert.match(child.stderr, /pending migrations: 0002_body_gallery/);
+    assert.match(child.stderr, /DRY RUN BLOCKED — NO CHANGES MADE/);
+    assert.equal(digest(databasePath), before);
+});
+
+test('publication tool rejects applied 0002 in both 0001 and 0002 registries without writes', (t) => {
+    const databasePath = fixture(t);
+    assert.deepEqual(createGalleryMigrationRunner().apply(databasePath).appliedNow, ['0002_body_gallery']);
+    const before = digest(databasePath);
+    const options = { databasePath, reviewedAt };
+    const unknown = /Unknown, out-of-order, or changed migration: 0002_body_gallery/;
+    assert.throws(() => dryRunFfg3OwnerAttestedPublication(options), unknown);
+    assert.throws(() => applyFfg3OwnerAttestedPublication(options), unknown);
+    const incompatible = /Database identity check failed:\n- applied migrations must be exactly 0000_existing_schema, 0001_public_author_publication_model$/;
+    assert.throws(() => galleryRegistryPublication.dryRunFfg3OwnerAttestedPublication(options), incompatible);
+    assert.throws(() => galleryRegistryPublication.applyFfg3OwnerAttestedPublication(options), incompatible);
+    for (const [cli, diagnostic] of [[cliPath, unknown], [galleryRegistryCliPath, incompatible]]) {
+        const child = spawnSync(process.execPath, [cli,
+            '--database', databasePath, '--site', 'ffg'], { encoding: 'utf8' });
+        assert.equal(child.status, 1, child.stderr);
+        assert.match(child.stderr.split('\nDRY RUN BLOCKED')[0], diagnostic);
+        assert.match(child.stderr, /DRY RUN BLOCKED — NO CHANGES MADE/);
+    }
+    assert.equal(digest(databasePath), before);
+});
+
+test('publication tool rejects unsupported schema identity before any publication writes', (t) => {
+    const databasePath = fixture(t);
+    const db = new Database(databasePath);
+    db.exec('ALTER TABLE posts ADD COLUMN unexpected TEXT');
+    db.close();
+    const before = digest(databasePath);
+    const options = { databasePath, reviewedAt };
+    const diagnostic = /Unsupported or drifted shared database schema/;
+    assert.throws(() => dryRunFfg3OwnerAttestedPublication(options), diagnostic);
+    assert.throws(() => applyFfg3OwnerAttestedPublication(options), diagnostic);
+    const child = spawnSync(process.execPath, [cliPath,
+        '--database', databasePath, '--site', 'ffg'], { encoding: 'utf8' });
+    assert.equal(child.status, 1, child.stderr);
+    assert.match(child.stderr, diagnostic);
+    assert.equal(digest(databasePath), before);
 });

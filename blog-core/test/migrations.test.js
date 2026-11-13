@@ -13,7 +13,7 @@ import { BASELINE_VARIANTS, expectedSignature, schemaSignature } from '../src/da
 
 const runner = createMigrationRunner();
 const syntheticMigration = {
-    id: '0002_test_only_probe',
+    id: '0003_test_only_probe',
     sql: 'CREATE TABLE migration_probe (id INTEGER PRIMARY KEY, marker TEXT NOT NULL);'
 };
 
@@ -124,7 +124,7 @@ test('recognized baseline is inspected and planned without creating or changing 
         baselineVariant: 'canonical_0000',
         variantRecorded: false,
         applied: [],
-        pending: ['0000_existing_schema', '0001_public_author_publication_model']
+        pending: ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery']
     });
     assert.deepEqual(runner.inspect(path), planned);
     assert.equal(digest(path), before);
@@ -151,13 +151,13 @@ for (const [variant, fixtureName] of [
             assert.equal(result.baselineVariant, variant);
             assert.equal(result.variantRecorded, false);
             assert.deepEqual(result.pending,
-                ['0000_existing_schema', '0001_public_author_publication_model']);
+                ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery']);
             assert.equal(digest(path), before);
         }
         initializeDatabase(path).close();
         const first = runner.apply(path);
         assert.deepEqual(first.appliedNow,
-            ['0000_existing_schema', '0001_public_author_publication_model']);
+            ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery']);
         assert.equal(first.recordedVariantNow, true);
         assert.equal(first.baselineVariant, variant);
         assert.deepEqual(readFixtureData(path), data);
@@ -178,8 +178,8 @@ for (const [variant, fixtureName] of [
         assert.equal(digest(path), after);
 
         const next = createMigrationRunner([...loadMigrations(), syntheticMigration]);
-        assert.deepEqual(next.plan(path).pending, ['0002_test_only_probe']);
-        assert.deepEqual(next.apply(path).appliedNow, ['0002_test_only_probe']);
+        assert.deepEqual(next.plan(path).pending, ['0003_test_only_probe']);
+        assert.deepEqual(next.apply(path).appliedNow, ['0003_test_only_probe']);
         assert.equal(next.inspect(path).baselineVariant, variant);
         assert.deepEqual(readFixtureData(path), data);
     });
@@ -201,7 +201,7 @@ test('previous canonical ledger gains variant metadata only on explicit apply', 
     assert.equal(runner.inspect(path).variantRecorded, false);
     assert.equal(digest(path), before);
     const recorded = runner.apply(path);
-    assert.deepEqual(recorded.appliedNow, ['0001_public_author_publication_model']);
+    assert.deepEqual(recorded.appliedNow, ['0001_public_author_publication_model', '0002_body_gallery']);
     assert.equal(recorded.recordedVariantNow, true);
     assert.equal(runner.inspect(path).baselineVariant, 'canonical_0000');
     assert.equal(runner.inspect(path).variantRecorded, true);
@@ -337,7 +337,7 @@ test('known site analytics tables coexist with the shared baseline', (t) => {
     db.close();
     assert.equal(runner.inspect(path).state, 'recognized-untracked-baseline');
     assert.deepEqual(runner.apply(path).appliedNow,
-        ['0000_existing_schema', '0001_public_author_publication_model']);
+        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery']);
     const reopened = new Database(path, { readonly: true });
     try {
         assert.equal(reopened.prepare(`SELECT COUNT(*) AS count FROM sqlite_schema
@@ -351,7 +351,7 @@ test('startup does not replay baseline schema onto an existing database', (t) =>
     const directory = fixture(t);
     const path = freshDatabase(directory, 'migrated.db');
     const dropTrigger = createMigrationRunner([...loadMigrations(), {
-        id: '0002_test_only_drop_trigger',
+        id: '0003_test_only_drop_trigger',
         sql: 'DROP TRIGGER posts_updated_at;'
     }]);
     dropTrigger.apply(path);
@@ -381,18 +381,18 @@ test('migration files cannot end the runner transaction', (t) => {
     const path = freshDatabase(fixture(t), 'transaction-control.db');
     const before = digest(path);
     assert.throws(() => createMigrationRunner([...loadMigrations(), {
-        id: '0002_test_only_commit',
+        id: '0003_test_only_commit',
         sql: 'CREATE TABLE unsafe_probe (id INTEGER); COMMIT;'
     }]), /transaction control/);
     assert.throws(() => createMigrationRunner([...loadMigrations(), {
-        id: '0002_test_only_end',
+        id: '0003_test_only_end',
         sql: 'END;'
     }]), /transaction control/);
     const multipleStatements = createMigrationRunner([...loadMigrations(), {
-        id: '0002_test_only_multiple',
+        id: '0003_test_only_multiple',
         sql: 'CREATE TABLE unsafe_probe (id INTEGER); CREATE TABLE second_probe (id INTEGER);'
     }]);
-    assert.deepEqual(multipleStatements.apply(path).appliedNow, ['0002_test_only_multiple']);
+    assert.deepEqual(multipleStatements.apply(path).appliedNow, ['0003_test_only_multiple']);
     const db = new Database(path, { readonly: true });
     assert.equal(db.prepare(`SELECT COUNT(*) AS count FROM sqlite_schema
         WHERE name IN ('unsafe_probe', 'second_probe')`).get().count, 2);
@@ -403,16 +403,16 @@ test('migration files cannot end the runner transaction', (t) => {
 test('a trigger after another migration statement remains supported', (t) => {
     const path = freshDatabase(fixture(t), 'trigger.db');
     const triggerRunner = createMigrationRunner([...loadMigrations(), {
-        id: '0002_test_only_trigger',
+        id: '0003_test_only_trigger',
         sql: `CREATE TABLE trigger_probe (id INTEGER PRIMARY KEY);
             CREATE TRIGGER test_only_user_insert AFTER INSERT ON users
             BEGIN UPDATE users SET role = 'editor' WHERE id = NEW.id; END;`
     }]);
     assert.deepEqual(triggerRunner.apply(path).appliedNow,
-        ['0002_test_only_trigger']);
+        ['0003_test_only_trigger']);
     assert.deepEqual(triggerRunner.inspect(path).pending, []);
     assert.throws(() => createMigrationRunner([...loadMigrations(), {
-        id: '0002_test_only_trigger_escape',
+        id: '0003_test_only_trigger_escape',
         sql: `CREATE TRIGGER test_only_escape AFTER INSERT ON users
             BEGIN SELECT 1; END; END;`
     }]), /transaction control/);
@@ -424,7 +424,7 @@ test('recognized baseline is recorded once and survives reopen with fixture data
     const data = readFixtureData(path);
     const first = runner.apply(path);
     assert.deepEqual(first.appliedNow,
-        ['0000_existing_schema', '0001_public_author_publication_model']);
+        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery']);
     assert.deepEqual(first.pending, []);
     assert.deepEqual(readFixtureData(path), data);
 
@@ -432,7 +432,7 @@ test('recognized baseline is recorded once and survives reopen with fixture data
     assert.deepEqual(runner.apply(path).appliedNow, []);
     assert.equal(digest(path), after);
     assert.deepEqual(runner.inspect(path).applied,
-        ['0000_existing_schema', '0001_public_author_publication_model']);
+        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery']);
 });
 
 test('synthetic migration applies once, persists, and is isolated between two site databases', (t) => {
@@ -445,8 +445,8 @@ test('synthetic migration applies once, persists, and is isolated between two si
     const ttaData = readFixtureData(tta);
     const testRunner = createMigrationRunner([...loadMigrations(), syntheticMigration]);
 
-    assert.deepEqual(testRunner.plan(ffg).pending, ['0002_test_only_probe']);
-    assert.deepEqual(testRunner.apply(ffg).appliedNow, ['0002_test_only_probe']);
+    assert.deepEqual(testRunner.plan(ffg).pending, ['0003_test_only_probe']);
+    assert.deepEqual(testRunner.apply(ffg).appliedNow, ['0003_test_only_probe']);
     assert.deepEqual(runner.plan(tta).pending, []);
     assert.deepEqual(readFixtureData(ffg), ffgData);
     assert.deepEqual(readFixtureData(tta), ttaData);
@@ -455,19 +455,19 @@ test('synthetic migration applies once, persists, and is isolated between two si
     assert.deepEqual(testRunner.apply(ffg).appliedNow, []);
     assert.equal(digest(ffg), after);
     assert.deepEqual(testRunner.inspect(ffg).applied,
-        ['0000_existing_schema', '0001_public_author_publication_model',
-            '0002_test_only_probe']);
-    assert.deepEqual(testRunner.apply(tta).appliedNow, ['0002_test_only_probe']);
+        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery',
+            '0003_test_only_probe']);
+    assert.deepEqual(testRunner.apply(tta).appliedNow, ['0003_test_only_probe']);
     assert.deepEqual(readFixtureData(tta), ttaData);
 });
 
 test('a failed migration rolls back its schema and all new migration records', (t) => {
     const directory = fixture(t);
     const testRunner = createMigrationRunner([...loadMigrations(), {
-        id: '0002_test_only_probe',
+        id: '0003_test_only_probe',
         sql: 'CREATE TABLE temporary_probe (id INTEGER);'
     }, {
-        id: '0003_test_only_failure',
+        id: '0004_test_only_failure',
         sql: 'INSERT INTO missing_table VALUES (1);'
     }]);
 
@@ -491,7 +491,7 @@ test('a failed migration rolls back its schema and all new migration records', (
             if (tracked) {
                 assert.deepEqual(db.prepare('SELECT id FROM schema_migrations').all(),
                     [{ id: '0000_existing_schema' },
-                        { id: '0001_public_author_publication_model' }]);
+                        { id: '0001_public_author_publication_model' }, { id: '0002_body_gallery' }]);
             }
         } finally {
             db.close();
@@ -542,7 +542,7 @@ test('fresh schema and frozen existing baseline have equivalent shared objects',
     db.close();
     assert.deepEqual(runner.plan(fresh).pending, []);
     assert.deepEqual(runner.plan(baseline).pending,
-        ['0000_existing_schema', '0001_public_author_publication_model']);
+        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery']);
     runner.apply(baseline);
     const signature = path => {
         const connection = new Database(path, { readonly: true });
@@ -614,5 +614,43 @@ test('CLI inspect and plan are read-only; CLI apply records all pending migratio
     const applied = run('apply');
     assert.equal(applied.status, 0, applied.stderr);
     assert.deepEqual(JSON.parse(applied.stdout).appliedNow,
-        ['0000_existing_schema', '0001_public_author_publication_model']);
+        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery']);
 });
+
+for (const [variant, fixtureName] of [
+    ['tta_legacy_production', 'tta-legacy-schema.sql'],
+    ['ffg_legacy_production', 'ffg-legacy-schema.sql']
+]) {
+    test(`0002 adds only a nullable guarded gallery to tracked 0001 ${variant}`, (t) => {
+        const path = legacyDatabase(fixture(t), `${variant}.db`, fixtureName);
+        addFixtureData(path);
+        const oldRunner = createMigrationRunner(loadMigrations().slice(0, 2));
+        oldRunner.apply(path);
+        const beforeDb = new Database(path);
+        const original = beforeDb.prepare('SELECT * FROM posts').all();
+        const ledger = beforeDb.prepare('SELECT * FROM schema_migrations ORDER BY id').all();
+        beforeDb.close();
+        const beforeDigest = digest(path);
+        assert.deepEqual(runner.plan(path).pending, ['0002_body_gallery']);
+        initializeDatabase(path).close();
+        assert.equal(digest(path), beforeDigest, 'startup must not apply pending migration');
+        assert.deepEqual(runner.apply(path).appliedNow, ['0002_body_gallery']);
+        const db = new Database(path);
+        try {
+            const rows = db.prepare('SELECT * FROM posts').all();
+            assert.deepEqual(rows.map(({ body_gallery, ...post }) => post), original);
+            assert.ok(rows.every(post => post.body_gallery === null));
+            assert.deepEqual(db.prepare('SELECT * FROM schema_migrations ORDER BY id LIMIT 2').all(), ledger);
+            assert.throws(() => db.prepare('UPDATE posts SET body_gallery = ?').run('{bad'), /CHECK/);
+            assert.equal(db.pragma('integrity_check')[0].integrity_check, 'ok');
+            assert.deepEqual(db.pragma('foreign_key_check'), []);
+        } finally {
+            db.close();
+        }
+        const after = digest(path);
+        assert.throws(() => oldRunner.inspect(path), /Unknown, out-of-order, or changed migration/);
+        assert.throws(() => oldRunner.apply(path), /Unknown, out-of-order, or changed migration/);
+        assert.equal(digest(path), after, 'old runner rejection must not change the migrated database');
+        assert.deepEqual(runner.apply(path).appliedNow, []);
+    });
+}

@@ -5,24 +5,29 @@ import {
     mkdtempSync, readFileSync, rmSync, writeFileSync
 } from 'node:fs';
 import { join } from 'node:path';
-import test from 'node:test';
+import test, { after } from 'node:test';
 
 import Database from 'better-sqlite3';
 
-import {
+import { createHistoricalOperationContext } from './helpers/historical-operation-context.js';
+
+const historical = await createHistoricalOperationContext(after);
+const withGalleryMigration = await createHistoricalOperationContext(after, { includeBodyGallery: true });
+const { createMigrationRunner: createGalleryMigrationRunner, authorship: galleryRegistryAuthorship } = withGalleryMigration;
+const { createMigrationRunner } = historical;
+const {
     applyHistoricalAuthorshipBackfill,
     calculateHistoricalAuthorshipManifestDigest,
     dryRunHistoricalAuthorshipBackfill,
     historicalAuthorshipBackfillPolicy,
     loadHistoricalAuthorshipManifest
-} from '../src/database/historical-authorship-backfill.js';
-import { createMigrationRunner } from '../src/database/migrations.js';
+} = historical.authorship;
 
 const manifestPath = join(import.meta.dirname, '..', 'src', 'database', 'manifests',
     'historical-authorship-owner-attestation-v1.json');
 const reviewedAt = '2026-09-24T12:34:56.000Z';
-const cliPath = join(import.meta.dirname, '..', 'src', 'database',
-    'historical-authorship-backfill-cli.js');
+const cliPath = historical.authorshipCli;
+const galleryRegistryCliPath = withGalleryMigration.authorshipCli;
 
 const approvedCorpus = Object.freeze({
     tta: [
@@ -365,9 +370,23 @@ for (const [label, change] of staleCases) {
             manifestPath, databasePath, site: 'tta'
         });
         assert.equal(dryRun.status, 'blocked');
+        const diagnostic = {
+            'wrong slug': /slug is "changed"; expected/,
+            'missing post': /post is missing/,
+            'existing author assignment': /authorship is neither pristine nor the exact intended resolved state/,
+            'reviewed post': /authorship is neither pristine nor the exact intended resolved state/,
+            'missing MDC': /Public Person key mdc does not exist/,
+            'archived MDC': /MDC must be active/,
+            'wrong Public Person': /Public Person key mdc does not exist/,
+            'post count mismatch': /database has 7 posts; expected exactly 6/,
+            'unexpected publisher state': /publisher_public_person_id is not null/,
+            'unexpected publication state': /published_on is not null/,
+            'unexpected modified_at': /modified_at is not null/
+        }[label];
+        assert.match(dryRun.errors.join('\n'), diagnostic);
         assert.throws(() => applyHistoricalAuthorshipBackfill({
             manifestPath, databasePath, site: 'tta', reviewedAt
-        }), /blocked/i);
+        }), diagnostic);
         assert.deepEqual(databaseState(databasePath), before);
     });
 }
@@ -471,6 +490,7 @@ test('CLI reports a blocked dry run unambiguously without changing the database'
     ], { encoding: 'utf8' });
     assert.equal(child.status, 1);
     assert.match(child.stderr, /DRY RUN BLOCKED — NO CHANGES MADE/);
+    assert.match(child.stderr, /baseline is ffg_legacy_production; expected tta_legacy_production/);
     assert.equal(fileDigest(databasePath), before);
 });
 
@@ -537,3 +557,43 @@ test('partially resolved site is blocked rather than completed or re-reviewed', 
     assert.equal(result.status, 'blocked');
     assert.match(result.errors.join('\n'), /partially applied/);
 });
+
+for (const site of ['tta', 'ffg']) {
+    test(`${site} historical tool rejects pending 0002 for the migration diagnostic without writes`, (t) => {
+        const { databasePath } = fixture(t, site);
+        assert.deepEqual(createGalleryMigrationRunner().inspect(databasePath).pending, ['0002_body_gallery']);
+        const before = fileDigest(databasePath);
+        const options = { manifestPath, databasePath, site, reviewedAt };
+        const diagnostic = /Database identity check failed:\n- pending migrations: 0002_body_gallery$/;
+        assert.throws(() => galleryRegistryAuthorship.dryRunHistoricalAuthorshipBackfill(options), diagnostic);
+        assert.throws(() => galleryRegistryAuthorship.applyHistoricalAuthorshipBackfill(options), diagnostic);
+        const child = spawnSync(process.execPath, [galleryRegistryCliPath,
+            '--manifest', manifestPath, '--database', databasePath, '--site', site], { encoding: 'utf8' });
+        assert.equal(child.status, 1, child.stderr);
+        assert.match(child.stderr, /pending migrations: 0002_body_gallery/);
+        assert.match(child.stderr, /DRY RUN BLOCKED — NO CHANGES MADE/);
+        assert.equal(fileDigest(databasePath), before);
+    });
+
+    test(`${site} historical tool rejects applied 0002 in both 0001 and 0002 registries without writes`, (t) => {
+        const { databasePath } = fixture(t, site);
+        assert.deepEqual(createGalleryMigrationRunner().apply(databasePath).appliedNow, ['0002_body_gallery']);
+        const before = fileDigest(databasePath);
+        const options = { manifestPath, databasePath, site, reviewedAt };
+        const unknown = /Unknown, out-of-order, or changed migration: 0002_body_gallery/;
+        assert.throws(() => dryRunHistoricalAuthorshipBackfill(options), unknown);
+        assert.throws(() => applyHistoricalAuthorshipBackfill(options), unknown);
+        const incompatible = /Database identity check failed:\n- applied migrations must be exactly 0000_existing_schema, 0001_public_author_publication_model$/;
+        assert.throws(() => galleryRegistryAuthorship.dryRunHistoricalAuthorshipBackfill(options), incompatible);
+        assert.throws(() => galleryRegistryAuthorship.applyHistoricalAuthorshipBackfill(options), incompatible);
+        for (const [cli, diagnostic] of [[cliPath, unknown], [galleryRegistryCliPath, incompatible]]) {
+            const child = spawnSync(process.execPath, [cli,
+                '--manifest', manifestPath, '--database', databasePath, '--site', site], { encoding: 'utf8' });
+            assert.equal(child.status, 1, child.stderr);
+            // CLI appends usage/receipt text after the exact operation error.
+            assert.match(child.stderr.split('\nDRY RUN BLOCKED')[0], diagnostic);
+            assert.match(child.stderr, /DRY RUN BLOCKED — NO CHANGES MADE/);
+        }
+        assert.equal(fileDigest(databasePath), before);
+    });
+}

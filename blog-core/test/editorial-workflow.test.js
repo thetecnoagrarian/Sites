@@ -9,6 +9,17 @@ import { createMigrationRunner } from '../src/database/migrations.js';
 import { setDatabase, PublicPerson, PostPublication } from '../src/models/index.js';
 import { createEditorialService } from '../src/models/editorial-service.js';
 import { parseOrderedAuthors, removeUnreferencedMedia } from '../src/admin/editorial-router.js';
+import { serializeBodyGallery } from '../src/models/body-gallery.js';
+import Post from '../src/models/post.js';
+
+function bodyGallery(count = 1) {
+    return { version: 1, items: Array.from({ length: count }, (_, index) => ({
+        id: `abcdefab-1234-4234-8234-${String(index).padStart(12, '0')}`,
+        asset: { thumbnail: `/uploads/t-${index}.webp`, medium: `/uploads/m-${index}.webp`,
+            large: `/uploads/l-${index}.webp` },
+        alt: `Documentary detail ${index}`, caption: `Step ${index}`
+    })) };
+}
 
 function setup(t, variant = 'fresh') {
     const directory = mkdtempSync(join(tmpdir(), 'sites-editorial-'));
@@ -395,4 +406,138 @@ test('replaced media cleanup retains files referenced by any post', async (t) =>
     db.prepare('UPDATE posts SET images = ? WHERE id = ?').run('[]', second);
     await removeUnreferencedMedia([image], directory);
     assert.equal(existsSync(file), false, 'unreferenced replaced media is removed');
+});
+
+for (const count of [1, 65, 100]) {
+    test(`${count}-item gallery persists and hydrates through every Post read`, (t) => {
+        const { db, service, input } = setup(t);
+        const value = bodyGallery(count);
+        const id = service.create(input({ content: { ...input().content, body_gallery: value } }));
+        assert.equal(db.prepare('SELECT body_gallery FROM posts WHERE id = ?').get(id).body_gallery,
+            serializeBodyGallery(value));
+        const post = Post.findById(id);
+        for (const read of [post, Post.findBySlug(post.slug), Post.findAll()[0], Post.search('Synthetic')[0]]) {
+            assert.deepEqual(read.body_gallery, value);
+            assert.equal(read.body_gallery_error, null);
+        }
+        assert.equal(service.snapshot(id).facts.modified_at, null);
+    });
+}
+
+test('gallery changes, ordering and alt/caption edits advance revisions and modified_at; equivalent saves do not', (t) => {
+    const { db, service, input } = setup(t);
+    const value = bodyGallery(2);
+    const id = service.create(input());
+    const before = service.snapshot(id);
+    const save = gallery => service.update(id, input({
+        content: { ...input().content, body_gallery: gallery },
+        revisionToken: service.snapshot(id).revisionToken
+    }));
+    save(value);
+    let snapshot = service.snapshot(id);
+    assert.notEqual(snapshot.revisionToken, before.revisionToken);
+    assert.ok(snapshot.facts.modified_at);
+    const after = db.prepare('SELECT * FROM posts WHERE id = ?').get(id);
+    const equivalent = { items: value.items.map(item => ({ caption: ` ${item.caption} `,
+        alt: item.alt, asset: Object.fromEntries(Object.entries(item.asset).reverse()),
+        id: item.id.toUpperCase() })), version: 1 };
+    save(equivalent);
+    assert.deepEqual(db.prepare('SELECT * FROM posts WHERE id = ?').get(id), after);
+    assert.equal(service.snapshot(id).revisionToken, snapshot.revisionToken);
+    for (const change of [gallery => gallery.items.reverse(),
+        gallery => { gallery.items[0].alt = 'Another construction detail'; },
+        gallery => { gallery.items[0].caption = 'Revised process context'; },
+        gallery => { gallery.items[0].asset.medium = '/uploads/replacement-medium.webp'; }]) {
+        const changed = structuredClone(service.snapshot(id).post.body_gallery);
+        change(changed);
+        save(changed);
+        const next = service.snapshot(id);
+        assert.notEqual(next.revisionToken, snapshot.revisionToken);
+        assert.ok(next.facts.modified_at > snapshot.facts.modified_at);
+        assert.equal(next.facts.published_at, before.facts.published_at);
+        assert.deepEqual(next.authors, before.authors);
+        snapshot = next;
+    }
+});
+
+test('omitted gallery survives ordinary edits and FFG overwrite; explicit null/empty clears', (t) => {
+    const { db, service, input } = setup(t);
+    const value = bodyGallery();
+    const id = service.create(input({ content: { ...input().content, body_gallery: value } }));
+    service.update(id, input({ content: { ...input().content, body: 'Older caller edit' },
+        revisionToken: service.snapshot(id).revisionToken }));
+    assert.deepEqual(service.snapshot(id).post.body_gallery, value);
+    service.overwrite(id, input(), { revisionToken: service.snapshot(id).revisionToken });
+    assert.deepEqual(service.snapshot(id).post.body_gallery, value);
+    service.overwrite(id, input({ content: { ...input().content, body_gallery: bodyGallery(2) } }),
+        { revisionToken: service.snapshot(id).revisionToken });
+    assert.equal(service.snapshot(id).post.body_gallery.items.length, 2);
+    for (const clear of [null, { version: 1, items: [] }]) {
+        service.update(id, input({ content: { ...input().content, body_gallery: clear },
+            revisionToken: service.snapshot(id).revisionToken }));
+        assert.equal(db.prepare('SELECT body_gallery FROM posts WHERE id = ?').get(id).body_gallery, null);
+        assert.equal(Post.findById(id).body_gallery, null);
+        const previous = service.snapshot(id);
+        service.update(id, input({ content: { ...input().content, body_gallery: clear },
+            revisionToken: previous.revisionToken }));
+        assert.equal(service.snapshot(id).revisionToken, previous.revisionToken);
+        service.update(id, input({ content: { ...input().content, body_gallery: value },
+            revisionToken: service.snapshot(id).revisionToken }));
+    }
+    service.overwrite(id, input({ content: { ...input().content, body_gallery: null } }),
+        { revisionToken: service.snapshot(id).revisionToken });
+    assert.equal(Post.findById(id).body_gallery, null);
+});
+
+test('invalid gallery and stale gallery saves reject atomically, including overwrite and late failures', (t) => {
+    const { db, service, input } = setup(t);
+    const id = service.create(input());
+    const initial = service.snapshot(id);
+    const before = db.prepare('SELECT * FROM posts WHERE id = ?').get(id);
+    const invalid = input({ content: { ...input().content, body: 'Must not persist', body_gallery: bodyGallery(101) },
+        revisionToken: initial.revisionToken, categoryIds: [] });
+    assert.throws(() => service.update(id, invalid), /100/);
+    assert.throws(() => service.overwrite(id, invalid, { revisionToken: initial.revisionToken }), /100/);
+    assert.throws(() => service.create(invalid), /100/);
+    assert.throws(() => service.update(id, input({ content: { ...input().content, body_gallery: undefined },
+        revisionToken: initial.revisionToken })), TypeError);
+    assert.deepEqual(db.prepare('SELECT * FROM posts WHERE id = ?').get(id), before);
+    assert.deepEqual(service.snapshot(id).categories, initial.categories);
+    assert.throws(() => service.update(id, input({ content: { ...input().content, body_gallery: bodyGallery() },
+        revisionToken: initial.revisionToken, publisherAction: 'set', publisherId: 999 })), /does not exist/);
+    assert.deepEqual(db.prepare('SELECT * FROM posts WHERE id = ?').get(id), before);
+    service.update(id, input({ content: { ...input().content, body_gallery: bodyGallery(65) },
+        revisionToken: initial.revisionToken }));
+    const committed = db.prepare('SELECT * FROM posts WHERE id = ?').get(id);
+    assert.throws(() => service.update(id, input({ content: { ...input().content, body_gallery: null },
+        revisionToken: initial.revisionToken })), /changed after/);
+    assert.throws(() => service.overwrite(id, input(), { revisionToken: initial.revisionToken }), /changed after/);
+    assert.deepEqual(db.prepare('SELECT * FROM posts WHERE id = ?').get(id), committed);
+});
+
+test('malformed stored gallery is safe to read and survives omission, while revisions track corruption changes', (t) => {
+    const { db, service, input } = setup(t);
+    const id = service.create(input());
+    for (const stored of ['{"version":99,"items":[]}', '{bad json']) {
+        // Only synthetic corruption testing bypasses the database JSON guard.
+        db.pragma('ignore_check_constraints = ON');
+        db.prepare('UPDATE posts SET body_gallery = ? WHERE id = ?').run(stored, id);
+        db.pragma('ignore_check_constraints = OFF');
+        const snapshot = service.snapshot(id);
+        for (const post of [snapshot.post, Post.findBySlug(snapshot.post.slug),
+            Post.findAll()[0], Post.search('Synthetic')[0]]) {
+            assert.equal(post.body_gallery, null);
+            assert.equal(post.body_gallery_error, 'invalid_stored_body_gallery');
+        }
+        service.update(id, input({ content: { ...input().content, body: `Edit with ${stored.length}` },
+            revisionToken: snapshot.revisionToken }));
+        assert.equal(db.prepare('SELECT body_gallery FROM posts WHERE id = ?').get(id).body_gallery, stored);
+    }
+    const stale = service.snapshot(id).revisionToken;
+    db.prepare('UPDATE posts SET body_gallery = ? WHERE id = ?').run('{"version":98}', id);
+    assert.notEqual(service.snapshot(id).revisionToken, stale);
+    assert.throws(() => service.update(id, input({ revisionToken: stale })), /changed after/);
+    service.update(id, input({ content: { ...input().content, body_gallery: null },
+        revisionToken: service.snapshot(id).revisionToken }));
+    assert.equal(Post.findById(id).body_gallery_error, null);
 });

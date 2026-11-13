@@ -1,5 +1,14 @@
 import slugify from 'slugify';
 import { getDatabase } from './db.js';
+import { readStoredBodyGallery, serializeBodyGallery } from './body-gallery.js';
+
+function hydratePost(post) {
+    if (!post) return post;
+    const gallery = readStoredBodyGallery(post.body_gallery);
+    return { ...post, images: JSON.parse(post.images || '[]'),
+        captions: JSON.parse(post.captions || '[]'),
+        body_gallery: gallery.value, body_gallery_error: gallery.error };
+}
 
 // Helper function to check for existing post with same title
 const checkExistingPost = (title, excludeId = null) => {
@@ -50,8 +59,10 @@ class Post {
         return checkExistingPost(title, excludeId);
     }
 
-    static create({ title, body, description, excerpt, images = [], captions = [], created_at, author_id, overwriteExisting = false }) {
+    static create({ title, body, description, excerpt, images = [], captions = [], created_at, author_id, overwriteExisting = false, ...optional }) {
         try {
+            const gallery = Object.hasOwn(optional, 'body_gallery')
+                ? serializeBodyGallery(optional.body_gallery) : null;
             console.log('Creating post with:', { title, body, description, excerpt, images, captions, created_at, author_id, overwriteExisting });
             
             // Check if a post with the same title already exists
@@ -64,7 +75,8 @@ class Post {
             } else if (existingPost && overwriteExisting) {
                 // Update the existing post instead of creating a new one
                 // Update created_at to reflect when the new content was created
-                return Post.update(existingPost.id, { title, body, description, excerpt, images, captions, created_at, author_id });
+                return Post.update(existingPost.id, { title, body, description, excerpt, images, captions, created_at, author_id,
+                    ...(Object.hasOwn(optional, 'body_gallery') ? { body_gallery: optional.body_gallery } : {}) });
             } else {
                 // Generate new unique slug
                 slug = generateUniqueSlug(title);
@@ -74,8 +86,8 @@ class Post {
             let stmt, result;
             if (created_at) {
                 stmt = db.prepare(`
-                    INSERT INTO posts (title, slug, body, description, excerpt, images, captions, created_at, author_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO posts (title, slug, body, description, excerpt, images, captions, created_at, author_id, body_gallery)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `);
                 result = stmt.run(
                     title,
@@ -86,12 +98,13 @@ class Post {
                     JSON.stringify(images),
                     JSON.stringify(captions),
                     created_at,
-                    author_id
+                    author_id,
+                    gallery
                 );
             } else {
                 stmt = db.prepare(`
-                    INSERT INTO posts (title, slug, body, description, excerpt, images, captions, author_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO posts (title, slug, body, description, excerpt, images, captions, author_id, body_gallery)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `);
                 result = stmt.run(
                     title,
@@ -101,7 +114,8 @@ class Post {
                     excerpt,
                     JSON.stringify(images),
                     JSON.stringify(captions),
-                    author_id
+                    author_id,
+                    gallery
                 );
             }
             console.log('Post creation result:', result);
@@ -116,22 +130,14 @@ class Post {
         const db = getDatabase();
         const stmt = db.prepare('SELECT posts.*, users.username as author FROM posts LEFT JOIN users ON posts.author_id = users.id WHERE posts.id = ?');
         const post = stmt.get(id);
-        if (post) {
-            post.images = JSON.parse(post.images || '[]');
-            post.captions = JSON.parse(post.captions || '[]');
-        }
-        return post;
+        return hydratePost(post);
     }
 
     static findBySlug(slug) {
         const db = getDatabase();
         const stmt = db.prepare('SELECT posts.*, users.username as author FROM posts LEFT JOIN users ON posts.author_id = users.id WHERE posts.slug = ?');
         const post = stmt.get(slug);
-        if (post) {
-            post.images = JSON.parse(post.images || '[]');
-            post.captions = JSON.parse(post.captions || '[]');
-        }
-        return post;
+        return hydratePost(post);
     }
 
     static findAll(limit = 5, offset = 0) {
@@ -143,14 +149,12 @@ class Post {
             LIMIT ? OFFSET ?
         `);
         const posts = stmt.all(limit, offset);
-        return posts.map(post => ({
-            ...post,
-            images: JSON.parse(post.images || '[]'),
-            captions: JSON.parse(post.captions || '[]')
-        }));
+        return posts.map(hydratePost);
     }
 
-    static update(id, { title, body, description, excerpt, images = [], captions = [], created_at, author_id }) {
+    static update(id, { title, body, description, excerpt, images = [], captions = [], created_at, author_id, ...optional }) {
+        const hasGallery = Object.hasOwn(optional, 'body_gallery');
+        const gallery = hasGallery ? serializeBodyGallery(optional.body_gallery) : null;
         console.log('Updating post ID:', id, 'with data:', { title, body, description, excerpt, images, captions, created_at, author_id });
         // For updates, we need to check if the slug would conflict with other posts
         const currentPost = Post.findById(id);
@@ -186,6 +190,7 @@ class Post {
                 UPDATE posts 
                 SET title = ?, slug = ?, body = ?, description = ?, 
                     excerpt = ?, images = ?, captions = ?, created_at = ?, author_id = ?, updated_at = CURRENT_TIMESTAMP
+                    ${hasGallery ? ', body_gallery = ?' : ''}
                 WHERE id = ?
             `);
             result = stmt.run(
@@ -198,6 +203,7 @@ class Post {
                 JSON.stringify(captions),
                 created_at,
                 author_id,
+                ...(hasGallery ? [gallery] : []),
                 id
             );
         } else {
@@ -205,6 +211,7 @@ class Post {
                 UPDATE posts 
                 SET title = ?, slug = ?, body = ?, description = ?, 
                     excerpt = ?, images = ?, captions = ?, author_id = ?, updated_at = CURRENT_TIMESTAMP
+                    ${hasGallery ? ', body_gallery = ?' : ''}
                 WHERE id = ?
             `);
             result = stmt.run(
@@ -216,6 +223,7 @@ class Post {
                 JSON.stringify(images),
                 JSON.stringify(captions),
                 author_id,
+                ...(hasGallery ? [gallery] : []),
                 id
             );
         }
@@ -277,11 +285,7 @@ class Post {
             parameters.push(limit, offset);
         }
         const posts = stmt.all(...parameters);
-        return posts.map(post => ({
-            ...post,
-            images: JSON.parse(post.images || '[]'),
-            captions: JSON.parse(post.captions || '[]')
-        }));
+        return posts.map(hydratePost);
     }
 
     static countSearch(query) {

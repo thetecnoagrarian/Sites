@@ -107,7 +107,7 @@ for (const definition of [
 
         assert.equal(runner.plan(path).baselineVariant, definition.variant);
         assert.deepEqual(runner.apply(path).appliedNow,
-            ['0000_existing_schema', '0001_public_author_publication_model']);
+            ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery']);
         assert.deepEqual(runner.apply(path).appliedNow, []);
         initializeDatabase(path).close();
 
@@ -134,7 +134,7 @@ for (const definition of [
             assert.equal(db.prepare('SELECT COUNT(*) AS count FROM post_public_authors').get().count, 0);
             assert.deepEqual(db.prepare('SELECT id FROM schema_migrations ORDER BY id').all(), [
                 { id: '0000_existing_schema' },
-                { id: '0001_public_author_publication_model' }
+                { id: '0001_public_author_publication_model' }, { id: '0002_body_gallery' }
             ]);
             assert.deepEqual(db.prepare('SELECT variant FROM schema_baseline').get(),
                 { variant: definition.variant });

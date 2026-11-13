@@ -139,6 +139,8 @@ CREATE TABLE IF NOT EXISTS posts (
             OR published_on IS NOT NULL
         ),
     publication_review_note TEXT,
+    body_gallery TEXT
+        CHECK (body_gallery IS NULL OR json_valid(body_gallery)),
     FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (publisher_public_person_id) REFERENCES public_people(id) ON DELETE RESTRICT
 );
