@@ -187,13 +187,13 @@ test('FFG overwrite preserves historical publication and requires reviewed-autho
       authorship_review_state FROM posts WHERE slug = 'local-test-post'`)[0];
     expect(before.authorship_review_state).toBe('owner_attested');
     await submitSyntheticPost(page, site, 'Local Test Post', ['Mode B Author Two']);
-    await expect(page).toHaveURL(`${site.baseURL}/admin/posts/confirm-overwrite`);
+    await expect(page).toHaveURL(new RegExp(`${site.baseURL}/admin/posts/confirm-overwrite\\?mediaOperationId=[0-9a-f-]+$`));
     await expect(page.getByText('First publication:')).toBeVisible();
     await Promise.all([
       page.waitForNavigation(),
       page.locator('button[name="action"][value="overwrite"]').click()
     ]);
-    await expect(page).toHaveURL(`${site.baseURL}/admin/posts/confirm-overwrite`);
+    await expect(page).toHaveURL(new RegExp(`${site.baseURL}/admin/posts/confirm-overwrite\\?mediaOperationId=[0-9a-f-]+$`));
     expect(query(site, `SELECT body FROM posts WHERE id = ${before.id}`)[0].body).toBe(before.body);
     await page.locator('input[name="reopenAuthorship"]').check();
     await Promise.all([

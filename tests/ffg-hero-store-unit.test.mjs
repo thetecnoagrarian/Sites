@@ -98,15 +98,17 @@ test('resolver fails closed to repository assets and never archival PNG', async 
 
 test('JPEG, PNG, and WebP publish with canonical retained-source extensions', async (t) => {
   const { root, uploads } = await fixture(t);
+  const generations = [];
   for (const [format, extension] of [['jpeg', 'jpg'], ['png', 'png'], ['webp', 'webp']]) {
     const input = await synthetic(root, `source-${format}.${extension}`, format);
     const result = await publishHeroImage({ inputPath: input, uploadsPath: uploads });
+    generations.push(result.generation);
     const dir = generationPath(uploads, result.generation);
     const retainedSource = path.join(dir, '.source', `current-source.${extension}`);
     assert.equal(await hash(retainedSource), await hash(input));
     assert.deepEqual(
       (await readdir(path.join(uploads, 'hero'))).sort(),
-      ['.current.json', result.generation].sort()
+      ['.current.json', ...generations].sort()
     );
     assert.equal(result.descriptor.path, `/uploads/hero/${result.generation}/current-hero.webp`);
     assert.deepEqual(result.heroDimensions, { width: 1920, height: 960 });
@@ -149,10 +151,14 @@ test('persistent display/social resolution, corrupt fallback, replacement URL, a
     inputPath: await synthetic(root, 'second.png', 'png', { r: 130, g: 40, b: 80 }), uploadsPath: uploads
   });
   assert.notEqual(second.descriptor.path, first.descriptor.path);
+  assert.equal(await hash(path.join(generationPath(uploads, first.generation), '.source/current-source.jpg')),
+    await hash(path.join(root, 'first.jpg')), 'replacement retains the previous source');
   await writeFile(path.join(generationPath(uploads, second.generation), 'current-hero.webp'), 'corrupt');
   assert.equal((await resolveHeroImage(uploads, images)).path, '/images/HeroCamp.webp');
 
   await resetHeroImage(uploads);
+  await readFile(path.join(generationPath(uploads, first.generation), 'current-hero.webp'));
+  await readFile(path.join(generationPath(uploads, second.generation), '.source/current-source.png'));
   assert.equal((await resolveHeroImage(uploads, images)).path, '/images/HeroCamp.webp');
   assert.deepEqual(await resetHeroImage(uploads), { reset: false, generation: null });
 });

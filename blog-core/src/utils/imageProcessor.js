@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { logSafeError } from './error-diagnostics.js';
 
 const IMAGE_SIZES = {
   thumbnail: { maxWidth: 400, maxHeight: 400 },
@@ -10,7 +11,7 @@ const IMAGE_SIZES = {
 
 export const processImage = async (inputPath, filename, outputDir) => {
   try {
-    console.log('Processing image:', { inputPath, filename, outputDir });
+    console.log('Processing image');
     
     // Ensure output directory exists
     await fs.mkdir(outputDir, { recursive: true });
@@ -49,11 +50,11 @@ export const processImage = async (inputPath, filename, outputDir) => {
     results.originalHeight = height;
     results.originalAspectRatio = aspectRatio;
     
-    console.log('Image processing completed:', results);
+    console.log('Image processing completed:', { variantCount: Object.keys(IMAGE_SIZES).length });
     return results;
     
   } catch (error) {
-    console.error('Error processing image:', error);
+    logSafeError(error, { event: 'media-processing' });
     throw error;
   }
 };

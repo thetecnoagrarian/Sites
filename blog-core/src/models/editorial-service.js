@@ -3,6 +3,7 @@ import Post from './post.js';
 import PostPublication, { REVIEW_STATES } from './post-publication.js';
 import { getDatabase } from './db.js';
 import { normalizeBodyGallery, serializeBodyGallery, storedBodyGalleryKey } from './body-gallery.js';
+import { mediaReceipt, acceptMediaPublication, recoverMediaOutcome, assertMediaOverwrite } from './media-publication.js';
 
 const asArray = value => Array.isArray(value) ? value : (value == null ? [] : [value]);
 const integerId = (value, label) => {
@@ -224,7 +225,7 @@ function nextModifiedAt(previous, observedAt) {
     return new Date(Date.parse(previous) + 1).toISOString();
 }
 
-export function createEditorialService({ now = () => new Date().toISOString() } = {}) {
+export function createEditorialService({ now = () => new Date().toISOString(), onTransactionPhase = () => {} } = {}) {
     const db = getDatabase();
     const observedAt = () => {
         const value = now();
@@ -233,6 +234,60 @@ export function createEditorialService({ now = () => new Date().toISOString() } 
             throw new TypeError('Editorial clock must return a UTC ISO timestamp');
         }
         return value;
+    };
+    const execute = (run, input, action, postId = null) => {
+        if (input.mediaAcceptance && db.inTransaction) throw new Error('Managed acceptance requires its own outer editorial transaction');
+        try {
+            const result = run.immediate();
+            onTransactionPhase('after-commit');
+            return result;
+        } catch (error) { return recoverMediaOutcome(db, input.mediaAcceptance, input, action, postId, error); }
+    };
+
+    // Only overwrite may transform verified input, through the fixed rules below.
+    // The exported update API always verifies the exact input it persists.
+    const updateInternal = (postId, input, operationAction, publicationInput) => {
+        const id = integerId(postId, 'Post ID');
+        const run = db.transaction(() => {
+            const receipt = mediaReceipt(db, input.mediaAcceptance, publicationInput, operationAction, id);
+            if (receipt) return receipt.postId;
+            const before = currentState(db, id);
+            requireRevision(before, input.revisionToken);
+            const content = normalizeContent(input.content, before.post);
+            const duplicate = Post.checkForDuplicateTitle(content.title, id);
+            if (duplicate) throw new Error(`Another post already uses this title (ID: ${duplicate.id})`);
+            const categories = normalizeIds(input.categoryIds, 'category');
+            validateReferences(db, categories, 'categories', 'Category');
+            const instant = observedAt();
+            const oldContent = publicFacts(before);
+            if (!same({
+                title: content.title, body: content.body, description: content.description,
+                excerpt: content.excerpt, images: content.images,
+                captions: content.captions, created_at: content.created_at,
+                body_gallery: Object.hasOwn(content, 'body_gallery')
+                    ? serializeBodyGallery(content.body_gallery) : oldContent.body_gallery
+            }, {
+                title: oldContent.title, body: oldContent.body,
+                description: oldContent.description, excerpt: oldContent.excerpt,
+                images: oldContent.images, captions: oldContent.captions,
+                created_at: oldContent.created_at, body_gallery: oldContent.body_gallery
+            })) {
+                Post.update(id, { ...content, author_id: before.post.author_id });
+            }
+            replaceCategories(db, id, categories);
+            updateAuthorship(db, id, input, before, instant);
+            updatePublisher(db, id, input, before);
+            updatePublication(id, input, instant);
+            const after = currentState(db, id);
+            if (!same(publicFacts(before), publicFacts(after))) {
+                db.prepare('UPDATE posts SET modified_at = ? WHERE id = ?')
+                    .run(nextModifiedAt(before.post.modified_at, instant), id);
+            }
+            acceptMediaPublication(db, input.mediaAcceptance, publicationInput, operationAction, id, id);
+            onTransactionPhase('before-commit');
+            return id;
+        });
+        return execute(run, { ...publicationInput, mediaAcceptance: input.mediaAcceptance }, operationAction, id);
     };
 
     return {
@@ -250,6 +305,8 @@ export function createEditorialService({ now = () => new Date().toISOString() } 
 
         create(input) {
             const run = db.transaction(() => {
+                const receipt = mediaReceipt(db, input.mediaAcceptance, input, 'create');
+                if (receipt) return receipt.postId;
                 const content = normalizeContent(input.content);
                 const categories = normalizeIds(input.categoryIds, 'category');
                 const authors = normalizeIds(input.authorIds, 'public Person author');
@@ -280,56 +337,25 @@ export function createEditorialService({ now = () => new Date().toISOString() } 
                     publishedAt, state: 'verified', reviewedAt: publishedAt,
                     note: 'Server-observed first publication'
                 });
+                acceptMediaPublication(db, input.mediaAcceptance, input, 'create', null, postId);
+                onTransactionPhase('before-commit');
                 return postId;
             });
-            return run.immediate();
+            return execute(run, input, 'create');
         },
 
         update(postId, input) {
-            const id = integerId(postId, 'Post ID');
-            const run = db.transaction(() => {
-                const before = currentState(db, id);
-                requireRevision(before, input.revisionToken);
-                const content = normalizeContent(input.content, before.post);
-                const duplicate = Post.checkForDuplicateTitle(content.title, id);
-                if (duplicate) throw new Error(`Another post already uses this title (ID: ${duplicate.id})`);
-                const categories = normalizeIds(input.categoryIds, 'category');
-                validateReferences(db, categories, 'categories', 'Category');
-                const instant = observedAt();
-                const oldContent = publicFacts(before);
-                if (!same({
-                    title: content.title, body: content.body, description: content.description,
-                    excerpt: content.excerpt, images: content.images,
-                    captions: content.captions, created_at: content.created_at,
-                    body_gallery: Object.hasOwn(content, 'body_gallery')
-                        ? serializeBodyGallery(content.body_gallery) : oldContent.body_gallery
-                }, {
-                    title: oldContent.title, body: oldContent.body,
-                    description: oldContent.description, excerpt: oldContent.excerpt,
-                    images: oldContent.images, captions: oldContent.captions,
-                    created_at: oldContent.created_at, body_gallery: oldContent.body_gallery
-                })) {
-                    Post.update(id, { ...content, author_id: before.post.author_id });
-                }
-                replaceCategories(db, id, categories);
-                updateAuthorship(db, id, input, before, instant);
-                updatePublisher(db, id, input, before);
-                updatePublication(id, input, instant);
-                const after = currentState(db, id);
-                if (!same(publicFacts(before), publicFacts(after))) {
-                    db.prepare('UPDATE posts SET modified_at = ? WHERE id = ?')
-                        .run(nextModifiedAt(before.post.modified_at, instant), id);
-                }
-                return id;
-            });
-            return run.immediate();
+            return updateInternal(postId, input, 'update', input);
         },
 
         overwrite(postId, input, { revisionToken, reopenAuthorship = false } = {}) {
             const id = integerId(postId, 'Post ID');
+            assertMediaOverwrite(db, input.mediaAcceptance, input, revisionToken, reopenAuthorship);
+            const receipt = mediaReceipt(db, input.mediaAcceptance, input, 'overwrite', id);
+            if (receipt) return receipt.postId;
             const before = currentState(db, id);
             requireRevision(before, revisionToken);
-            if (before.post.title !== input.content?.title) {
+            if (before.post.title !== requiredText(input.content?.title, 'Title')) {
                 throw new Error('Duplicate title target changed; reload before overwriting');
             }
             const authors = normalizeIds(input.authorIds, 'public Person author');
@@ -338,7 +364,7 @@ export function createEditorialService({ now = () => new Date().toISOString() } 
                 && !reopenAuthorship) {
                 throw new Error('Explicitly reopen reviewed authorship before overwriting');
             }
-            return this.update(id, {
+            return updateInternal(id, {
                 ...input, revisionToken,
                 authorshipAction: changed
                     ? (before.post.authorship_review_state === 'unreviewed' ? 'replace' : 'reopen')
@@ -346,7 +372,7 @@ export function createEditorialService({ now = () => new Date().toISOString() } 
                 authorshipReviewState: 'unreviewed',
                 publisherAction: 'set',
                 publicationAction: 'preserve'
-            });
+            }, 'overwrite', input);
         }
     };
 }

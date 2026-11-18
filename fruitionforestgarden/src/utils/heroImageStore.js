@@ -3,6 +3,7 @@ import path from 'node:path';
 import { promises as fs } from 'node:fs';
 
 import sharp from 'sharp';
+import { logSafeError } from '@ffg/blog-core';
 import {
   HERO_FILENAME,
   HERO_OG_FILENAME,
@@ -40,7 +41,7 @@ const readCurrentGeneration = async (uploadsPath) => {
   try {
     return parseManifest(await fs.readFile(manifestPath(uploadsPath), 'utf8')).generation;
   } catch (error) {
-    if (error.code !== 'ENOENT') console.warn('Hero manifest unavailable; using repository fallback:', error.message);
+    if (error.code !== 'ENOENT') logSafeError(error, { event: 'hero' });
     return null;
   }
 };
@@ -89,14 +90,6 @@ const resolveHeroSocialImage = async (uploadsPath, imagesDir = null) => {
   return fallback ? { ...fallback, persistent: false } : null;
 };
 
-const removePath = async (target, { recursive = false, logger = console } = {}) => {
-  try {
-    await fs.rm(target, { recursive, force: true });
-  } catch (error) {
-    logger.error('Hero cleanup failed:', error);
-  }
-};
-
 const publishHeroImage = async ({ inputPath, uploadsPath, onPhase, logger = console }) => {
   if (!uploadsPath) throw new TypeError('The runtime uploads path is required');
   const store = heroStorePath(uploadsPath);
@@ -104,15 +97,11 @@ const publishHeroImage = async ({ inputPath, uploadsPath, onPhase, logger = cons
   const staging = path.join(store, `.staging-${generation}`);
   const promoted = generationPath(uploadsPath, generation);
   const temporaryManifest = path.join(store, `.current-${generation}.tmp`);
-  let wasPromoted = false;
-  let wasPublished = false;
-  const previousGeneration = await readCurrentGeneration(uploadsPath);
 
   try {
     await fs.mkdir(store, { recursive: true });
     const result = await processHeroImage(inputPath, staging, { onPhase });
     await fs.rename(staging, promoted);
-    wasPromoted = true;
 
     const descriptor = await persistentDescriptor(uploadsPath, generation, HERO_FILENAME);
     const socialDescriptor = await persistentDescriptor(uploadsPath, generation, HERO_OG_FILENAME);
@@ -125,30 +114,23 @@ const publishHeroImage = async ({ inputPath, uploadsPath, onPhase, logger = cons
     });
     if (onPhase) await onPhase('manifest-rename');
     await fs.rename(temporaryManifest, manifestPath(uploadsPath));
-    wasPublished = true;
-
-    if (previousGeneration && previousGeneration !== generation) {
-      await removePath(generationPath(uploadsPath, previousGeneration), { recursive: true, logger });
-    }
+    // Superseded generations may still be embedded in article HTML or drafts.
     return { ...result, generation, descriptor, socialDescriptor };
   } catch (error) {
-    if (!wasPublished) {
-      await removePath(staging, { recursive: true, logger });
-      if (wasPromoted) await removePath(promoted, { recursive: true, logger });
-      await removePath(temporaryManifest, { logger });
-    }
+    // Retain uncertain generated artifacts, including protected retained sources.
+    // Request-owned raw input cleanup is handled separately by the upload layer.
+    logger.warn?.('Unpublished hero artifacts may remain; retained for manual review');
     throw error;
   }
 };
 
-const resetHeroImage = async (uploadsPath, { logger = console } = {}) => {
+const resetHeroImage = async (uploadsPath) => {
   const generation = await readCurrentGeneration(uploadsPath);
   try {
     await fs.unlink(manifestPath(uploadsPath));
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
   }
-  if (generation) await removePath(generationPath(uploadsPath, generation), { recursive: true, logger });
   return { reset: Boolean(generation), generation };
 };
 

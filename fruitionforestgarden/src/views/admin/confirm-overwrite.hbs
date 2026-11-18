@@ -51,6 +51,7 @@
     <div class="mt-4">
         <form method="POST" action="/admin/posts/confirm-overwrite">
             <input type="hidden" name="_csrf" value="{{csrfToken}}">
+            <input type="hidden" name="mediaOperationId" value="{{mediaOperationId}}">
             
             <div class="alert alert-info">
                 <h4>What would you like to do?</h4>

@@ -100,6 +100,23 @@ Provides `createBlogApp(config)`, the shared Express application factory. Confir
 - SQLite-backed session store.
 - Helmet security middleware and CSP configuration.
 - Morgan/Pino-style request logging.
+- Shared global/editorial error diagnostics use fixed route families, allowlisted error names/codes,
+  HTTP methods and a server-generated error ID. They exclude request bodies,
+  queries, cookies, raw error objects/messages/stacks and client-supplied IDs.
+  Existing production/non-production HTTP error responses are preserved.
+  `utils/error-diagnostics.js` also serves Post/image-processing and post-deletion
+  catches, authentication, admin/public/hero failures, session persistence and
+  analytics exceptions. Property extraction tolerates throwing getters; raw
+  errors never enter the diagnostic sink. Request/access log query privacy and
+  analytics metadata storage remain separate concerns.
+- Site entrypoints call `setupFinalHandlers()` only after mounting their routes.
+  It adds 404 handling then the bounded error handler, rejects duplicate
+  finalization/late application registration, and preserves settings reads.
+  `utils/asyncHandler.js` forwards native Promise rejections from Express 4
+  handlers/callbacks without a new dependency. Error-view failures receive a
+  bounded fallback; failures after headers are sent close the response.
+- A local SQLite session-store subclass preserves the existing expiry SQL and
+  schedule while reporting its internal timer failures through bounded diagnostics.
 - Compression and request body parsing.
 - Session setup using `SESSION_SECRET`.
 - CSRF token creation and validation.
@@ -108,11 +125,20 @@ Provides `createBlogApp(config)`, the shared Express application factory. Confir
 - Handlebars setup and shared helpers.
 - User attachment middleware.
 - Bot-protection and sensitive-path request blocking.
-- Rate limiting with environment-controlled settings.
+- Rate limiting with environment-controlled settings. `utils/trusted-rate-limit.js`
+  compiles the complete explicit `TRUSTED_IPS` configuration once per app instance.
+  Missing/empty/whitespace-only configuration grants no elevated exemptions.
+  Any compilation failure rejects the entire list, retains ordinary limits and
+  emits one bounded diagnostic during initialization; requests do not recompile it.
+  `/debug-ip` reuses this matcher and omits the raw configuration field.
 - Health check endpoint.
 - Global error handling and final 404 handler setup.
 
-Security note: safe source inspection found environment-specific origins and trusted-IP defaults in shared app code. Values are intentionally not reproduced here. This should be reviewed later as a configuration-boundary issue.
+Security note: the November 18, 2026 local correction removed the source-embedded
+trusted-IP fallback and its numeric examples. Explicit environment configuration
+is now the sole exemption source. Earlier Git history still contains the old
+defaults; no history sanitization or production deployment is implied.
+Environment-specific origins remain a separate configuration-boundary concern.
 
 ### `blog-core/src/index.js`
 
@@ -150,7 +176,7 @@ Do not inspect SQLite database files. Schema files are source; database files ar
 
 ### `blog-core/src/admin/`
 
-- `editorial-router.js` provides the shared admin-only Public Person and post editor routes for both sites. It validates multipart CSRF after upload parsing, cleans temporary and failed generated media, and delegates database changes to the editorial service. Uploaded media is prepared outside the transaction; replaced media is removed after a successful database save only when no post still references it. FFG retains generated media while duplicate-title confirmation is pending; cancellation or replacement of that pending submission cleans it, but session expiry or abandonment can leave up to one pending submission's generated variants orphaned per session. That media debt needs a separately designed cleanup procedure.
+- `editorial-router.js` provides the shared admin-only Public Person and post editor routes for both sites. It validates multipart CSRF after upload parsing and delegates transactional database changes to the editorial service. Committed and potentially published generated media is retained after association removal, replacement, overwrite, cancellation and post deletion. The shared upload layer cleans only proven request-owned private raw inputs; FFG hero selection changes also retain generation media. `Documents/BODY_GALLERY_DESIGN.md` owns the retention, temporary-ownership and storage-growth policy. Physical-media garbage collection requires a separate design and authorization.
 
 ### `blog-core/src/utils/`
 
@@ -390,6 +416,38 @@ Runtime/user-generated uploads:
 - `thetecnoagrarian/src/public/uploads/`
 - production `/app/data/uploads`
 
+The shared `media-serving.js` registers both public-tree and upload static
+handlers behind one path/authorization boundary. `private-media.js` allocates
+unpublished post/hero candidates beneath `uploads/.media`; private raw inputs
+remain under `uploads/temp/.operation-*`. Both namespaces and hero `.source`
+are denied before static serving, including encoded/alias attempts. Managed
+`m1-` post filenames and `hero/m1-` generation URLs require explicit post/hero
+provider approval and never use legacy static fallback. Managed posts use
+`media-publication.js` and the existing SQLite connection: a server-issued
+operation receipt and per-candidate grants in `media_publications` commit inside
+the shared editorial transaction after private file verification/sync. UUID
+primary keys support one authorization statement per image; publication survives
+association removal/post deletion. Migration `0003` adds no historical backfill
+and further restricts older-image rollback. Existing unversioned uploads retain
+public-tree-first static behavior without a historical publication inference.
+The FFG hero writer/index is not integrated yet and remains a release blocker.
+`BODY_GALLERY_DESIGN.md` owns receipts, recovery, capacity and cutover limitations.
+
+FFG duplicate-title confirmation is keyed by the operation UUID in SQLite,
+not a shared pending session slot. Migration `0003` and the fresh schema add
+nullable `pending_input`: a versioned, lossless editorial snapshot bounded to
+8 MiB of serialized UTF-8 JSON, separate from 128 KiB publication metadata.
+Conditional immediate binding is immutable and owner/target/revision-bound;
+SQL guards protect UUID/hidden-rowid collisions and prohibit rowid reassignment;
+stored rowids are positive so automatic allocation remains safe.
+oversize returns explicit 413 without truncation or acceptance. Operation-specific
+confirmation GET/POST retain administrator/CSRF checks and ignore legacy pending
+session data, so reversed whole-session saves cannot erase another pending input.
+Public media queries exclude the snapshot. Terminal snapshots remain retained
+(1,000 maximum-size snapshots approach 7.8 GiB before overhead); no cleanup or
+draft system is added. Final article/grants still share one editorial transaction.
+Hero publication and production migration/paired restore gates remain separate.
+
 FFG seasonal hero state belongs under `<uploadsPath>/hero`. Its minimal
 `.current.json` contains only a validated server-generated generation UUID.
 The selected generation contains `.source/current-source.<decoded-extension>`,
@@ -569,14 +627,21 @@ Visible security concepts from safe source/docs:
 - Image processing with Sharp.
 - `sanitize-html` in site post controllers.
 - Rate limiting through `express-rate-limit`.
-- Trusted-IP bypass logic driven by environment/defaults.
+- Elevated rate limits driven only by explicit environment configuration.
 - Bot-pattern and sensitive-path request blocking.
 - Production cookies marked secure when `NODE_ENV=production`.
 - Placeholder-based env handling in documentation.
 
 Do not document, print, or inspect actual secret values. Environment names and placeholder examples are acceptable.
 
-Architecture concern for later review: safe source inspection found deployment-specific origins and trusted-IP defaults in source. Replace or document these through placeholder-based configuration in a later security/environment pass; do not reproduce the values here.
+Trusted-rate exemptions intentionally retain legacy literal, opaque and
+regex-bearing wildcard matching. Whole-list compilation is not semantic IP
+validation and does not establish regex complexity safety. Configuration is
+captured during app initialization; changing it requires a new app instance.
+The forwarded-header trust-chain weakness remains unresolved and must be
+hardened before production release. Future strict validation requires a separate
+compatibility assessment. This local source correction is not deployment
+authorization. Deployment-specific origins remain a separate review item.
 
 ## 12. Architecture Boundaries for Future Codex Work
 
@@ -635,5 +700,6 @@ Requires explicit user approval:
 - Should The Tecnoagrarian `src/database/seed.js` be documented as source setup, historical utility, or runtime-adjacent script?
 - Should dependency/security remediation wait until documentation, architecture mapping, and environment/secrets mapping are complete?
 - Should generated artifacts and runtime folders be cleaned or ignored later? Do not perform cleanup without explicit approval.
-- Safe source inspection found deployment-specific origins and trusted-IP defaults in source. Should those move to environment-driven configuration?
+- Deployment-specific origins remain for configuration review; trusted-rate
+  exemptions are environment-only, with legacy regex and proxy-trust risks open.
 - CI currently tolerates some test/audit failures. Is that intended for migration, or should hard failure be introduced later?

@@ -1,7 +1,5 @@
 import express from 'express';
-import path from 'path';
-import { promises as fs } from 'fs';
-import { isAuthenticated, isAdmin, Post, Category, User, createEditorialAdminRouter } from '@ffg/blog-core';
+import { isAuthenticated, isAdmin, Post, Category, User, createEditorialAdminRouter, logSafeError, asyncHandler } from '@ffg/blog-core';
 import Analytics from '../models/analytics.js';
 
 const router = express.Router();
@@ -23,7 +21,7 @@ router.get('/', isAdmin, (req, res) => {
 });
 
 // Admin dashboard
-router.get('/dashboard', isAdmin, async (req, res) => {
+router.get('/dashboard', isAdmin, asyncHandler(async (req, res) => {
     try {
         console.log('Loading admin dashboard...');
         // Get all posts with their categories
@@ -35,7 +33,7 @@ router.get('/dashboard', isAdmin, async (req, res) => {
                 post.categories = Post.getCategories(post.id);
                 console.log('Dashboard: Post', post.id, 'categories:', post.categories);
             } catch (categoryError) {
-                console.error('Error loading categories for post', post.id, ':', categoryError);
+                logSafeError(categoryError, { request: req, event: 'admin' });
                 post.categories = [];
             }
         }
@@ -61,48 +59,32 @@ router.get('/dashboard', isAdmin, async (req, res) => {
         });
         console.log('Dashboard rendered successfully');
     } catch (error) {
-        console.error('Dashboard error:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to load dashboard: ' + error.message);
         res.redirect('/');
     }
-});
+}));
 
-// Update the delete post route to delete all image sizes for each image
-router.post('/dashboard/posts/:id/delete', isAdmin, async (req, res) => {
+// Remove the post association; committed media remains available to other references.
+router.post('/dashboard/posts/:id/delete', isAdmin, asyncHandler(async (req, res) => {
     try {
         const post = Post.findById(req.params.id);
         if (!post) {
             req.flash('error', 'Post not found');
             return res.redirect('/admin/dashboard');
         }
-        // Delete associated images (all sizes)
-        if (post.images && Array.isArray(post.images)) {
-            for (const imageObj of post.images) {
-                for (const size of ['thumbnail', 'medium', 'large']) {
-                    if (imageObj && imageObj[size]) {
-                        try {
-                            await fs.unlink(path.join(process.cwd(), 'src/public', imageObj[size]));
-                        } catch (err) {
-                            if (err.code !== 'ENOENT') {
-                                console.error('Error deleting image file:', err);
-                            }
-                        }
-                    }
-                }
-            }
-        }
         Post.delete(post.id);
         req.flash('success', 'Post deleted successfully');
         res.redirect('/admin/dashboard');
     } catch (error) {
-        console.error('Error deleting post:', error);
+        logSafeError(error, { request: req });
         req.flash('error', 'Failed to delete post');
         res.redirect('/admin/dashboard');
     }
-});
+}));
 
 // Categories list
-router.get('/categories', isAdmin, async (req, res) => {
+router.get('/categories', isAdmin, asyncHandler(async (req, res) => {
     try {
         const categories = Category.findAll();
         res.render('admin/categories', {
@@ -114,11 +96,11 @@ router.get('/categories', isAdmin, async (req, res) => {
             csrfToken: req.csrfToken()
         });
     } catch (error) {
-        console.error('Error fetching categories:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to fetch categories');
         res.redirect('/admin');
     }
-});
+}));
 
 // Create category
 router.post('/categories', isAdmin, (req, res) => {
@@ -133,7 +115,7 @@ router.post('/categories', isAdmin, (req, res) => {
         req.flash('success', 'Category created successfully');
         res.redirect('/admin/dashboard');
     } catch (error) {
-        console.error('Error creating category:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to create category');
         res.redirect('/admin/dashboard');
     }
@@ -152,7 +134,7 @@ router.post('/categories/update', isAdmin, (req, res) => {
         req.flash('success', 'Category updated successfully');
         res.redirect('/admin/dashboard');
     } catch (error) {
-        console.error('Error updating category:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to update category');
         res.redirect('/admin/dashboard');
     }
@@ -166,7 +148,7 @@ router.post('/categories/:id/delete', isAdmin, (req, res) => {
         req.flash('success', 'Category deleted successfully');
         res.redirect('/admin/dashboard');
     } catch (error) {
-        console.error('Error deleting category:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to delete category');
         res.redirect('/admin/dashboard');
     }
@@ -176,7 +158,7 @@ router.post('/categories/:id/delete', isAdmin, (req, res) => {
 router.use(createEditorialAdminRouter({ allowOverwrite: false }));
 
 // Analytics dashboard
-router.get('/analytics', isAdmin, async (req, res) => {
+router.get('/analytics', isAdmin, asyncHandler(async (req, res) => {
     try {
         // Get row limits from query parameters with defaults
         const pageViewLimit = parseInt(req.query.pageViewLimit) || 25;
@@ -201,21 +183,22 @@ router.get('/analytics', isAdmin, async (req, res) => {
             csrfToken: req.csrfToken()
         });
     } catch (error) {
-        console.error('Error loading analytics:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to load analytics');
         res.redirect('/admin/dashboard');
     }
-});
+}));
 
 // Analytics health check API
-router.get('/analytics/health', isAdmin, async (req, res) => {
+router.get('/analytics/health', isAdmin, asyncHandler(async (req, res) => {
     try {
         const health = Analytics.checkDatabaseHealth();
         res.json(health);
     } catch (error) {
+        logSafeError(error, { request: req, event: 'admin' });
         res.status(500).json({ error: 'Health check failed', details: error.message });
     }
-});
+}));
 
 // User management
 
@@ -255,6 +238,7 @@ router.post('/users', isAdmin, (req, res) => {
         req.flash('success', 'User created successfully');
         res.redirect('/admin/users');
     } catch (error) {
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to create user: ' + error.message);
         res.redirect('/admin/users/new');
     }
@@ -271,6 +255,7 @@ router.post('/users/:id/delete', isAdmin, (req, res) => {
         req.flash('success', 'User deleted successfully');
         res.redirect('/admin/users');
     } catch (error) {
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to delete user: ' + error.message);
         res.redirect('/admin/users');
     }

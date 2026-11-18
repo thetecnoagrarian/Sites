@@ -1,3 +1,4 @@
+import { logSafeError, asyncHandler } from '@ffg/blog-core';
 import express from 'express';
 import { isNotAuthenticated } from '@ffg/blog-core';
 
@@ -13,7 +14,7 @@ router.get('/login', isNotAuthenticated, (req, res) => {
 });
 
 // Login handler
-router.post('/login', async (req, res) => {
+router.post('/login', asyncHandler(async (req, res) => {
     const { username, password } = req.body;
     
     try {
@@ -34,17 +35,17 @@ router.post('/login', async (req, res) => {
         req.session.userId = user.id;
         res.redirect('/admin');
     } catch (error) {
-        console.error('Login error:', error);
+        logSafeError(error, { request: req, event: 'authentication' });
         req.flash('error', 'An error occurred during login');
         res.redirect('/login');
     }
-});
+}));
 
 // Logout handler
 router.post('/logout', (req, res) => {
     req.session.destroy((err) => {
         if (err) {
-            console.error('Logout error:', err);
+            logSafeError(err, { request: req, event: 'authentication' });
         }
         res.redirect('/');
     });
@@ -54,6 +55,7 @@ router.post('/logout', (req, res) => {
 router.get('/logout', (req, res) => {
   req.session.destroy(err => {
     if (err) {
+      logSafeError(err, { request: req, event: 'authentication' });
       return res.redirect('/'); // Redirect to home on error
     }
     res.clearCookie('connect.sid'); // Clear the session cookie

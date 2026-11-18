@@ -1,8 +1,6 @@
 import express from 'express';
-import path from 'path';
-import { promises as fs } from 'fs';
 import multer from 'multer';
-import { isAuthenticated, isAdmin, createEditorialAdminRouter } from '@ffg/blog-core';
+import { isAuthenticated, isAdmin, createEditorialAdminRouter, cleanupOwnedUploads, logSafeError, asyncHandler } from '@ffg/blog-core';
 import Analytics from '../models/analytics.js';
 import {
     publishHeroImage,
@@ -12,14 +10,6 @@ import {
 } from '../utils/heroImageStore.js';
 
 const router = express.Router();
-
-const removeHeroTemp = async filePath => {
-    try {
-        await fs.unlink(filePath);
-    } catch (error) {
-        if (error.code !== 'ENOENT') console.error('Hero temp cleanup failed:', error);
-    }
-};
 
 // Top-level logger for all admin requests
 router.use((req, res, next) => {
@@ -38,7 +28,7 @@ router.get('/', isAdmin, (req, res) => {
 });
 
 // Admin dashboard
-router.get('/dashboard', isAdmin, async (req, res) => {
+router.get('/dashboard', isAdmin, asyncHandler(async (req, res) => {
     try {
         const { Post } = await import('@ffg/blog-core');
         console.log('Loading admin dashboard...');
@@ -51,7 +41,7 @@ router.get('/dashboard', isAdmin, async (req, res) => {
                 post.categories = Post.getCategories(post.id);
                 console.log('Dashboard: Post', post.id, 'categories:', post.categories);
             } catch (categoryError) {
-                console.error('Error loading categories for post', post.id, ':', categoryError);
+                logSafeError(categoryError, { request: req, event: 'admin' });
                 post.categories = [];
             }
         }
@@ -73,14 +63,14 @@ router.get('/dashboard', isAdmin, async (req, res) => {
         });
         console.log('Dashboard rendered successfully');
     } catch (error) {
-        console.error('Dashboard error:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to load dashboard: ' + error.message);
         res.redirect('/');
     }
-});
+}));
 
-// Update the delete post route to delete all image sizes for each image
-router.post('/dashboard/posts/:id/delete', isAdmin, async (req, res) => {
+// Remove the post association; committed media remains available to other references.
+router.post('/dashboard/posts/:id/delete', isAdmin, asyncHandler(async (req, res) => {
     try {
         const { Post } = await import('@ffg/blog-core');
         const post = Post.findById(req.params.id);
@@ -88,34 +78,18 @@ router.post('/dashboard/posts/:id/delete', isAdmin, async (req, res) => {
             req.flash('error', 'Post not found');
             return res.redirect('/admin/dashboard');
         }
-        // Delete associated images (all sizes)
-        if (post.images && Array.isArray(post.images)) {
-            for (const imageObj of post.images) {
-                for (const size of ['thumbnail', 'medium', 'large']) {
-                    if (imageObj && imageObj[size]) {
-                        try {
-                            await fs.unlink(path.join(process.cwd(), 'src/public', imageObj[size]));
-                        } catch (err) {
-                            if (err.code !== 'ENOENT') {
-                                console.error('Error deleting image file:', err);
-                            }
-                        }
-                    }
-                }
-            }
-        }
         Post.delete(post.id);
         req.flash('success', 'Post deleted successfully');
         res.redirect('/admin/dashboard');
     } catch (error) {
-        console.error('Error deleting post:', error);
+        logSafeError(error, { request: req });
         req.flash('error', 'Failed to delete post');
         res.redirect('/admin/dashboard');
     }
-});
+}));
 
 // Categories list
-router.get('/categories', isAdmin, async (req, res) => {
+router.get('/categories', isAdmin, asyncHandler(async (req, res) => {
     try {
         const { Category } = await import('@ffg/blog-core');
         const categories = Category.findAll();
@@ -127,14 +101,14 @@ router.get('/categories', isAdmin, async (req, res) => {
             user: req.user
         });
     } catch (error) {
-        console.error('Error fetching categories:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to fetch categories');
         res.redirect('/admin');
     }
-});
+}));
 
 // Create category
-router.post('/categories', isAdmin, async (req, res) => {
+router.post('/categories', isAdmin, asyncHandler(async (req, res) => {
     try {
         const { Category } = await import('@ffg/blog-core');
         const { name } = req.body;
@@ -147,14 +121,14 @@ router.post('/categories', isAdmin, async (req, res) => {
         req.flash('success', 'Category created successfully');
         res.redirect('/admin/dashboard');
     } catch (error) {
-        console.error('Error creating category:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to create category');
         res.redirect('/admin/dashboard');
     }
-});
+}));
 
 // Update category
-router.post('/categories/update', isAdmin, async (req, res) => {
+router.post('/categories/update', isAdmin, asyncHandler(async (req, res) => {
     try {
         const { Category } = await import('@ffg/blog-core');
         const { categoryId, name } = req.body;
@@ -167,14 +141,14 @@ router.post('/categories/update', isAdmin, async (req, res) => {
         req.flash('success', 'Category updated successfully');
         res.redirect('/admin/categories');
     } catch (error) {
-        console.error('Error updating category:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to update category');
         res.redirect('/admin/categories');
     }
-});
+}));
 
 // Delete category
-router.post('/categories/:id/delete', isAdmin, async (req, res) => {
+router.post('/categories/:id/delete', isAdmin, asyncHandler(async (req, res) => {
     try {
         const { Category } = await import('@ffg/blog-core');
         const categoryId = req.params.id;
@@ -182,17 +156,17 @@ router.post('/categories/:id/delete', isAdmin, async (req, res) => {
         req.flash('success', 'Category deleted successfully');
         res.redirect('/admin/dashboard');
     } catch (error) {
-        console.error('Error deleting category:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to delete category');
         res.redirect('/admin/dashboard');
     }
-});
+}));
 
 // Shared admin-only Public Person and editorial post workflow.
 router.use(createEditorialAdminRouter({ allowOverwrite: true }));
 
 // Analytics dashboard
-router.get('/analytics', isAdmin, async (req, res) => {
+router.get('/analytics', isAdmin, asyncHandler(async (req, res) => {
     try {
         // Get row limits from query parameters with defaults
         const pageViewLimit = parseInt(req.query.pageViewLimit) || 25;
@@ -216,26 +190,27 @@ router.get('/analytics', isAdmin, async (req, res) => {
             csrfToken: req.csrfToken()
         });
     } catch (error) {
-        console.error('Error loading analytics:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to load analytics');
         res.redirect('/admin/dashboard');
     }
-});
+}));
 
 // Analytics health check API
-router.get('/analytics/health', isAdmin, async (req, res) => {
+router.get('/analytics/health', isAdmin, asyncHandler(async (req, res) => {
     try {
         const health = Analytics.checkDatabaseHealth();
         res.json(health);
     } catch (error) {
+        logSafeError(error, { request: req, event: 'admin' });
         res.status(500).json({ error: 'Health check failed', details: error.message });
     }
-});
+}));
 
 // User management
 
 // List users
-router.get('/users', isAdmin, async (req, res) => {
+router.get('/users', isAdmin, asyncHandler(async (req, res) => {
     const { User } = await import('@ffg/blog-core');
     const users = User.findAll();
     res.render('admin/users', {
@@ -245,7 +220,7 @@ router.get('/users', isAdmin, async (req, res) => {
         success: req.flash('success'),
         error: req.flash('error')
     });
-});
+}));
 
 // Show new user form
 router.get('/users/new', isAdmin, (req, res) => {
@@ -259,7 +234,7 @@ router.get('/users/new', isAdmin, (req, res) => {
 });
 
 // Create user
-router.post('/users', isAdmin, async (req, res) => {
+router.post('/users', isAdmin, asyncHandler(async (req, res) => {
     const { User } = await import('@ffg/blog-core');
     const { username, password, role } = req.body;
     if (!username || !password || !role) {
@@ -271,13 +246,14 @@ router.post('/users', isAdmin, async (req, res) => {
         req.flash('success', 'User created successfully');
         res.redirect('/admin/users');
     } catch (error) {
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to create user: ' + error.message);
         res.redirect('/admin/users/new');
     }
-});
+}));
 
 // Delete user (cannot delete self)
-router.post('/users/:id/delete', isAdmin, async (req, res) => {
+router.post('/users/:id/delete', isAdmin, asyncHandler(async (req, res) => {
     if (req.session.userId == req.params.id) {
         req.flash('error', 'You cannot delete your own account.');
         return res.redirect('/admin/users');
@@ -288,15 +264,16 @@ router.post('/users/:id/delete', isAdmin, async (req, res) => {
         req.flash('success', 'User deleted successfully');
         res.redirect('/admin/users');
     } catch (error) {
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to delete user: ' + error.message);
         res.redirect('/admin/users');
     }
-});
+}));
 
 // Hero Image Management Routes
 
 // GET route for hero image management page
-router.get('/hero-image', isAdmin, async (req, res) => {
+router.get('/hero-image', isAdmin, asyncHandler(async (req, res) => {
     try {
         const heroImage = await resolveHeroImage(req.app.locals.uploadsPath);
         res.render('admin/hero-image', {
@@ -309,36 +286,37 @@ router.get('/hero-image', isAdmin, async (req, res) => {
             csrfToken: req.csrfToken()
         });
     } catch (error) {
-        console.error('Error loading hero image page:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to load hero image page');
         res.redirect('/admin/dashboard');
     }
-});
+}));
 
 // POST route for hero image upload
-router.post('/hero-image/upload', isAdmin, (req, res) => {
-    req.app.locals.upload.single('heroImage')(req, res, async function (err) {
+router.post('/hero-image/upload', isAdmin, (req, res, next) => {
+    req.app.locals.upload.single('heroImage')(req, res, err => asyncHandler(async () => {
         if (err instanceof multer.MulterError) {
-            if (req.file?.path) await removeHeroTemp(req.file.path);
-            console.error('Hero upload rejected by Multer:', err);
+            await cleanupOwnedUploads(req);
+            logSafeError(err, { request: req, event: 'admin' });
             req.flash('error', err.code === 'LIMIT_FILE_SIZE'
                 ? 'File upload error: the image exceeds the 50MB limit.'
                 : 'File upload error. Upload exactly one JPEG, PNG, or WebP image.');
             return res.redirect('/admin/hero-image');
         } else if (err) {
-            if (req.file?.path) await removeHeroTemp(req.file.path);
-            console.error('Hero upload failed:', err);
+            await cleanupOwnedUploads(req);
+            logSafeError(err, { request: req, event: 'admin' });
             req.flash('error', 'File upload failed. Please try again.');
             return res.redirect('/admin/hero-image');
         }
 
         if (!req.file) {
+            await cleanupOwnedUploads(req);
             req.flash('error', 'No file uploaded. Please select an image file.');
             return res.redirect('/admin/hero-image');
         }
 
         if (!req.verifyCsrfToken(req.body?._csrf)) {
-            await removeHeroTemp(req.file.path);
+            await cleanupOwnedUploads(req);
             return res.status(403).json({ error: 'Invalid CSRF token' });
         }
 
@@ -357,24 +335,24 @@ router.post('/hero-image/upload', isAdmin, (req, res) => {
             );
             res.redirect('/admin/hero-image');
         } catch (error) {
-            console.error('Error processing hero image:', error);
+            logSafeError(error, { request: req, event: 'admin' });
             req.flash('error', 'Failed to process hero image. Confirm it is a JPEG, PNG, or WebP within the documented limits.');
             res.redirect('/admin/hero-image');
         } finally {
-            await removeHeroTemp(req.file.path);
+            await cleanupOwnedUploads(req);
         }
-    });
+    })(req, res, next));
 });
 
-router.post('/hero-image/reset', isAdmin, async (req, res) => {
+router.post('/hero-image/reset', isAdmin, asyncHandler(async (req, res) => {
     try {
         await withHeroOperationLock(() => resetHeroImage(req.app.locals.uploadsPath));
         req.flash('success', 'Hero image reset to the repository default.');
     } catch (error) {
-        console.error('Error resetting hero image:', error);
+        logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to reset the hero image. Please try again.');
     }
     res.redirect('/admin/hero-image');
-});
+}));
 
 export default router; 

@@ -1,3 +1,4 @@
+import { logSafeError } from '@ffg/blog-core';
 import Analytics from '../models/analytics.js';
 
 // Track if analytics tables have been initialized
@@ -13,7 +14,7 @@ try {
 } catch (error) {
             // Only log error if it's not a "database not initialized" error
             if (!error.message.includes('Database not initialized')) {
-    console.error('❌ Error initializing analytics tables:', error);
+    logSafeError(error, { request: req, event: 'analytics' });
             }
             // Don't block requests if analytics initialization fails
         }
@@ -44,7 +45,7 @@ try {
                 Analytics.recordUniqueVisitor(req.session.id);
             }
         } catch (error) {
-            console.error('Analytics error:', error);
+            logSafeError(error, { request: req, event: 'analytics' });
             // Don't let analytics errors break the site
         }
     });

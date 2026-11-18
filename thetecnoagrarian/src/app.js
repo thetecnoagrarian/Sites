@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createBlogApp } from '@ffg/blog-core';
+import { createBlogApp, logSafeError } from '@ffg/blog-core';
 import analyticsMiddleware from './middleware/analytics.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -53,4 +53,4 @@ async function startApp() {
     });
 }
 
-startApp().catch(console.error);
+startApp().catch(error => logSafeError(error, { event: 'startup' }));

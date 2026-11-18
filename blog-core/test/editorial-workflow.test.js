@@ -8,7 +8,7 @@ import { initializeDatabase } from '../src/database/init.js';
 import { createMigrationRunner } from '../src/database/migrations.js';
 import { setDatabase, PublicPerson, PostPublication } from '../src/models/index.js';
 import { createEditorialService } from '../src/models/editorial-service.js';
-import { parseOrderedAuthors, removeUnreferencedMedia } from '../src/admin/editorial-router.js';
+import { parseOrderedAuthors } from '../src/admin/editorial-router.js';
 import { serializeBodyGallery } from '../src/models/body-gallery.js';
 import Post from '../src/models/post.js';
 
@@ -388,7 +388,7 @@ test('ordinary edit rejects a real stale snapshot inside its write transaction',
     assert.equal(db.prepare('SELECT body FROM posts WHERE id = ?').get(id).body, 'Current body');
 });
 
-test('replaced media cleanup retains files referenced by any post', async (t) => {
+test('association removal retains committed media even after the last structured reference', (t) => {
     const { db, directory, service, input } = setup(t);
     const mediaUrl = '/uploads/shared-thumbnail.webp';
     const image = { thumbnail: mediaUrl };
@@ -400,12 +400,10 @@ test('replaced media cleanup retains files referenced by any post', async (t) =>
     writeFileSync(file, 'synthetic media');
 
     db.prepare('UPDATE posts SET images = ? WHERE id = ?').run('[]', first);
-    await removeUnreferencedMedia([image], directory);
     assert.equal(existsSync(file), true, 'another post still references the media');
 
     db.prepare('UPDATE posts SET images = ? WHERE id = ?').run('[]', second);
-    await removeUnreferencedMedia([image], directory);
-    assert.equal(existsSync(file), false, 'unreferenced replaced media is removed');
+    assert.equal(existsSync(file), true, 'committed media is retained without requiring a reference count');
 });
 
 for (const count of [1, 65, 100]) {

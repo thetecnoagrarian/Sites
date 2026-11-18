@@ -12,14 +12,41 @@ import rateLimit from 'express-rate-limit';
 import compression from 'compression';
 import multer from 'multer';
 import { mkdirSync } from 'fs';
+import { METHODS } from 'node:http';
+import { compileTrustedRateLimitMatcher } from './utils/trusted-rate-limit.js';
 
 import { setDatabase } from './models/db.js';
 import { initializeDatabase } from './database/init.js';
 import { attachUser } from './middleware/auth.js';
 import { createUploadMiddleware } from './middleware/upload.js';
+import { mountMediaServing } from './middleware/media-serving.js';
+import { createPostMediaProvider } from './models/media-publication.js';
 import Post from './models/post.js';
 import Category from './models/category.js';
 import logger from './utils/logger.js';
+import { logSafeError, readDiagnosticProperty } from './utils/error-diagnostics.js';
+
+export function createGlobalErrorHandler(log = logger) {
+    return (err, req, res, next) => {
+        logSafeError(err, { request: req, event: 'global' }, log);
+
+        // Like Express's final handler, close an already-started failed response.
+        // Do not forward the private exception to its raw-stack logger.
+        if (res.headersSent) return res.destroy();
+
+        // Preserve the existing production/non-production HTTP response behavior.
+        const locals = process.env.NODE_ENV === 'production' ? {} : {
+            error: readDiagnosticProperty(err, 'message'), stack: readDiagnosticProperty(err, 'stack') };
+        res.status(500).render('500', locals, (renderError, html) => {
+            if (renderError) {
+                logSafeError(renderError, { request: req, event: 'global' }, log);
+                if (res.headersSent) return res.destroy();
+                return res.status(500).type('text/plain').send('Internal Server Error');
+            }
+            res.send(html);
+        });
+    };
+}
 
 const normalizeBaseUrl = (baseUrl) => {
     if (!baseUrl || typeof baseUrl !== 'string') return '';
@@ -60,6 +87,7 @@ const buildSitemapXml = (urls) => {
  * @param {string} config.baseUrl - Public canonical base URL for the site (optional)
  * @param {Object} config.handlebarsHelpers - Additional Handlebars helpers (optional)
  * @param {RegExp[]} config.privateUploadPathPatterns - Upload URL paths to return as 404 (optional)
+ * @param {Object} config.mediaPublicationProviders - Optional additional providers; managed posts always use SQLite
  * @returns {express.Application} - Configured Express app
  */
 export function createBlogApp(config) {
@@ -72,7 +100,8 @@ export function createBlogApp(config) {
         publicPath,
         baseUrl,
         handlebarsHelpers = {},
-        privateUploadPathPatterns = []
+        privateUploadPathPatterns = [],
+        mediaPublicationProviders = {}
     } = config;
     const canonicalBaseUrl = normalizeBaseUrl(baseUrl);
 
@@ -111,7 +140,16 @@ export function createBlogApp(config) {
 
     // Initialize SQLite session store
     const SQLiteStore = SQLiteStoreFactory(session);
-    const sessionStore = new SQLiteStore({
+    // The installed store dumps timer errors internally. Keep its exact expiry
+    // query/schedule while routing that catch through project-owned diagnostics.
+    class BoundedSQLiteStore extends SQLiteStore {
+        clearExpiredSessions() {
+            try {
+                this.client.prepare("DELETE FROM sessions WHERE datetime('now') > datetime(expire)").run();
+            } catch (error) { logSafeError(error, { event: 'session' }); }
+        }
+    }
+    const sessionStore = new BoundedSQLiteStore({
         client: db,
         expired: {
             clear: true,
@@ -196,7 +234,7 @@ export function createBlogApp(config) {
             req.session.csrfSecret = secret;
             // Ensure session is saved when we set the CSRF secret
             req.session.save((err) => {
-                if (err) console.error('Session save error:', err);
+                if (err) logSafeError(err, { request: req, event: 'session' });
             });
         }
         
@@ -283,30 +321,8 @@ export function createBlogApp(config) {
         next();
     });
     
-    // Site-specific retained source material can be explicitly excluded from
-    // both the public tree and the separately mounted uploads tree.
-    if (privateUploadPathPatterns.length > 0) {
-        app.use('/uploads', (req, res, next) => {
-            let requestPath;
-            try { requestPath = decodeURIComponent(req.path); }
-            catch { return res.sendStatus(404); }
-            if (privateUploadPathPatterns.some(pattern => pattern.test(requestPath))) {
-                return res.sendStatus(404);
-            }
-            next();
-        });
-    }
-
-    app.use(express.static(staticPath, {
-        maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0, // Reduced from 30d during active development
-        immutable: false // Disabled during active development to allow cache-busting
-    }));
-
-    // Serve uploads directory separately (keep longer cache for images)
-    app.use('/uploads', express.static(uploadsPath, {
-        maxAge: process.env.NODE_ENV === 'production' ? '7d' : 0, // Images can cache longer
-        immutable: false
-    }));
+    mountMediaServing(app, { publicPath: staticPath, uploadsPath,
+        privateUploadPathPatterns, publicationProviders: { ...mediaPublicationProviders, post: createPostMediaProvider(db) } });
 
     // Register Handlebars helpers
     const defaultHelpers = {
@@ -416,7 +432,7 @@ export function createBlogApp(config) {
             res.type('application/xml; charset=utf-8');
             res.send(buildSitemapXml(urls));
         } catch (error) {
-            logger.error({ err: error }, 'Sitemap generation failed');
+            logSafeError(error, { request: req, event: 'sitemap' });
             res.status(500).type('application/xml').send(buildSitemapXml([]));
         }
     });
@@ -463,43 +479,14 @@ export function createBlogApp(config) {
     });
 
     // Rate limiting for production security
+    const matchesTrustedRateLimitClient = compileTrustedRateLimitMatcher(process.env.TRUSTED_IPS);
     app.use(rateLimit({
         windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes default
         max: (req) => {
-            // Trusted IPs that bypass rate limiting
-            // Read from environment variable or use defaults
-            const trustedIPsEnv = process.env.TRUSTED_IPS || '129.222.46.17,129.222.46.40';
-            const trustedIPs = trustedIPsEnv.split(',').map(ip => ip.trim()).filter(ip => ip.length > 0);
-            
-            // Get client IP (handle X-Forwarded-For which may contain multiple IPs)
+            // Retain the current forwarded-header identity policy in this slice.
             let clientIP = req.headers['x-forwarded-for'] || req.ip;
-            // X-Forwarded-For can be a comma-separated list, take the first one
-            if (clientIP.includes(',')) {
-                clientIP = clientIP.split(',')[0].trim();
-            }
-            
-            // Check if client IP matches any trusted IP or is in the same subnet
-            const isTrusted = trustedIPs.some(trustedIP => {
-                // Exact match
-                if (clientIP === trustedIP) return true;
-                // Subnet match (e.g., 129.222.46.* or 129.222.*.*)
-                if (trustedIP.includes('*')) {
-                    // Escape dots and convert * to .*
-                    const pattern = trustedIP
-                        .replace(/\./g, '\\.')  // Escape dots first
-                        .replace(/\*/g, '.*');   // Then convert * to .*
-                    const regex = new RegExp(`^${pattern}$`);
-                    return regex.test(clientIP);
-                }
-                return false;
-            });
-            
-            // If IP is trusted, allow unlimited requests
-            if (isTrusted) {
-                return 10000; // Effectively unlimited
-            }
-            
-            // Otherwise use environment-based rate limits
+            if (clientIP.includes(',')) clientIP = clientIP.split(',')[0].trim();
+            if (matchesTrustedRateLimitClient(clientIP)) return 10000;
             return parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || (process.env.NODE_ENV === 'production' ? 25 : 1000);
         },
         standardHeaders: true,
@@ -526,7 +513,6 @@ export function createBlogApp(config) {
     app.get('/debug-ip', (req, res) => {
         const xForwardedFor = req.headers['x-forwarded-for'];
         const reqIP = req.ip;
-        const trustedIPsEnv = process.env.TRUSTED_IPS || '';
         let clientIP = xForwardedFor || reqIP;
         if (clientIP && clientIP.includes(',')) {
             clientIP = clientIP.split(',')[0].trim();
@@ -535,43 +521,34 @@ export function createBlogApp(config) {
             'x-forwarded-for': xForwardedFor,
             'req.ip': reqIP,
             'detected-client-ip': clientIP,
-            'trusted-ips': trustedIPsEnv,
-            'is-trusted': trustedIPsEnv.split(',').map(ip => ip.trim()).some(ip => {
-                if (ip.includes('*')) {
-                    const pattern = ip.replace(/\*/g, '.*');
-                    return new RegExp(`^${pattern}$`).test(clientIP);
-                }
-                return clientIP === ip;
-            })
+            'is-trusted': matchesTrustedRateLimitClient(clientIP)
         });
     });
 
-    // Global error handler
-    app.use((err, req, res, next) => {
-        logger.error({ 
-            err,
-            method: req.method,
-            url: req.url,
-            body: req.body,
-            query: req.query,
-            ip: req.ip
-        }, 'Global Error Handler');
-        
-        // Don't leak error details in production
-        if (process.env.NODE_ENV === 'production') {
-            res.status(500).render('500');
-        } else {
-            res.status(500).render('500', { error: err.message, stack: err.stack });
-        }
-    });
-
-    // Function to set up final handlers after routes are registered
+    // Site entrypoints must finish mounting middleware/routes before this boundary.
+    let finalized = false;
     const setupFinalHandlers = () => {
-        // 404 handler - must be last after all routes
+        if (finalized) throw new Error('Application routes are already finalized');
+        // Preserve not-found behavior; rendering failures reach the final handler too.
         app.use((req, res) => {
             logger.warn({ url: req.url }, '404 Not Found');
             res.status(404).render('404');
         });
+        app.use(createGlobalErrorHandler());
+        finalized = true;
+        // Block use(), route() and HTTP-verb registration; settings reads work.
+        // Adding routes later requires deliberately revisiting this boundary.
+        const rejectLateRegistration = () => { throw new Error('Register application routes before setupFinalHandlers'); };
+        app.use = rejectLateRegistration;
+        app.route = rejectLateRegistration;
+        app.all = rejectLateRegistration;
+        for (const method of METHODS.map(value => value.toLowerCase())) {
+            const register = app[method];
+            app[method] = function (...args) {
+                if (method === 'get' && args.length === 1) return register.apply(this, args);
+                return rejectLateRegistration();
+            };
+        }
     };
 
     return { app, setupFinalHandlers };

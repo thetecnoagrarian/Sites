@@ -1,3 +1,4 @@
+import { logSafeError, asyncHandler } from '@ffg/blog-core';
 import express from 'express';
 import {
     buildBlogPostingJsonLd,
@@ -36,19 +37,19 @@ router.get('/health', (req, res) => {
 });
 
 // Middleware to load categories for sidebar
-router.use(async (req, res, next) => {
+router.use(asyncHandler(async (req, res, next) => {
     try {
         const { Category } = await import('@ffg/blog-core');
         res.locals.sidebarCategories = Category.findAll();
     } catch (error) {
-        console.error('Error loading categories:', error);
+        logSafeError(error, { request: req, event: 'public' });
         res.locals.sidebarCategories = [];
     }
     next();
-});
+}));
 
 // Home page
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
     try {
         const { Post, PostPublication } = await import('@ffg/blog-core');
         const page = parsePageNumber(req.query.page);
@@ -63,7 +64,7 @@ router.get('/', async (req, res) => {
             const count = Post.count;
             totalCount = typeof count === 'number' ? count : 0;
         } catch (err) {
-            console.error('Error fetching post count:', err);
+            logSafeError(err, { request: req, event: 'public' });
             totalCount = 0;
         }
 
@@ -86,7 +87,7 @@ router.get('/', async (req, res) => {
                 publicByline: buildPublicByline(authorsByPost.get(post.id) ?? [])
             }));
         } catch (err) {
-            console.error('Error fetching posts:', err);
+            logSafeError(err, { request: req, event: 'public' });
             posts = [];
         }
 
@@ -106,16 +107,16 @@ router.get('/', async (req, res) => {
             canonicalUrl: getCanonicalUrl(res, pagination.currentUrl)
         });
     } catch (error) {
-        console.error('Error loading home page:', error);
+        logSafeError(error, { request: req, event: 'public' });
         res.status(500).render('error', {
             title: 'Error',
             message: 'Failed to load posts'
         });
     }
-});
+}));
 
 // About page
-router.get('/about', async (req, res) => {
+router.get('/about', asyncHandler(async (req, res) => {
     const canonicalUrl = getCanonicalUrl(res, '/about');
     const heroImage = await resolveHeroImage(req.app.locals.uploadsPath);
     const ogTags = await buildOgTags(null, req, {
@@ -130,10 +131,10 @@ router.get('/about', async (req, res) => {
         metaDescription: ABOUT_DESCRIPTION,
         canonicalUrl
     });
-});
+}));
 
 // Category page
-router.get('/category/:slug', async (req, res) => {
+router.get('/category/:slug', asyncHandler(async (req, res) => {
     try {
         const { Category } = await import('@ffg/blog-core');
         const page = parsePageNumber(req.query.page);
@@ -171,16 +172,16 @@ router.get('/category/:slug', async (req, res) => {
             canonicalUrl: getCanonicalUrl(res, pagination.currentUrl)
         });
     } catch (error) {
-        console.error('Error loading category:', error);
+        logSafeError(error, { request: req, event: 'public' });
         res.status(500).render('error', {
             title: 'Error',
             message: 'Failed to load category'
         });
     }
-});
+}));
 
 // Search page
-router.get('/search', async (req, res) => {
+router.get('/search', asyncHandler(async (req, res) => {
     try {
         const { Post } = await import('@ffg/blog-core');
         const query = typeof req.query.q === 'string' ? req.query.q : '';
@@ -221,16 +222,16 @@ router.get('/search', async (req, res) => {
             canonicalUrl: getCanonicalUrl(res, pagination.currentUrl)
         });
     } catch (error) {
-        console.error('Error searching:', error);
+        logSafeError(error, { request: req, event: 'public' });
         res.status(500).render('error', {
             title: 'Error',
             message: 'Search failed'
         });
     }
-});
+}));
 
 // Single post page
-router.get('/post/:slug', async (req, res) => {
+router.get('/post/:slug', asyncHandler(async (req, res) => {
     try {
         const { Post, PostPublication, PublicPerson } = await import('@ffg/blog-core');
         const post = Post.findBySlug(req.params.slug);
@@ -312,12 +313,12 @@ router.get('/post/:slug', async (req, res) => {
             blogPostingJsonLd
         });
     } catch (error) {
-        console.error('Error loading post:', error);
+        logSafeError(error, { request: req, event: 'public' });
         res.status(500).render('error', {
             title: 'Error',
             message: 'Failed to load post'
         });
     }
-});
+}));
 
 export default router; 

@@ -722,11 +722,29 @@ Before any deployment, confirm:
 - [ ] Exact Compose file confirmed.
 - [ ] Exact Dockerfile confirmed.
 - [ ] Required env files exist by path, without opening them.
-- [ ] `[SESSION_SECRET]`, `[TRUSTED_IPS]`, `[DATABASE_PATH]`, and `[UPLOADS_PATH]` are expected to be supplied by env/config.
+- [ ] `[SESSION_SECRET]`, `[DATABASE_PATH]`, and `[UPLOADS_PATH]` are expected to be supplied by env/config.
+- [ ] If elevated rate-limit exemptions are intended, `[TRUSTED_IPS]` is supplied explicitly and its complete list compiles. Missing/empty/whitespace-only configuration uses ordinary limits; any compilation failure disables all exemptions.
 - [ ] Backup status confirmed without opening backup contents.
 - [ ] Rollback concept agreed.
 - [ ] CI status reviewed, with attention to tolerant failures.
 - [ ] User explicitly approved the deployment command before it is run.
+
+The November 18, 2026 local trusted-rate correction removes the source fallback;
+it does not change actual environment files or authorize deployment. The list is
+compiled once at app initialization. Both sites may start without it. An invalid
+list emits one bounded diagnostic without raw entries/errors and cannot grant a
+partial exemption. Ordinary/elevated limits and client-identity selection remain
+unchanged. Local tests must supply synthetic configuration deliberately.
+The `/debug-ip` response omits the raw trusted-list configuration and uses the
+same compiled eligibility result; it does not recompile request-time patterns.
+
+Legacy opaque and regex-bearing entries remain accepted for compatibility.
+Compilation is neither semantic address validation nor regex complexity safety.
+Strict validation needs a separate compatibility assessment. Forwarded-header
+identity remains an unresolved security gate before production release; this
+correction does not harden nginx/Express proxy trust. Earlier Git copies of the
+removed defaults remain and require explicit restricted-content review during
+checkpoint preparation; no history rewrite is performed by this correction.
 
 ## 9. Safe Command Categories
 

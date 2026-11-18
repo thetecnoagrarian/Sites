@@ -1,4 +1,5 @@
 import User from '../models/user.js';
+import { logSafeError } from '../utils/error-diagnostics.js';
 
 // Middleware to check if user is authenticated
 export const isAuthenticated = (req, res, next) => {
@@ -33,7 +34,7 @@ export const attachUser = async (req, res, next) => {
             req.user = user;
             res.locals.user = user; // Make user available in templates
         } catch (error) {
-            console.error('Error attaching user:', error);
+            logSafeError(error, { request: req, event: 'authentication' });
         }
     }
     next();
@@ -65,7 +66,7 @@ export const isAdmin = (req, res, next) => {
         console.log('isAdmin: User is admin, proceeding');
         next();
     } catch (error) {
-        console.error('Admin authentication error:', error);
+        logSafeError(error, { request: req, event: 'authentication' });
         req.flash('error', 'An error occurred');
         res.redirect('/');
     }

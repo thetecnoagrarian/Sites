@@ -1,4 +1,4 @@
-import { getDatabase } from '@ffg/blog-core';
+import { getDatabase, logSafeError } from '@ffg/blog-core';
 
 class Analytics {
     static getDb() {
@@ -61,7 +61,7 @@ class Analytics {
                 return result;
             }
         } catch (error) {
-            console.error('❌ Error recording page view:', error);
+            logSafeError(error, { event: 'analytics' });
             // Don't throw error to prevent breaking the site
             return null;
         }
@@ -89,7 +89,7 @@ class Analytics {
             
             return result;
         } catch (error) {
-            console.error('Error recording unique visitor:', error);
+            logSafeError(error, { event: 'analytics' });
             throw error;
         }
     }
@@ -110,7 +110,7 @@ class Analytics {
             `);
             return stmt.all(limit);
         } catch (error) {
-            console.error('Error getting page view stats:', error);
+            logSafeError(error, { event: 'analytics' });
             return [];
         }
     }
@@ -132,7 +132,7 @@ class Analytics {
                 todayPageViews: todayViews.count
             };
         } catch (error) {
-            console.error('Error getting total stats:', error);
+            logSafeError(error, { event: 'analytics' });
             return { totalPageViews: 0, totalUniqueVisitors: 0, todayPageViews: 0 };
         }
     }
@@ -148,7 +148,7 @@ class Analytics {
             `);
             return stmt.all(limit);
         } catch (error) {
-            console.error('Error getting recent activity:', error);
+            logSafeError(error, { event: 'analytics' });
             return [];
         }
     }
@@ -182,7 +182,7 @@ class Analytics {
                 timestamp: new Date().toISOString()
             };
         } catch (error) {
-            console.error('❌ Database health check failed:', error);
+            logSafeError(error, { event: 'analytics' });
             return {
                 healthy: false,
                 error: error.message,

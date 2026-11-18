@@ -1,14 +1,18 @@
+import { asyncHandler } from '../utils/asyncHandler.js';
 import express from 'express';
 import multer from 'multer';
-import path from 'node:path';
-import { promises as fs } from 'node:fs';
 import { isAdmin } from '../middleware/auth.js';
 import { createEditorialService } from '../models/editorial-service.js';
-import { getDatabase } from '../models/db.js';
+import { cleanupOwnedUploads } from '../middleware/owned-upload.js';
 import PublicPerson from '../models/public-person.js';
 import Post from '../models/post.js';
 import Category from '../models/category.js';
-import { processImage } from '../utils/imageProcessor.js';
+import { logSafeError, readDiagnosticProperty } from '../utils/error-diagnostics.js';
+import { preparePostCandidate, verifyStoredPostCandidate } from '../utils/private-media.js';
+import { getDatabase } from '../models/db.js';
+import { allocateMediaOperation, readMediaOperation, prepareMediaOperation, markPendingOverwrite,
+    cancelMediaOperation, verifyMediaAcceptance, submissionDigest, mediaDigest, publishedMediaCandidate,
+    readPendingOverwrite } from '../models/media-publication.js';
 
 const array = value => Array.isArray(value) ? value : (value == null ? [] : [value]);
 const present = value => typeof value === 'string' && value.trim() !== '';
@@ -89,64 +93,109 @@ function personOptions(people, selectedId = null) {
         }));
 }
 
-function mediaFiles(images, uploadsPath) {
-    return images.flatMap(image => ['thumbnail', 'medium', 'large']
-        .map(size => image?.[size])
-        .filter(value => typeof value === 'string' && /^\/uploads\/[^/]+\.webp$/.test(value))
-        .map(value => ({ url: value, file: path.join(uploadsPath, path.basename(value)) })));
-}
-
-async function removePaths(paths) {
-    for (const file of paths) {
-        try { await fs.unlink(file); }
-        catch (error) { if (error.code !== 'ENOENT') console.error('Media cleanup failed:', error); }
-    }
-}
-
-// A media URL can be reused by another post. Only remove a replaced variant
-// after the committed database state shows that no post still references it.
-export async function removeUnreferencedMedia(images, uploadsPath) {
-    const db = getDatabase();
-    let referenced;
-    try {
-        referenced = db.prepare(`
-            SELECT 1 FROM posts, json_tree(posts.images) AS media
-            WHERE media.type = 'text' AND media.value = ? LIMIT 1
-        `);
-    } catch (error) {
-        console.error('Media reference check failed:', error);
-        return;
-    }
-    for (const { url, file } of mediaFiles(images, uploadsPath)) {
-        try {
-            if (!referenced.get(url)) await removePaths([file]);
-        } catch (error) {
-            // Cleanup is best effort after commit; a lookup failure must never
-            // turn a successful save into an apparent retryable failure.
-            console.error('Media reference check failed:', error);
-        }
-    }
-}
-
-function predictedPaths(files, uploadsPath) {
-    return files.flatMap(file => ['thumbnail', 'medium', 'large'].map(size =>
-        path.join(uploadsPath, `${path.parse(file.filename).name}-${size}.webp`)));
-}
-
 function captionsFor(body, count, previous = []) {
     const supplied = array(body['captions[]'] ?? body.captions);
     return Array.from({ length: count }, (_, index) => supplied[index] ?? previous[index] ?? '');
 }
 
 function flashError(req, res, error, target) {
-    console.error('Editorial admin action failed:', error);
-    req.flash('error', error.message);
+    logSafeError(error, { request: req });
+    const code = readDiagnosticProperty(error, 'code');
+    const message = readDiagnosticProperty(error, 'message');
+    const mediaOutcome = readDiagnosticProperty(error, 'mediaOutcome');
+    if (code === 'PENDING_INPUT_TOO_LARGE') {
+        return res.status(413).set('Cache-Control', 'no-store').json({
+            error: typeof message === 'string' ? message : 'Pending snapshot too large',
+            actualBytes: readDiagnosticProperty(error, 'actualBytes'), maxBytes: readDiagnosticProperty(error, 'maxBytes') });
+    }
+    const databaseUnavailable = /^SQLITE_/.test(typeof code === 'string' ? code : '') || /(?:database|connection).*(?:closed|not open)/i.test(typeof message === 'string' ? message : '');
+    if (code === 'MEDIA_OUTCOME_UNKNOWN' || mediaOutcome === 'unknown'
+        || (req.body.mediaOperationId && databaseUnavailable && !mediaOutcome)) {
+        return res.status(503).set('Cache-Control', 'no-store').json({
+            error: 'Editorial outcome unknown. Check the operation status before retrying.',
+            operationId: req.body.mediaOperationId, state: 'unknown' });
+    }
+    req.flash('error', typeof message === 'string' ? message : 'Editorial action failed');
     return res.redirect(target);
 }
 
 export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
     const router = express.Router();
     router.use(isAdmin);
+    const confirmationUrl = id => `/admin/posts/confirm-overwrite?mediaOperationId=${encodeURIComponent(id)}`;
+
+    const accepted = async (req, res, id) => {
+        res.set('Cache-Control', 'no-store');
+        let operation;
+        try { operation = readMediaOperation(getDatabase(), id, req.user.id); }
+        catch (error) {
+            logSafeError(error, { request: req });
+            const unavailable = new Error('Editorial outcome unknown. Check the operation status before retrying.');
+            unavailable.code = 'MEDIA_OUTCOME_UNKNOWN';
+            throw unavailable;
+        }
+        if (operation.state !== 'published') throw new Error('Acceptance could not be confirmed');
+        try {
+            for (const candidateId of operation.data.required) {
+                await verifyStoredPostCandidate(req.app.locals.uploadsPath, publishedMediaCandidate(getDatabase(), candidateId));
+            }
+        } catch (error) {
+            logSafeError(error, { request: req });
+            return res.status(409).json({ operationId: id, state: 'published', receipt: operation.data.receipt,
+                error: 'Article accepted; required media could not be verified. Do not submit a new operation.' });
+        }
+        try {
+            req.flash('success', `Post accepted (ID ${operation.data.receipt.postId})`);
+            return res.redirect('/admin/dashboard');
+        } catch (error) {
+            logSafeError(error, { request: req });
+            return res.status(503).json({ operationId: id, state: 'published', receipt: operation.data.receipt,
+                error: 'Article accepted; response handling failed. Check operation status before retrying.' });
+        }
+    };
+    const submission = async (req, action, postId = null) => {
+        const db = getDatabase();
+        const id = req.body.mediaOperationId;
+        const operation = readMediaOperation(db, id, req.user.id);
+        if (operation.data.context.action !== action || operation.data.context.postId !== postId) throw new Error('Media operation target changed');
+        if (operation.state === 'cancelled') throw new Error('Media operation was cancelled; reload the editor');
+        const files = req.files ?? [];
+        const fingerprintInput = formInput(req.body, [], array(req.body['captions[]'] ?? req.body.captions));
+        const digest = await submissionDigest(fingerprintInput, files, req.app.locals.uploadsPath);
+        if (operation.state !== 'allocated' && operation.data.submission !== digest) throw new Error('Changed submission cannot reuse a media operation');
+        if (operation.state === 'published') return { id, published: true };
+        const previous = action === 'update' ? createEditorialService().snapshot(postId) : null;
+        const oldImages = files.length ? [] : previous?.post.images ?? [];
+        let input = formInput(req.body, oldImages, captionsFor(req.body, files.length || oldImages.length,
+            files.length ? [] : previous?.post.captions ?? []));
+        if (action === 'create') input.loginUserId = req.user.id;
+        let candidates = operation.data.candidates;
+        if (operation.state === 'allocated') {
+            candidates = [];
+            for (const file of files) {
+                const result = await (req.app.locals.preparePostCandidate ?? preparePostCandidate)({
+                    uploadsPath: req.app.locals.uploadsPath, inputPath: file.path });
+                candidates.push({ id: result.candidate.id, image: result.image, files: result.files });
+            }
+        }
+        if (files.length) input.content.images = candidates.map(item => item.image);
+        let stored = operation;
+        if (operation.state === 'allocated') stored = prepareMediaOperation(db, id, req.user.id, digest, input, candidates);
+        if (stored.state === 'published') return { id, published: true };
+        if (files.length) input.content.images = stored.data.candidates.map(item => item.image);
+        if (stored.data.pending) input.revisionToken = stored.data.pending.revisionToken;
+        return { id, input, pending: stored.data.pending };
+    };
+
+    router.get('/media-operations/:id', asyncHandler(async (req, res) => {
+        try {
+            const operation = readMediaOperation(getDatabase(), req.params.id, req.user.id);
+            res.set('Cache-Control', 'no-store').json({ operationId: operation.id, state: operation.state, receipt: operation.data.receipt });
+        } catch (error) {
+            logSafeError(error, { request: req });
+            res.status(503).set('Cache-Control', 'no-store').json({ state: 'unknown', error: 'Operation status unavailable' });
+        }
+    }));
 
     router.get('/public-people', (req, res) => {
         res.render('admin/public-people', {
@@ -190,6 +239,7 @@ export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
     router.get('/posts/new', (req, res) => {
         const people = PublicPerson.list({ includeArchived: true });
         res.render('admin/new-post', {
+            mediaOperationId: allocateMediaOperation(getDatabase(), req.user.id, 'create'),
             title: 'New Post', categories: Category.findAll(),
             authorRows: authorRows(people), publisherOptions: personOptions(people),
             user: req.user, csrfToken: req.csrfToken(), error: req.flash('error')
@@ -203,6 +253,7 @@ export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
             const categories = Category.findAll().map(category => ({ ...category,
                 selected: snapshot.categories.includes(category.id) }));
             res.render('admin/new-post', {
+                mediaOperationId: allocateMediaOperation(getDatabase(), req.user.id, 'update', Number(req.params.id)),
                 title: 'Edit Post', post: snapshot.post, categories,
                 authorRows: authorRows(people, selected),
                 publisherOptions: personOptions(people, snapshot.facts.publisher_public_person_id),
@@ -213,91 +264,80 @@ export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
     });
 
     const upload = (req, res, next) => {
-        req.app.locals.upload.array('image', 25)(req, res, async error => {
+        req.app.locals.upload.array('image', 25)(req, res, error => asyncHandler(async () => {
             if (error) {
-                await removePaths((req.files ?? []).map(file => file.path));
+                logSafeError(error, { request: req });
+                await cleanupOwnedUploads(req);
                 req.flash('error', error instanceof multer.MulterError
                     ? 'Image upload exceeds the configured limit' : error.message);
                 return res.redirect(req.params.id
                     ? `/admin/posts/${req.params.id}/edit` : '/admin/posts/new');
             }
             if (!req.verifyCsrfToken(req.body?._csrf)) {
-                await removePaths((req.files ?? []).map(file => file.path));
+                await cleanupOwnedUploads(req);
                 return res.status(403).json({ error: 'Invalid CSRF token' });
             }
             next();
-        });
+        })(req, res, next));
     };
 
-    router.post('/dashboard/posts/create', upload, async (req, res) => {
-        const files = req.files ?? [];
-        const outputDir = req.app.locals.uploadsPath;
-        const generated = predictedPaths(files, outputDir);
-        let retainGenerated = false;
+    router.post('/dashboard/posts/create', upload, asyncHandler(async (req, res) => {
         try {
-            const images = [];
-            for (const file of files) images.push(await processImage(file.path, file.filename, outputDir));
-            const input = formInput(req.body, images, captionsFor(req.body, images.length));
-            input.loginUserId = req.user.id;
+            const prepared = await submission(req, 'create');
+            if (prepared.published) return await accepted(req, res, prepared.id);
+            const { input, id } = prepared;
+            if (prepared.pending) {
+                readPendingOverwrite(getDatabase(), id, req.user.id);
+                return res.redirect(confirmationUrl(id));
+            }
+            input.mediaAcceptance = await verifyMediaAcceptance({ db: getDatabase(), uploadsPath: req.app.locals.uploadsPath,
+                id, ownerId: req.user.id, input, action: 'create' });
             const service = createEditorialService();
             try {
                 service.create(input);
             } catch (error) {
                 if (!allowOverwrite || error.code !== 'DUPLICATE_TITLE') throw error;
-                if (req.session.pendingEditorialOverwrite) {
-                    await removePaths(req.session.pendingEditorialOverwrite.generated);
-                }
-                req.session.pendingEditorialOverwrite = {
-                    input, existingPostId: error.existingPostId,
-                    revisionToken: error.revisionToken, generated
-                };
-                retainGenerated = true;
+                delete input.mediaAcceptance;
+                input.revisionToken = error.revisionToken;
+                markPendingOverwrite(getDatabase(), id, req.user.id, { postId: error.existingPostId, revisionToken: error.revisionToken }, input);
                 req.flash('warning', 'Duplicate title: review the existing post before overwriting');
-                return res.redirect('/admin/posts/confirm-overwrite');
+                return res.redirect(confirmationUrl(id));
             }
-            retainGenerated = true;
-            req.flash('success', 'Post published');
-            res.redirect('/admin/dashboard');
+            return await accepted(req, res, id);
         } catch (error) { flashError(req, res, error, '/admin/posts/new'); }
         finally {
-            await removePaths(files.map(file => file.path));
-            if (!retainGenerated) await removePaths(generated);
+            await cleanupOwnedUploads(req);
         }
-    });
+    }));
 
-    router.post('/dashboard/posts/:id/update', upload, async (req, res) => {
-        const files = req.files ?? [];
-        const outputDir = req.app.locals.uploadsPath;
-        const generated = predictedPaths(files, outputDir);
-        let committed = false;
+    router.post('/dashboard/posts/:id/update', upload, asyncHandler(async (req, res) => {
         try {
-            const previous = createEditorialService().snapshot(req.params.id);
-            const images = [];
-            for (const file of files) images.push(await processImage(file.path, file.filename, outputDir));
-            const nextImages = files.length ? images : previous.post.images;
-            const input = formInput(req.body, nextImages,
-                captionsFor(req.body, nextImages.length,
-                    files.length ? [] : previous.post.captions));
+            const prepared = await submission(req, 'update', Number(req.params.id));
+            if (prepared.published) return await accepted(req, res, prepared.id);
+            const { id, input } = prepared;
+            input.mediaAcceptance = await verifyMediaAcceptance({ db: getDatabase(), uploadsPath: req.app.locals.uploadsPath,
+                id, ownerId: req.user.id, input, action: 'update', postId: Number(req.params.id) });
             createEditorialService().update(req.params.id, input);
-            committed = true;
-            if (files.length) await removeUnreferencedMedia(previous.post.images, outputDir);
-            req.flash('success', 'Post updated');
-            res.redirect('/admin/dashboard');
+            return await accepted(req, res, id);
         } catch (error) {
             flashError(req, res, error, `/admin/posts/${req.params.id}/edit`);
         } finally {
-            await removePaths(files.map(file => file.path));
-            if (!committed) await removePaths(generated);
+            await cleanupOwnedUploads(req);
         }
-    });
+    }));
 
     if (allowOverwrite) {
         router.get('/posts/confirm-overwrite', (req, res) => {
-            const pending = req.session.pendingEditorialOverwrite;
-            if (!pending) return res.redirect('/admin/posts/new');
+            res.set('Cache-Control', 'no-store');
             try {
-                const existing = createEditorialService().snapshot(pending.existingPostId);
+                const operation = readMediaOperation(getDatabase(), req.query.mediaOperationId, req.user.id);
+                if (!operation.data.pending) throw new Error('Overwrite operation unavailable');
+                if (operation.state !== 'prepared') return res.status(409).json({
+                    operationId: operation.id, state: operation.state, receipt: operation.data.receipt });
+                const pending = readPendingOverwrite(getDatabase(), operation.id, req.user.id);
+                const existing = createEditorialService().snapshot(pending.postId);
                 res.render('admin/confirm-overwrite', {
+                    mediaOperationId: operation.id,
                     title: 'Confirm Overwrite', existingPost: existing.post,
                     facts: existing.facts, pendingPostData: pending.input.content,
                     authorNames: pending.input.authorIds.map(id => PublicPerson.findById(id)?.display_name ?? '(missing)'),
@@ -305,28 +345,40 @@ export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
                 });
             } catch (error) { flashError(req, res, error, '/admin/posts/new'); }
         });
-        router.post('/posts/confirm-overwrite', async (req, res) => {
-            const pending = req.session.pendingEditorialOverwrite;
-            if (!pending) return res.redirect('/admin/posts/new');
-            if (req.body.action === 'cancel') {
-                await removePaths(pending.generated);
-                delete req.session.pendingEditorialOverwrite;
-                return res.redirect('/admin/posts/new');
+        router.post('/posts/confirm-overwrite', asyncHandler(async (req, res) => {
+            res.set('Cache-Control', 'no-store');
+            if (!['overwrite', 'cancel'].includes(req.body.action)) return res.status(400).send('Invalid action');
+            if (Object.keys(req.body).some(key => !['_csrf', 'mediaOperationId', 'action', 'reopenAuthorship'].includes(key))) {
+                return res.status(400).send('Confirmation cannot change editorial content');
             }
-            if (req.body.action !== 'overwrite') return res.status(400).send('Invalid action');
             try {
+                const id = req.body.mediaOperationId;
+                const operation = readMediaOperation(getDatabase(), id, req.user.id);
+                if (!operation.data.pending) throw new Error('Reload the editor: overwrite operation unavailable');
+                if (req.body.action === 'cancel') {
+                    const receipt = cancelMediaOperation(getDatabase(), id, req.user.id);
+                    return receipt ? await accepted(req, res, id) : res.redirect('/admin/posts/new');
+                }
+                const reopenAuthorship = req.body.reopenAuthorship === 'yes';
+                if (operation.state === 'published') {
+                    const binding = mediaDigest({ action: 'overwrite', postId: operation.data.pending.postId,
+                        inputHash: operation.data.inputHash, reopenAuthorship });
+                    if (binding !== operation.data.receipt.binding) throw new Error('Changed confirmation cannot reuse a receipt');
+                    return await accepted(req, res, id);
+                }
+                if (operation.state !== 'prepared') throw new Error('Overwrite operation is not prepared');
+                const pending = readPendingOverwrite(getDatabase(), id, req.user.id);
+                const input = { ...pending.input };
+                input.mediaAcceptance = await verifyMediaAcceptance({ db: getDatabase(), uploadsPath: req.app.locals.uploadsPath,
+                    id, ownerId: req.user.id, input, action: 'overwrite', postId: pending.postId, reopenAuthorship });
                 const service = createEditorialService();
-                const before = service.snapshot(pending.existingPostId);
-                service.overwrite(pending.existingPostId, pending.input, {
+                service.overwrite(pending.postId, input, {
                     revisionToken: pending.revisionToken,
-                    reopenAuthorship: req.body.reopenAuthorship === 'yes'
+                    reopenAuthorship
                 });
-                delete req.session.pendingEditorialOverwrite;
-                await removeUnreferencedMedia(before.post.images, req.app.locals.uploadsPath);
-                req.flash('success', 'Existing post overwritten; first publication preserved');
-                res.redirect('/admin/dashboard');
-            } catch (error) { flashError(req, res, error, '/admin/posts/confirm-overwrite'); }
-        });
+                return await accepted(req, res, id);
+            } catch (error) { flashError(req, res, error, confirmationUrl(req.body.mediaOperationId)); }
+        }));
     }
     return router;
 }

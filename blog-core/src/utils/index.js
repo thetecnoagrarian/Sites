@@ -5,3 +5,5 @@ export * from './pagination.js';
 export * from './publicByline.js';
 export * from './publicPublicationDisplay.js';
 export { default as logger } from './logger.js';
+export { logSafeError } from './error-diagnostics.js';
+export { asyncHandler } from './asyncHandler.js';

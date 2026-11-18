@@ -137,6 +137,249 @@ images cannot automatically roll back against a migrated database, so production
 rollout still requires a schema-compatible rollback/recovery gate. Do not rerun
 completed historical operations as part of gallery deployment.
 
+## Phase 2: media retention and temporary cleanup
+
+Removing an association does not delete previously committed physical media.
+Highlight replacement/removal, FFG overwrite/cancellation, and both active
+post-delete routes retain files even if no structured reference is found.
+Post/category deletion is transactional. This also protects body galleries,
+other posts, raw-HTML links and unsaved/concurrent edits without attempting to
+enumerate every reference. Body-gallery association removal remains backend-only.
+No automatic garbage collection or reference counter is introduced.
+
+The audit also found that FFG hero replacement/reset deleted previous generation
+directories, including retained source material. They now change the selected
+manifest without deleting generations. Reset removes only the selection
+manifest; it still returns to the repository defaults. Failed/unpublished hero
+artifacts are conservatively retained and reported as potentially remaining.
+
+Raw uploads use exclusively created hidden request directories beneath the
+configured `uploads/temp` root. The shared media-serving boundary denies that
+URL namespace before either static handler, alongside Express dotfile handling.
+The shared upload layer records server-reserved names and device/inode identity
+after writing. Multer error cleanup, editorial request finalization and hero
+request finalization use that ownership record, never public URLs or session
+path lists. Cleanup validates canonical root/directory identity and regular,
+single-link file identity, rejects traversal/symlinks/unknown entries, and uses
+non-recursive directory removal. Cleanup is idempotent per request; unrelated
+operations have separate directories. Uncertain files are retained with a warning,
+and cleanup failure does not turn a committed save into an apparent failure.
+This assumes the configured uploads filesystem is operated by trusted processes;
+it is not a sandbox against a privileged actor rewriting paths between syscalls.
+
+Managed post derivatives are prepared privately before the editorial transaction
+and require the SQLite authority below. Failed saves, pending overwrites,
+cancellations and abandoned operations retain candidates privately. Legacy files
+are not reclassified or deleted. Only proven request-owned private raw inputs
+are automatically cleaned; incomplete inputs and interrupted processing can
+leave private residue for review. Hero publication still uses its original
+generation/selection mechanism and remains a separate unresolved boundary. No
+historical filename reconstruction or protected-source deletion is introduced.
+
+Retention can grow without a fixed bound as uploads, replacements and failed
+operations accumulate; backups also grow. Existing host disk-capacity preflights
+and per-site backup size receipts provide a non-destructive observation basis.
+Compare those over time and include read-only live uploads usage in separately
+authorized disk audits. No new job or monitor is needed in this slice; these
+checks do not constitute continuous capacity alerting or identify all orphans.
+Any physical-media cleanup needs a separate owner-authorized design and review
+covering all references, pending/concurrent work, recovery and uncertainty.
+
+Technology selection followed the native-first process: the problem is unsafe
+deletion authority, not missing media-management features. Retention avoids the
+incomplete reference graph and races of counters or scan-then-delete. Existing
+Multer storage hooks and native Node filesystem identities provide the small
+private-input cleanup boundary; no new dependency, registry or scheduled sweeper
+is warranted. The ownership helper is limited to raw inputs, while uncertain
+generated outputs are retained. The managed post authority below adds only the
+durable receipt and exact candidate grants needed for editorial acceptance.
+
+### Managed post publication (local implementation)
+
+`private-media.js` allocates private candidate directories beneath
+`uploads/.media/post/<UUID>` and `uploads/.media/hero/<UUID>`. Raw inputs remain
+separate beneath `uploads/temp/.operation-*`; no existing files are moved.
+Candidate preparation reuses the existing image processor and profiles, verifies
+all three WebP variants/dimensions/hashes, and rejects malformed metadata or
+changed directory identities. Partial/failed preparations stay private, with no
+automatic deletion. Hero candidates can use the existing hero processor without
+changing its selection manifest. The shared editorial router now uses private
+post preparation; the hero writer is not integrated with managed publication.
+
+`media-serving.js` owns both static registrations in their existing order. It
+denies `.media`, `.source`, temporary uploads, ambiguous encodings/traversal and
+symlink traversal before static serving. New reserved URL families are flat
+`/uploads/m1-<UUID>-<thumbnail|medium|large>.webp` for posts and
+`/uploads/hero/m1-<UUID>/current-hero.webp` or `current-hero-og.webp` for heroes.
+Each request must receive literal `true` from its configured post/hero publication
+callback before private bytes or conditional/304 responses are served.
+`createBlogApp` installs the SQLite-backed post provider on its existing database
+connection. Hero publication-index/provider integration remains unimplemented.
+Missing/error/malformed grants deny; no speculative cache is used.
+
+Migration `0003_media_publications.sql` and the matching fresh schema add one
+table. An operation row is keyed by its server-generated UUID; each accepted
+candidate has a separate row keyed by candidate UUID, sharing the operation ID.
+The operation index supports grouping; image authorization performs one SQL
+statement with primary-key lookups for candidate and parent receipt. Rows record
+site-local owner identity, type, lifecycle state, bounded metadata JSON (128 KiB), and
+creation time. Operation data contains create/update context, submission/input
+hashes, up to 25 verified candidates, required managed-image IDs (including
+retained images), optional overwrite binding and receipt.
+Candidate rows hold exact variant URLs, dimensions, byte counts and SHA-256s.
+Only duplicate-title confirmations add a private body snapshot in the separate
+`pending_input` column described below; public authorization reads metadata only.
+No reference counter, general asset catalogue or historical backfill is added.
+No post/user FK can cascade away a published grant. Database guards
+make published/cancelled rows immutable, retain published records, and require
+candidate membership in an accepted parent manifest when grants are inserted.
+
+Editor GETs allocate operation IDs, carried by hidden fields in both editors and
+FFG confirmation. Old forms lacking an ID must reload. Multipart submission binds
+allowed editorial fields and ordered raw-file hashes, excluding CSRF/session
+transport fields. Preparation records may persist independently, but grant rows
+never do: private file integrity/type/proportions are verified, files and parent
+directories are synced, then the existing immediate editorial transaction writes
+the article, acceptance receipt and all grants together. There is no post-commit
+file promotion. Acceptance refuses a connection below SQLite FULL synchronous
+durability. Filesystem readiness and SQLite acceptance remain separate steps,
+not a shared atomic transaction.
+
+Accepted retries return their durable receipt without repeating article writes;
+changed payloads cannot reuse it. Confirmation also binds target/revision and
+explicit authorship reopening. Cancellation uses a conditional transaction:
+cancel-first prevents acceptance; accept-first returns the existing receipt.
+The owner-only operation status endpoint reports authoritative state. A lost
+response can be recovered by identical resubmission/status lookup; an unreadable
+database outcome returns unknown/503 rather than declaring rollback. An accepted
+operation with missing/damaged media returns accepted-needs-repair/409; its grant
+and article are retained. Ordinary replacement, gallery association removal,
+overwrite and post deletion cannot revoke published media.
+
+#### Operation-keyed FFG pending confirmation
+
+The November 16, 2026 local implementation revised the then-uncommitted,
+undeployed `0003` and matching fresh schema to include a nullable
+`pending_input TEXT` column on the existing operation row. It holds
+a version-1 JSON envelope of the existing allowlisted editorial input, including
+the exact body, ordered authors/categories, captions, server-generated image
+references and target revision. JSON round-trip preserves submitted text; the
+existing stable input digest binds its meaning. CSRF/session fields, filesystem
+authority and runtime acceptance capabilities are excluded. The existing 25-image
+request limit is separate from the body gallery's 100-item collection contract.
+
+The snapshot is limited to **8,388,608 serialized UTF-8 bytes (8 MiB)** in both
+application validation and SQLite. Oversize binding returns HTTP 413 with actual
+bytes and the ceiling; it never truncates, raises limits automatically or accepts
+an overwrite. Existing parser limits are unchanged. Any already prepared
+derivatives remain private under the existing retention policy.
+
+A conditional `BEGIN IMMEDIATE` transaction binds the snapshot, original
+submission fingerprint, target/revision and prepared image references together.
+Identical rebinding is idempotent; changed content, target, revision or candidate
+binding is rejected. SQL guards prohibit replacing/clearing a bound snapshot or
+changing its metadata binding. Published/cancelled immutability remains intact.
+A BEFORE INSERT collision guard rejects UUID and hidden-rowid reuse through
+REPLACE/UPSERT, independently of SQLite recursive-trigger settings. A positive
+rowid CHECK reserves the unassigned BEFORE INSERT marker; UPDATE guards prohibit
+rowid reassignment, including moves from unbound rows onto protected records.
+Direct SQL tests cover all rowid aliases, automatic/explicit allocation and
+statement rollback in fresh/migrated schemas with recursive triggers off/on.
+Idempotent retries read existing operations/receipts rather than reinserting
+records. Overwrite target comparison uses the existing title trim rule without
+changing snapshot input,
+case sensitivity or Unicode semantics.
+Pending binding alone creates no article update or public grant.
+
+Confirmation uses `/admin/posts/confirm-overwrite?mediaOperationId=<UUID>` and the
+form's operation ID. GET/POST load owner-authorized SQLite state; no active route
+reads, restores, writes or clears `session.pendingEditorialOverwrite`. Obsolete
+session data is ignored. Authentication, administrator checks and CSRF still use
+the existing session middleware. Its independent, whole-session snapshots can
+still overwrite flash/session data, but cannot change pending editorial authority.
+Confirmation/status responses are `no-store` and status never returns the body.
+
+Confirm/cancel affects only its identified operation. Concurrent tabs remain
+independent; a revision-changing acceptance makes another operation on that old
+revision stale. There is no silent revision refresh. Same-operation retries use
+the immutable receipt. Session loss requires reauthentication, not resubmitting
+pending content. Final overwrite and grants still share the existing immediate
+editorial transaction after complete private derivative verification; filesystem
+readiness and SQLite acceptance are not one atomic transaction.
+
+Terminal snapshots are retained for this non-destructive slice. One thousand
+maximum-size snapshots approach 7.8 GiB before database overhead and media.
+Future read-only diagnostics should expose counts, ages and byte totals; no
+diagnostic UI, expiry, draft system, quota or deletion job is implemented here.
+Keeping the payload separate avoids copying/parsing article bodies in public
+media authorization; it still increases database/backup size. A dedicated table
+would be preferable if independent snapshot disposal becomes a requirement.
+
+Synthetic tests use the actual Express session middleware and installed SQLite
+store, with barriers before the real persistence write, plus disposable database
+and upload roots. Reversed session writes, stale tabs, confirmation/cancellation,
+owner/CSRF binding, UTF-8/size limits, response loss and crash recovery are covered.
+This does not establish Linux volume/power-loss or production recovery readiness.
+
+The shared `error-diagnostics.js` policy is reused by global and caught editorial
+errors, nested Post/image-processing failures and site post-deletion catches.
+It emits bounded names/codes/categories, method, fixed route family and a
+server-generated error ID; exception objects/messages/stacks and submitted data
+are excluded. Image-processing progress reports counts rather than raw upload
+paths/names. HTTP error responses and cleanup/retention behavior are unchanged.
+Diagnostic property reads are guarded and performed once, including inherited
+or throwing getters; arbitrary thrown objects are never serialized. Active
+authentication, administrative/public routes, hero, sitemap, analytics exceptions
+and session callbacks use the same policy. The session-store adapter preserves
+the installed expiry query/schedule while replacing its internal raw-error dump.
+This does not change analytics storage or request/access-log policy.
+
+Both site entrypoints finalize after shared middleware and site routes.
+`setupFinalHandlers()` registers the existing 404 renderer followed by the bounded
+error handler exactly once, then rejects late application route registration.
+The small native-Promise `asyncHandler` forwards Express 4 route/callback
+rejections to that boundary. Error-template failures use a bounded text fallback;
+an already-started failed response is closed without forwarding a private stack.
+This diagnostic boundary does not change request/access logging: Morgan and site
+request loggers still retain raw query values. A separate narrow access-log
+privacy correction remains required before production release.
+
+Synthetic HTTP tests cover confidentiality before acceptance, rejected/stale
+saves, cancellation, multi-file failure, actual response loss, duplicate/concurrent
+requests and grant-insertion rollback. Disposable child processes are killed
+immediately before/after commit, then reopened to verify prepared/private versus
+published/available state. Restart never publishes a prepared row or deletes
+abandoned files. These tests do not prove power-loss behavior, Linux volume
+durability, multi-container contention or the production backup/restore pair.
+
+`0003` is additive and does not alter frozen `0000`/`0001`/`0002` or gallery
+storage. Startup does not migrate databases. The new application requires an
+explicit authorized upgrade before startup. Frozen older runners/images reject
+the newer ledger/schema, so an older-image rollback requires a compatible
+database/uploads recovery plan; restoring an earlier pair discards later writes.
+
+Unversioned legacy URLs retain static serving, public-tree precedence, MIME,
+ETags and existing cache periods. This compatibility branch is not a historical
+publication classification or a managed-candidate fallback. Reserved managed
+requests never fall through, even if a matching public-tree file exists. No
+historical media inventory or migration is performed; reserved-name collisions,
+legacy leftovers and hero publication history require an explicit cutover review
+before rollout. URL spelling containing ambiguous encodings and filesystem
+symlinks are intentionally unsupported. Filesystem checks assume trusted local
+writers; they do not sandbox a privileged process replacing paths between calls.
+
+**Phase 2 remains blocked pending review and hero correction.** The FFG hero writer
+can still expose an unselected generation through legacy serving before manifest
+acceptance; this post-only authority does not repair it. Retention still grows
+without bound. The existing 25-file/50 MiB-per-file defaults permit about 1.22 GiB
+of raw inputs per request, without aggregate/in-flight admission budgets. Setting
+those budgets is a separate pre-deployment gate, not an arbitrary limit change
+in this slice. No cleanup job, gallery HTTP upload/editor/rendering, dependency,
+nginx or Docker change is introduced. Private storage stays in uploads for
+recursive backup coverage. Release also requires final post-authority review,
+hero-index work, legacy cutover checks, isolated Docker and restore verification,
+and separately authorized migration/deployment with compatible rollback anchors.
+
 ## Deferred boundaries
 
 Future placement is one explicit, structurally validated standalone marker in
@@ -145,17 +388,13 @@ implemented; do not append galleries automatically or evaluate article HTML as
 Handlebars. A later rendering phase must preserve complete documentary photos
 and test accessibility, loading budgets and 65/100-item collections.
 
-Before enabling actual uploads or asset reuse, establish server-side asset
-authorization, existence checks and temporary-file ownership/lifetime rules.
+Before enabling gallery uploads or asset reuse, establish server-side asset
+authorization and existence checks, plus gallery draft/staging lifetime rules.
 The pure URL check does not prove any of those facts or prove that differently
 named files are physically distinct. Missing files must not silently remove
 items/captions from persisted data.
 
-Existing replacement cleanup only checks highlight references; existing post
-deletion paths also need review. They do not protect gallery references or all
-raw-HTML/cross-post reuse, and check-then-unlink races remain possible. **Do not
-enable real gallery writes/uploads/reuse until media-reference safety is
-addressed.** Retaining committed derivatives while only cleaning provably owned
-temporary outputs is the proposed first safety policy; it is not implemented
-here. Garbage collection, upload batching, editor UX, HTTP payload limits and
-image-loading behavior remain separate work.
+Committed-media retention removes ordinary editorial check-then-unlink races;
+it does not prove asset ownership, eliminate abandoned files or authorize
+gallery HTTP writes. Garbage collection, gallery upload batching, editor UX,
+HTTP payload limits and image-loading behavior remain separate work.

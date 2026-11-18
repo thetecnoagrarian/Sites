@@ -1,6 +1,7 @@
 import slugify from 'slugify';
 import { getDatabase } from './db.js';
 import { readStoredBodyGallery, serializeBodyGallery } from './body-gallery.js';
+import { logSafeError } from '../utils/error-diagnostics.js';
 
 function hydratePost(post) {
     if (!post) return post;
@@ -63,7 +64,7 @@ class Post {
         try {
             const gallery = Object.hasOwn(optional, 'body_gallery')
                 ? serializeBodyGallery(optional.body_gallery) : null;
-            console.log('Creating post with:', { title, body, description, excerpt, images, captions, created_at, author_id, overwriteExisting });
+            console.log('Creating post:', { imageCount: images.length, overwriteExisting });
             
             // Check if a post with the same title already exists
             const existingPost = checkExistingPost(title);
@@ -121,7 +122,7 @@ class Post {
             console.log('Post creation result:', result);
             return result;
         } catch (error) {
-            console.error('Error creating post:', error);
+            logSafeError(error, { event: 'post-model' });
             throw error;
         }
     }
@@ -155,7 +156,7 @@ class Post {
     static update(id, { title, body, description, excerpt, images = [], captions = [], created_at, author_id, ...optional }) {
         const hasGallery = Object.hasOwn(optional, 'body_gallery');
         const gallery = hasGallery ? serializeBodyGallery(optional.body_gallery) : null;
-        console.log('Updating post ID:', id, 'with data:', { title, body, description, excerpt, images, captions, created_at, author_id });
+        console.log('Updating post ID:', id, { imageCount: images.length });
         // For updates, we need to check if the slug would conflict with other posts
         const currentPost = Post.findById(id);
         const baseSlug = slugify(title, { lower: true, strict: true });
@@ -233,13 +234,11 @@ class Post {
 
     static delete(id) {
         const db = getDatabase();
-        // First delete associated category relationships
-        const deleteCategoriesStmt = db.prepare('DELETE FROM post_categories WHERE post_id = ?');
-        deleteCategoriesStmt.run(id);
-        
-        // Then delete the post
-        const stmt = db.prepare('DELETE FROM posts WHERE id = ?');
-        return stmt.run(id);
+        // Association removal is atomic; committed physical media is retained.
+        return db.transaction(() => {
+            db.prepare('DELETE FROM post_categories WHERE post_id = ?').run(id);
+            return db.prepare('DELETE FROM posts WHERE id = ?').run(id);
+        })();
     }
 
     static addCategory(postId, categoryId) {

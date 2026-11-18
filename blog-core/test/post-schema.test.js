@@ -26,6 +26,8 @@ test('fresh database supports the post body lifecycle', (t) => {
     assert.ok(postColumns.includes('body'));
     assert.ok(!postColumns.includes('content'));
     assert.ok(postColumns.includes('body_gallery'));
+    assert.deepEqual(db.pragma('table_info(media_publications)').map(({ name }) => name),
+        ['id', 'operation_id', 'record_type', 'owner_user_id', 'state', 'data', 'created_at', 'pending_input']);
 
     const originalBody = 'Synthetic fresh-database body marker.';
     const createResult = Post.create({

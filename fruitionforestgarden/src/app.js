@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { createBlogApp } from '@ffg/blog-core';
+import { createBlogApp, logSafeError } from '@ffg/blog-core';
 import analyticsMiddleware from './middleware/analytics.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -46,8 +46,8 @@ async function startApp() {
             console.log(`Fruition Forest Garden running on port ${port} in ${process.env.NODE_ENV || 'development'} mode`);
         });
     } catch (error) {
-        console.error('Error starting app:', error);
+        logSafeError(error, { event: 'startup' });
     }
 }
 
-startApp().catch(console.error);
+startApp().catch(error => logSafeError(error, { event: 'startup' }));

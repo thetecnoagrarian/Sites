@@ -1,34 +1,15 @@
 import multer from 'multer';
-import { promises as fs } from 'fs';
-import fsSync from 'fs';
 import path from 'path';
 import { randomUUID } from 'node:crypto';
-
-// Create uploads directory if it doesn't exist
-const ensureUploadsDir = async (uploadsPath) => {
-    try {
-        await fs.mkdir(uploadsPath, { recursive: true });
-    } catch (error) {
-        if (error.code !== 'EEXIST') {
-            throw error;
-        }
-    }
-};
+import { ownedUploadDirectory, reserveUploadFilename, recordOwnedUpload,
+    removeOwnedUpload } from './owned-upload.js';
+export { cleanupOwnedUploads } from './owned-upload.js';
 
 // Configure multer for file uploads
 export const createUploadMiddleware = (uploadsPath) => {
-    // Ensure uploads directory exists synchronously
-    try {
-        fsSync.mkdirSync(uploadsPath, { recursive: true });
-    } catch (error) {
-        if (error.code !== 'EEXIST') {
-            throw error;
-        }
-    }
-    
     const storage = multer.diskStorage({
         destination: (req, file, cb) => {
-            cb(null, uploadsPath);
+            ownedUploadDirectory(req, uploadsPath).then(directory => cb(null, directory), cb);
         },
         filename: (req, file, cb) => {
             // Generate unique filename with timestamp
@@ -36,9 +17,23 @@ export const createUploadMiddleware = (uploadsPath) => {
             const ext = path.extname(file.originalname);
             const basename = path.basename(file.originalname, ext);
             const filename = `${basename}-${timestamp}-${randomUUID()}${ext}`;
-            cb(null, filename);
+            reserveUploadFilename(req, filename).then(() => cb(null, filename), cb);
         }
     });
+
+    const handleFile = storage._handleFile.bind(storage);
+    storage._handleFile = (req, file, cb) => handleFile(req, file, (error, info) => {
+        if (error) return cb(error);
+        recordOwnedUpload(req, info).then(() => cb(null, info), cb);
+    });
+    storage._removeFile = (req, file, cb) => {
+        removeOwnedUpload(req, file).then(() => {
+            delete file.destination;
+            delete file.filename;
+            delete file.path;
+            cb(null);
+        }, cb);
+    };
 
     const fileFilter = (req, file, cb) => {
         // Allow images only
