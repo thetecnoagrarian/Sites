@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import express from 'express';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
@@ -24,7 +25,7 @@ function privateError() {
     return error;
 }
 
-async function fixture(t, site, { trustedIPs, ordinaryLimit } = {}) {
+async function fixture(t, site, { trustedIPs, ordinaryLimit, authenticated = true, registerRoutes = () => {} } = {}) {
     const root = await fs.mkdtemp(path.join(tmpdir(), 'sites-final-diagnostics-'));
     const publicPath = path.join(root, 'public'), uploadsPath = path.join(root, 'uploads'), viewsPath = path.join(root, 'views');
     await Promise.all([publicPath, uploadsPath, viewsPath].map(p => fs.mkdir(p, { recursive: true })));
@@ -78,7 +79,9 @@ async function fixture(t, site, { trustedIPs, ordinaryLimit } = {}) {
     const owner = Number(db.prepare("INSERT INTO users(username,password_hash,role) VALUES('synthetic','synthetic','admin')").run().lastInsertRowid);
     app.set('view options', { layout: false });
     app.use((req, res, next) => {
-        req.session.userId = owner; req.user = { id: owner, role: 'admin' };
+        if (authenticated) {
+            req.session.userId = owner; req.user = { id: owner, role: 'admin' };
+        }
         if (req.path === '/__synthetic/attach') return attachUser(req, res, () => res.sendStatus(204));
         next();
     });
@@ -97,6 +100,7 @@ async function fixture(t, site, { trustedIPs, ordinaryLimit } = {}) {
     const fault = { create: privateError };
     app.get('/__synthetic/route-error', () => { throw fault.create(); });
     app.get('/__synthetic/async-error', asyncHandler(async () => { throw privateError(); }));
+    registerRoutes(app);
     setupFinalHandlers();
     const server = app.listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));
@@ -307,5 +311,119 @@ for (const site of ['ffg', 'tta']) for (const [name, trustedIPs, elevated] of [
         assert.equal(after.headers.get('ratelimit-limit'), '3');
         assert.equal(f.records.length, initialDiagnostics, 'Requests never recompile or repeat configuration diagnostics');
         f.bounded();
+    });
+}
+
+for (const site of ['ffg', 'tta']) {
+    test(`${site}: actual login, session authentication and CSRF remain intact`, async t => {
+        const f = await fixture(t, site, { authenticated: false, registerRoutes(app) {
+            app.get('/__synthetic/identity', (req, res) => res.json({ id: req.user?.id ?? null }));
+        } });
+        const username = 'synthetic-login', password = 'SYNTHETIC_ERROR_PASSWORD';
+        const userId = Number(User.create(username, password, 'admin').lastInsertRowid);
+        const unauthenticated = await f.request('/admin');
+        assert.equal(unauthenticated.status, 302); assert.equal(unauthenticated.location, '/login');
+        const csrf = JSON.parse((await f.request('/__synthetic/csrf')).text).csrf;
+        const login = await f.request('/login', { method: 'POST',
+            body: new URLSearchParams({ _csrf: csrf, username, password }) });
+        assert.equal(login.status, 302); assert.equal(login.location, '/admin');
+        assert.equal(JSON.parse((await f.request('/__synthetic/identity')).text).id, userId);
+        const admin = await f.request('/admin');
+        assert.equal(admin.status, 302); assert.equal(admin.location, '/admin/dashboard');
+        f.bounded();
+        // Existing fixed CSRF warnings are outside the exception diagnostic sink.
+        const forbidden = await f.request('/logout', { method: 'POST', body: new URLSearchParams() });
+        assert.equal(forbidden.status, 403);
+        assert.equal(JSON.parse((await f.request('/__synthetic/identity')).text).id, userId);
+        assert.equal(f.records.length, 0);
+        assert.equal(f.diagnostics.join('\n').includes(password), false);
+        const logout = await f.request('/logout', { method: 'POST', body: new URLSearchParams({ _csrf: csrf }) });
+        assert.equal(logout.status, 302); assert.equal(logout.location, '/');
+        assert.equal(JSON.parse((await f.request('/__synthetic/identity')).text).id, null);
+    });
+
+    test(`${site}: rejected values reach the real final handler while explicit routing remains intact`, async t => {
+        let rejection = privateError;
+        const forwarded = [], unhandled = [];
+        const onUnhandled = value => unhandled.push(value);
+        process.on('unhandledRejection', onUnhandled);
+        t.after(() => process.off('unhandledRejection', onUnhandled));
+        const f = await fixture(t, site, { ordinaryLimit: 1000, registerRoutes(app) {
+            const track = handler => (req, res, next) => asyncHandler(handler)(req, res, (...args) => {
+                forwarded.push(args); return next(...args);
+            });
+            app.get('/__synthetic/rejection', track(async () => { throw rejection(); }));
+            app.get('/__synthetic/sync-throw', track(() => { throw privateError(); }));
+            app.get('/__synthetic/resolved', track(async (req, res) => { res.send('resolved'); }));
+            app.get('/__synthetic/headers-error', track(async (req, res) => {
+                res.write('partial response'); res.flushHeaders();
+                await delay(10);
+                throw rejection();
+            }));
+            const router = express.Router();
+            router.get('/route', track(async (req, res, next) => next('route')),
+                () => assert.fail('Explicit route control must skip this handler'));
+            router.get('/route', (req, res) => res.send('next route'));
+            router.get('/router', track(async (req, res, next) => next('router')));
+            router.use(() => assert.fail('Explicit router control must leave this router'));
+            app.use('/__synthetic/control', router);
+            app.get('/__synthetic/control/router', (req, res) => res.send('outside router'));
+            app.get('/__synthetic/callback-race', track(async (req, res, next) => {
+                next(privateError()); await delay(5); throw privateError();
+            }));
+        } });
+        const cases = [
+            ['undefined', () => undefined], ['null', () => null], ['false', () => false],
+            ['zero', () => 0], ['empty string', () => ''], ['route', () => 'route'],
+            ['router', () => 'router'], ['ordinary Error', privateError],
+            ['truthy private object', () => ({ message: privateText, stack: privateText, body: privateText })],
+            ['throwing getters', () => Object.defineProperties({}, Object.fromEntries(
+                ['name', 'code', 'message', 'stack', 'toString', 'toJSON'].map(key =>
+                    [key, { get() { throw new Error(privateText); } }])))],
+            ['revoked proxy', () => { const p = Proxy.revocable({}, {}); p.revoke(); return p.proxy; }]
+        ];
+        for (const [name, create] of cases) await t.test(name, async () => {
+            rejection = create;
+            const before = f.records.length, calls = forwarded.length;
+            const response = await f.request('/__synthetic/rejection', { signal: AbortSignal.timeout(3000) });
+            assert.equal(response.status, 500); assert.equal(response.text, '500');
+            assert.equal(forwarded.length, calls + 1);
+            assert.equal(f.records.length, before + 1);
+            assert.equal(f.records.at(-1).message, 'Global Error Handler');
+            f.bounded();
+        });
+        await t.test('synchronous Error and callback/rejection race each log once', async () => {
+            for (const path of ['/__synthetic/sync-throw', '/__synthetic/callback-race']) {
+                const before = f.records.length, calls = forwarded.length;
+                assert.equal((await f.request(path, { signal: AbortSignal.timeout(3000) })).status, 500);
+                await delay(10);
+                assert.equal(forwarded.length, calls + 1);
+                assert.equal(f.records.length, before + 1);
+                f.bounded();
+            }
+        });
+        await t.test('resolved handlers and explicit routing preserve successful HTTP behavior', async () => {
+            const before = f.records.length;
+            for (const [path, text] of [['resolved', 'resolved'], ['control/route', 'next route'],
+                ['control/router', 'outside router']]) {
+                const response = await f.request('/__synthetic/' + path, { signal: AbortSignal.timeout(3000) });
+                assert.equal(response.status, 200); assert.equal(response.text, text);
+            }
+            assert.equal((await f.request('/health')).status, 200);
+            assert.equal((await f.request('/missing')).status, 404);
+            assert.equal(f.records.length, before);
+            assert.throws(() => f.setupFinalHandlers(), /already finalized/);
+        });
+        await t.test('failure after headers closes HTTP response with one bounded diagnostic', async () => {
+            rejection = () => 'route';
+            const before = f.records.length, calls = forwarded.length;
+            await assert.rejects(f.request('/__synthetic/headers-error', { signal: AbortSignal.timeout(3000) }),
+                error => error instanceof TypeError);
+            assert.equal(forwarded.length, calls + 1);
+            assert.equal(f.records.length, before + 1);
+            f.bounded();
+        });
+        await delay(10);
+        assert.equal(unhandled.length, 0);
     });
 }
