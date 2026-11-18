@@ -28,15 +28,32 @@ const getDefaultImagesDir = () => {
 
 const getImageDescriptor = async (imagesDir, publicPath) => {
   const filePath = path.join(imagesDir, path.basename(publicPath));
+  let stats;
   try {
-    const [stats, metadata] = await Promise.all([fs.stat(filePath), sharp(filePath).metadata()]);
-    if (!stats.isFile() || stats.size < 1
-      || !Number.isInteger(metadata.width) || !Number.isInteger(metadata.height)) return null;
-    return { path: publicPath, width: metadata.width, height: metadata.height };
+    stats = await fs.stat(filePath);
   } catch (error) {
     if (error.code === 'ENOENT' || error.code === 'EISDIR') return null;
     throw error;
   }
+  if (!stats.isFile() || stats.size < 1) return null;
+
+  let metadata;
+  try {
+    metadata = await sharp(filePath).metadata();
+  } catch (error) {
+    // An explicit unrelated failure must not be hidden by a later disappearance.
+    if (error.code !== undefined && error.code !== 'ENOENT' && error.code !== 'EISDIR') throw error;
+    // Sharp can report missing input without a filesystem error code. Only a
+    // confirmed disappearance permits fallback; existing-file failures propagate.
+    try { await fs.stat(filePath); }
+    catch (statError) {
+      if (statError.code === 'ENOENT') return null;
+      throw statError;
+    }
+    throw error;
+  }
+  if (!Number.isInteger(metadata.width) || !Number.isInteger(metadata.height)) return null;
+  return { path: publicPath, width: metadata.width, height: metadata.height };
 };
 
 const validateHeroSourceMetadata = (metadata) => {
