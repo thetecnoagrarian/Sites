@@ -430,7 +430,9 @@ primary keys support one authorization statement per image; publication survives
 association removal/post deletion. Migration `0003` adds no historical backfill
 and further restricts older-image rollback. Existing unversioned uploads retain
 public-tree-first static behavior without a historical publication inference.
-The FFG hero writer/index is not integrated yet and remains a release blocker.
+The November 19, 2026 local implementation connects FFG hero publication to a
+filesystem authority and managed provider. Review, legacy inventory and
+production durability/restore gates remain prerequisites to rollout.
 `BODY_GALLERY_DESIGN.md` owns receipts, recovery, capacity and cutover limitations.
 
 FFG duplicate-title confirmation is keyed by the operation UUID in SQLite,
@@ -446,16 +448,34 @@ session data, so reversed whole-session saves cannot erase another pending input
 Public media queries exclude the snapshot. Terminal snapshots remain retained
 (1,000 maximum-size snapshots approach 7.8 GiB before overhead); no cleanup or
 draft system is added. Final article/grants still share one editorial transaction.
-Hero publication and production migration/paired restore gates remain separate.
+Hero publication uses the filesystem authority below; production migration and
+paired restore gates remain separate.
 
-FFG seasonal hero state belongs under `<uploadsPath>/hero`. Its minimal
-`.current.json` contains only a validated server-generated generation UUID.
-The selected generation contains `.source/current-source.<decoded-extension>`,
-`current-hero.webp`, and `current-hero-og.webp`. Only the two derivatives are
-public. No directory scan chooses an older generation when the manifest or
-selected derivative is invalid. Express mediation prevents the retained
-`.source` file from being served publicly. The whole hero tree is persistent
-volume-backed runtime content and is included in the normal uploads archive.
+FFG seasonal hero authority remains `<uploadsPath>/hero/.current.json`. The
+legacy v1 `{generation}` shape is read without rewriting it or inferring old
+publication history. V2 records a monotonic revision, typed current selection,
+observed legacy selection, append-only managed grants and accepted-operation
+receipts. New server-issued generations stay beneath `uploads/.media/hero/<UUID>`;
+only explicit grants authorize their `hero/m1-<UUID>` derivative URLs. The shared
+serving boundary uses FFG's optional opened-file verifier to check recorded size
+and SHA-256 on the securely opened descriptor before headers, HEAD or 304. Body
+streaming restarts at offset zero on that same descriptor. Post authorization
+and TTA do not depend on this hero manifest.
+
+The local coordinator serializes authority mutations across ESM instances in one
+application process, keyed by canonical uploads-root filesystem identity.
+Preparation verifies and synchronizes retained source and both derivatives;
+acceptance writes/syncs a same-directory temporary manifest, renames it and
+syncs the parent. Receipt reconciliation distinguishes accepted, not accepted
+and recovery-required outcomes. No media move follows acceptance. Only owned
+raw inputs are cleaned up; failed candidates, publication grants and historical
+bytes are retained. Reset commits a null selection while retaining history,
+rather than unlinking the authority. Resolver fallback does not revoke grants.
+
+Legacy plain-UUID URLs retain their compatibility behavior pending a separate
+inventory/cutover. Paired database/uploads recovery must include the canonical
+manifest and hidden `.media` contents, not just the currently selected image.
+V2 authority requires a v2-capable rollback image; see the deployment runbook.
 
 Treat `src/public/uploads/` as runtime/user-generated data even though it lives below `src/public/`. Do not inspect or summarize upload contents unless explicitly approved for a specific task.
 

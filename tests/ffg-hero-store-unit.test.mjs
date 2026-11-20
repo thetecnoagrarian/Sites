@@ -13,16 +13,35 @@ import {
   validateHeroSourceMetadata
 } from '../fruitionforestgarden/src/utils/heroImageProcessor.js';
 import {
-  generationPath,
+  managedGenerationPath as generationPath,
+  allocateHeroOperation,
   manifestPath,
   parseManifest,
-  publishHeroImage,
+  publishHeroImage as publish,
   readCurrentGeneration,
-  resetHeroImage,
+  resetHeroImage as reset,
   resolveHeroImage,
   resolveHeroSocialImage,
   withHeroOperationLock
 } from '../fruitionforestgarden/src/utils/heroImageStore.js';
+import { ownedUploadDirectory, reserveUploadFilename, recordOwnedUpload } from '../blog-core/src/middleware/owned-upload.js';
+
+// Existing lifecycle assertions now enter through the real private raw-upload
+// ownership and server-issued operation contract, not arbitrary input paths.
+async function publishHeroImage(options) {
+  const req = {}, filename = path.basename(options.inputPath);
+  const directory = await ownedUploadDirectory(req, path.join(options.uploadsPath, 'temp'));
+  const inputPath = path.join(directory, filename);
+  await reserveUploadFilename(req, filename);
+  await copyFile(options.inputPath, inputPath);
+  await recordOwnedUpload(req, { filename, path: inputPath });
+  const operationId = await allocateHeroOperation(options.uploadsPath, 1);
+  return publish({ ...options, inputPath, operationId, ownerUserId: 1 });
+}
+async function resetHeroImage(uploadsPath) {
+  const operationId = await allocateHeroOperation(uploadsPath, 1, 'reset');
+  return reset(uploadsPath, { operationId, ownerUserId: 1 });
+}
 
 const execFile = promisify(execFileCallback);
 const repositoryRoot = path.resolve('.');
@@ -107,10 +126,11 @@ test('JPEG, PNG, and WebP publish with canonical retained-source extensions', as
     const retainedSource = path.join(dir, '.source', `current-source.${extension}`);
     assert.equal(await hash(retainedSource), await hash(input));
     assert.deepEqual(
-      (await readdir(path.join(uploads, 'hero'))).sort(),
-      ['.current.json', ...generations].sort()
+      (await readdir(path.join(uploads, '.media', 'hero'))).sort(),
+      [...generations].sort()
     );
-    assert.equal(result.descriptor.path, `/uploads/hero/${result.generation}/current-hero.webp`);
+    assert.deepEqual(await readdir(path.join(uploads, 'hero')), ['.current.json']);
+    assert.equal(result.descriptor.path, `/uploads/hero/m1-${result.generation}/current-hero.webp`);
     assert.deepEqual(result.heroDimensions, { width: 1920, height: 960 });
     assert.deepEqual(result.ogDimensions, { width: 1200, height: 630 });
   }
@@ -160,7 +180,9 @@ test('persistent display/social resolution, corrupt fallback, replacement URL, a
   await readFile(path.join(generationPath(uploads, first.generation), 'current-hero.webp'));
   await readFile(path.join(generationPath(uploads, second.generation), '.source/current-source.png'));
   assert.equal((await resolveHeroImage(uploads, images)).path, '/images/HeroCamp.webp');
-  assert.deepEqual(await resetHeroImage(uploads), { reset: false, generation: null });
+  const repeated = await resetHeroImage(uploads);
+  assert.equal(repeated.reset, false); assert.equal(repeated.generation, null);
+  assert.equal(repeated.receipt.action, 'reset');
 });
 
 test('every injected pre-publication failure preserves manifest, URLs, and hashes', async (t) => {
@@ -182,33 +204,46 @@ test('every injected pre-publication failure preserves manifest, URLs, and hashe
   }
 });
 
-test('hero operation lock serializes upload/reset critical sections', async () => {
+test('hero operation lock serializes upload/reset critical sections', async t => {
+  const { uploads } = await fixture(t);
   const events = [];
-  let releaseFirst;
-  const firstGate = new Promise(resolve => { releaseFirst = resolve; });
-  const first = withHeroOperationLock(async () => {
+  const firstGate = Promise.withResolvers(), started = Promise.withResolvers();
+  const first = withHeroOperationLock(uploads, async () => {
     events.push('first-start');
-    await firstGate;
+    started.resolve();
+    await firstGate.promise;
     events.push('first-end');
   });
-  const second = withHeroOperationLock(async () => { events.push('second'); });
-  await new Promise(resolve => setImmediate(resolve));
+  await started.promise;
+  const second = withHeroOperationLock(uploads, async () => { events.push('second'); });
   assert.deepEqual(events, ['first-start']);
-  releaseFirst();
+  firstGate.resolve();
   await Promise.all([first, second]);
   assert.deepEqual(events, ['first-start', 'first-end', 'second']);
 });
 
-test('hero operation lock continues in FIFO order after a rejected operation', async () => {
+test('hero operation lock preserves queue order after a rejected operation', async t => {
+  const { uploads } = await fixture(t);
   const events = [];
-  const first = withHeroOperationLock(async () => {
+  const started = Promise.withResolvers(), release = Promise.withResolvers();
+  const first = withHeroOperationLock(uploads, async () => {
     events.push('first');
+    started.resolve();
+    await release.promise;
     throw new Error('expected failure');
   });
-  const second = withHeroOperationLock(async () => { events.push('second'); });
-  const third = withHeroOperationLock(async () => { events.push('third'); });
-
+  await started.promise;
+  const secondStarted = Promise.withResolvers(), releaseSecond = Promise.withResolvers();
+  const second = withHeroOperationLock(uploads, async () => {
+    events.push('second');
+    secondStarted.resolve();
+    await releaseSecond.promise;
+  });
+  release.resolve();
   await assert.rejects(first, /expected failure/);
+  await secondStarted.promise;
+  const third = withHeroOperationLock(uploads, async () => { events.push('third'); });
+  releaseSecond.resolve();
   await Promise.all([second, third]);
   assert.deepEqual(events, ['first', 'second', 'third']);
 });

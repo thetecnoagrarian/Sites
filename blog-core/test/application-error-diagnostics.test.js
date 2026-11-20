@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import express from 'express';
+import { engine } from 'express-handlebars';
+import sharp from 'sharp';
+import { chromium } from '@playwright/test';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
@@ -14,6 +17,7 @@ import logger from '../src/utils/logger.js';
 import User from '../src/models/user.js';
 import Post from '../src/models/post.js';
 import Category from '../src/models/category.js';
+import { createHeroPublicationProvider } from '../../fruitionforestgarden/src/utils/heroImageStore.js';
 
 const sentinels = ['ARTICLE', 'PENDING', 'CAPTION', 'PASSWORD', 'COOKIE', 'CSRF', 'TOKEN', 'QUERY', 'FILENAME', 'FILE_CONTENT'];
 const privateText = sentinels.map(value => `SYNTHETIC_ERROR_${value}`).join('|');
@@ -25,7 +29,8 @@ function privateError() {
     return error;
 }
 
-async function fixture(t, site, { trustedIPs, ordinaryLimit, authenticated = true, registerRoutes = () => {} } = {}) {
+async function fixture(t, site, { trustedIPs, ordinaryLimit, authenticated = true,
+    decorateRequest = () => {}, registerRoutes = () => {} } = {}) {
     const root = await fs.mkdtemp(path.join(tmpdir(), 'sites-final-diagnostics-'));
     const publicPath = path.join(root, 'public'), uploadsPath = path.join(root, 'uploads'), viewsPath = path.join(root, 'views');
     await Promise.all([publicPath, uploadsPath, viewsPath].map(p => fs.mkdir(p, { recursive: true })));
@@ -72,8 +77,11 @@ async function fixture(t, site, { trustedIPs, ordinaryLimit, authenticated = tru
     const intervals = [], ticks = [], nativeInterval = globalThis.setInterval;
     globalThis.setInterval = (...args) => { const handle = nativeInterval(...args); handle.unref(); intervals.push(handle); ticks.push(args[0]); return handle; };
     let application;
+    const hero = site === 'ffg' ? createHeroPublicationProvider(uploadsPath) : null;
     try { application = createBlogApp({ siteName: site, databasePath: path.join(root, 'synthetic.db'),
-        publicPath, uploadsPath, viewsPath, baseUrl: 'https://example.invalid' }); }
+        publicPath, uploadsPath, viewsPath, baseUrl: 'https://example.invalid',
+        mediaPublicationProviders: hero ? { hero: hero.authorize } : {},
+        mediaPublicationIntegrityVerifiers: hero ? { hero: hero.verifyOpenedFile } : {} }); }
     finally { globalThis.setInterval = nativeInterval; }
     const { app, setupFinalHandlers } = application, db = getDatabase();
     const owner = Number(db.prepare("INSERT INTO users(username,password_hash,role) VALUES('synthetic','synthetic','admin')").run().lastInsertRowid);
@@ -82,6 +90,7 @@ async function fixture(t, site, { trustedIPs, ordinaryLimit, authenticated = tru
         if (authenticated) {
             req.session.userId = owner; req.user = { id: owner, role: 'admin' };
         }
+        decorateRequest(req);
         if (req.path === '/__synthetic/attach') return attachUser(req, res, () => res.sendStatus(204));
         next();
     });
@@ -130,6 +139,7 @@ async function fixture(t, site, { trustedIPs, ordinaryLimit, authenticated = tru
         for (const row of records) { assert.ok(row.errorId); assert.ok(row.errorCategory); assert.ok(row.route); }
     };
     return { app, setupFinalHandlers, db, request, records, diagnostics, bounded, uploadsPath, access,
+        baseURL: base, cookie: () => cookie,
         tickSessions: () => ticks.forEach(tick => tick()), setFault: create => { fault.create = create; }, viewsPath };
 }
 
@@ -231,6 +241,257 @@ for (const site of ['ffg', 'tta']) {
         f.bounded();
     });
 }
+
+async function heroViews(f) {
+    const site = path.resolve('fruitionforestgarden/src');
+    await fs.mkdir(path.join(f.viewsPath, 'admin'), { recursive: true });
+    await fs.mkdir(path.join(f.viewsPath, 'partials', 'layouts'), { recursive: true });
+    for (const name of ['admin/hero-image', 'home', 'about']) {
+        await fs.copyFile(path.join(site, 'views', name + '.hbs'), path.join(f.viewsPath, name + '.hbs'));
+    }
+    // Real page templates, with a local shell that avoids external scripts/CDNs.
+    for (const name of ['main', 'admin']) await fs.writeFile(path.join(f.viewsPath, 'partials', 'layouts', name + '.hbs'),
+        '{{> @partial-block}}');
+    await fs.writeFile(path.join(f.viewsPath, 'layouts', 'main.hbs'),
+        '<html><head>{{{ogTags}}}</head><body>{{{body}}}</body></html>');
+    f.app.set('view options', { layout: 'main' });
+    f.app.engine('hbs', engine({ extname: '.hbs', defaultLayout: 'main', layoutsDir: path.join(f.viewsPath, 'layouts'),
+        partialsDir: path.join(f.viewsPath, 'partials') }));
+    const publicPath = path.join(path.dirname(f.viewsPath), 'public');
+    await fs.mkdir(path.join(publicPath, 'images'), { recursive: true });
+    for (const name of ['HeroCamp.webp', 'HeroCamp-og.webp']) await fs.copyFile(path.join(site, 'public/images', name), path.join(publicPath, 'images', name));
+}
+function heroForm(html, name = 'heroOperationId') {
+    const value = html.match(new RegExp(`name="${name}" value="([^"]+)"`))?.[1];
+    assert.ok(value, `Expected real form field ${name}`);
+    return value;
+}
+const heroBody = (id, csrf, bytes) => {
+    const body = new FormData(); body.append('_csrf', csrf); body.append('heroOperationId', id);
+    body.append('heroImage', new Blob([bytes], { type: 'image/png' }), 'SYNTHETIC_ERROR_FILENAME.png');
+    return body;
+};
+
+test('FFG real admin upload receipts survive response failure and post deletion without leaking diagnostics', async t => {
+    let failResponse = true;
+    const f = await fixture(t, 'ffg', { decorateRequest(req) {
+        const flash = req.flash;
+        req.flash = function (type, ...args) {
+            if (failResponse && req.originalUrl === '/admin/hero-image/upload' && type === 'success') throw privateError();
+            return flash.call(this, type, ...args);
+        };
+    } });
+    await heroViews(f);
+    const form = await f.request('/admin/hero-image');
+    assert.equal(form.status, 200);
+    const id = heroForm(form.text), csrf = heroForm(form.text, '_csrf');
+    const bytes = await sharp({ create: { width: 120, height: 60, channels: 3, background: '#246842' } }).png().toBuffer();
+    const failedResponse = await f.request('/admin/hero-image/upload', { method: 'POST', body: heroBody(id, csrf, bytes) });
+    assert.equal(failedResponse.status, 503); assert.equal(JSON.parse(failedResponse.text).state, 'accepted');
+    failResponse = false;
+    const status = await f.request('/admin/hero-image/operations/' + id);
+    assert.equal(status.status, 200); assert.equal(JSON.parse(status.text).state, 'accepted');
+    assert.equal(status.headers.get('cache-control'), 'no-store');
+    const authorityPath = path.join(f.uploadsPath, 'hero', '.current.json');
+    const authorityBefore = await fs.readFile(authorityPath), candidatesBefore = await fs.readdir(path.join(f.uploadsPath, '.media', 'hero'));
+    const integrity = await f.request('/admin/hero-image/integrity');
+    assert.equal(integrity.status, 200); assert.equal(JSON.parse(integrity.text).state, 'ok');
+    assert.equal(integrity.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await fs.readFile(authorityPath), authorityBefore);
+    assert.deepEqual(await fs.readdir(path.join(f.uploadsPath, '.media', 'hero')), candidatesBefore);
+    const retried = await f.request('/admin/hero-image/upload', { method: 'POST', body: heroBody(id, csrf, bytes) });
+    assert.equal(retried.status, 302);
+    const url = `/uploads/hero/m1-${id}/current-hero.webp`;
+    assert.equal((await f.request(url)).status, 200);
+    const created = Post.create({ title: 'Synthetic hero association', body: `<img src="${url}">`,
+        description: '', excerpt: '', images: [], captions: [], created_at: '2026-01-01', author_id: 1 });
+    const deleted = await f.request(`/admin/dashboard/posts/${created.lastInsertRowid}/delete`, {
+        method: 'POST', body: new URLSearchParams({ _csrf: csrf }) });
+    assert.equal(deleted.status, 302); assert.equal((await f.request(url)).status, 200);
+    f.bounded();
+});
+
+function failHeroDirectorySync(t, directory) {
+    const native = fs.open.bind(fs);
+    const patched = t.mock.method(fs, 'open', async (file, ...args) => {
+        const handle = await native(file, ...args);
+        if (file !== directory) return handle;
+        return new Proxy(handle, { get(target, key) {
+            if (key === 'sync') return async () => { throw Object.assign(privateError(), { code: 'EIO' }); };
+            const value = Reflect.get(target, key, target); return typeof value === 'function' ? value.bind(target) : value;
+        } });
+    });
+    return () => patched.mock.restore();
+}
+
+function assertHeroUnknown(result, operationId) {
+    assert.equal(result.status, 503);
+    assert.equal(result.headers.get('cache-control'), 'no-store');
+    const body = JSON.parse(result.text);
+    assert.equal(body.state, 'unknown');
+    if (operationId) assert.equal(body.operationId, operationId);
+    assert.doesNotMatch(result.text, /Failed to (?:process|reset)|SYNTHETIC_ERROR_|[.]current[.]json/);
+}
+
+test('FFG upload retry and receipt status stay unknown through persistent sync, read and validation faults', async t => {
+    const f = await fixture(t, 'ffg'); await heroViews(f);
+    const form = await f.request('/admin/hero-image'), id = heroForm(form.text), csrf = heroForm(form.text, '_csrf');
+    const bytes = await sharp({ create: { width: 120, height: 60, channels: 3, background: '#246842' } }).png().toBuffer();
+    const directory = await fs.realpath(path.join(f.uploadsPath, 'hero'));
+    const file = path.join(directory, '.current.json');
+    const lookup = '/admin/hero-image/operations/' + id;
+    const url = `/uploads/hero/m1-${id}/current-hero.webp`;
+    const upload = () => f.request('/admin/hero-image/upload', { method: 'POST', body: heroBody(id, csrf, bytes) });
+    const before = await fs.readFile(file);
+    const rename = t.mock.method(fs, 'rename', async () => { throw Object.assign(privateError(), { code: 'EIO' }); });
+    const notAccepted = await upload();
+    assert.equal(notAccepted.status, 302);
+    assert.equal(notAccepted.location, '/admin/hero-image');
+    rename.mock.restore();
+    assert.deepEqual(await fs.readFile(file), before);
+    assert.deepEqual(JSON.parse((await f.request(lookup)).text), { state: 'not-accepted' });
+    assert.equal((await f.request(url)).status, 404);
+
+    const restoreSync = failHeroDirectorySync(t, directory);
+    assertHeroUnknown(await upload(), id);
+    const accepted = await fs.readFile(file);
+    assert.equal(JSON.parse(accepted).operations[id].revision, 1);
+    assertHeroUnknown(await upload(), id);
+    assertHeroUnknown(await f.request(lookup));
+    const denied = await f.request(url, { headers: { 'If-None-Match': '*' } });
+    assert.equal(denied.status, 404); assert.equal(denied.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await fs.readFile(file), accepted);
+    restoreSync();
+
+    const native = fs.open.bind(fs);
+    const unreadable = t.mock.method(fs, 'open', async (filePath, ...args) => {
+        if (filePath === file) throw Object.assign(privateError(), { code: 'EACCES' });
+        return native(filePath, ...args);
+    });
+    assertHeroUnknown(await upload(), id);
+    assertHeroUnknown(await f.request(lookup));
+    unreadable.mock.restore();
+    // A schema error previously surfaced as HERO_REJECTED, even in receipt lookup.
+    await fs.writeFile(file, JSON.stringify({ ...JSON.parse(accepted), version: 3 }));
+    assertHeroUnknown(await upload(), id);
+    assertHeroUnknown(await f.request(lookup));
+    await fs.writeFile(file, accepted);
+
+    const recovered = await f.request(lookup);
+    assert.equal(recovered.status, 200);
+    assert.equal(JSON.parse(recovered.text).state, 'accepted');
+    assert.equal((await upload()).status, 302);
+    assert.deepEqual(await fs.readFile(file), accepted);
+    assert.equal((await f.request(url)).status, 200);
+    f.bounded();
+});
+
+test('FFG reset and retries report unknown until the existing reset receipt is durable', async t => {
+    const f = await fixture(t, 'ffg'); await heroViews(f);
+    const form = await f.request('/admin/hero-image'), id = heroForm(form.text), csrf = heroForm(form.text, '_csrf');
+    const bytes = await sharp({ create: { width: 120, height: 60, channels: 3, background: '#246842' } }).png().toBuffer();
+    assert.equal((await f.request('/admin/hero-image/upload', { method: 'POST', body: heroBody(id, csrf, bytes) })).status, 302);
+    const selected = await f.request('/admin/hero-image');
+    const resetId = heroForm(selected.text.slice(selected.text.indexOf('<form action="/admin/hero-image/reset"')));
+    const reset = () => f.request('/admin/hero-image/reset', { method: 'POST', body: new URLSearchParams({ _csrf: csrf, heroOperationId: resetId }) });
+    const lookup = '/admin/hero-image/operations/' + resetId;
+    const directory = await fs.realpath(path.join(f.uploadsPath, 'hero'));
+    const file = path.join(directory, '.current.json');
+    const restore = failHeroDirectorySync(t, directory);
+    assertHeroUnknown(await reset(), resetId);
+    const accepted = await fs.readFile(file);
+    const snapshot = JSON.parse(accepted);
+    assert.equal(snapshot.current, null);
+    assert.equal(snapshot.operations[resetId].revision, 2);
+    assert.ok(snapshot.publications[id]);
+    assertHeroUnknown(await reset(), resetId);
+    assertHeroUnknown(await f.request(lookup));
+    restore();
+    assert.equal((await reset()).status, 302);
+    const receipt = JSON.parse((await f.request(lookup)).text);
+    assert.equal(receipt.state, 'accepted'); assert.equal(receipt.revision, 2);
+    assert.deepEqual(await fs.readFile(file), accepted);
+    assert.equal((await f.request(`/uploads/hero/m1-${id}/current-hero.webp`)).status, 200);
+    f.bounded();
+});
+
+test('FFG actual lost upload response recovers its durable receipt on retry', async t => {
+    let loseResponse = true;
+    const f = await fixture(t, 'ffg', { decorateRequest(req) {
+        if (req.originalUrl !== '/admin/hero-image/upload') return;
+        const redirect = req.res.redirect;
+        req.res.redirect = function (...args) {
+            if (loseResponse) { this.destroy(); throw privateError(); }
+            return redirect.apply(this, args);
+        };
+    } });
+    await heroViews(f);
+    const form = await f.request('/admin/hero-image'), id = heroForm(form.text), csrf = heroForm(form.text, '_csrf');
+    const bytes = await sharp({ create: { width: 120, height: 60, channels: 3, background: '#246842' } }).png().toBuffer();
+    await assert.rejects(f.request('/admin/hero-image/upload', { method: 'POST', body: heroBody(id, csrf, bytes) }), error => error instanceof TypeError);
+    loseResponse = false;
+    const status = JSON.parse((await f.request('/admin/hero-image/operations/' + id)).text);
+    assert.equal(status.state, 'accepted'); assert.equal(status.revision, 1);
+    const retry = await f.request('/admin/hero-image/upload', { method: 'POST', body: heroBody(id, csrf, bytes) });
+    assert.equal(retry.status, 302);
+    assert.equal(JSON.parse((await f.request('/admin/hero-image/operations/' + id)).text).revision, 1);
+    f.bounded();
+});
+
+test('FFG reset response failure reports accepted and retries cannot reset a newer publication', async t => {
+    let failReset = true;
+    const f = await fixture(t, 'ffg', { decorateRequest(req) {
+        if (req.originalUrl !== '/admin/hero-image/reset') return;
+        const redirect = req.res.redirect;
+        req.res.redirect = function (...args) {
+            if (failReset) throw privateError();
+            return redirect.apply(this, args);
+        };
+    } });
+    await heroViews(f);
+    const form = await f.request('/admin/hero-image'), id = heroForm(form.text), csrf = heroForm(form.text, '_csrf');
+    const bytes = await sharp({ create: { width: 120, height: 60, channels: 3, background: '#246842' } }).png().toBuffer();
+    assert.equal((await f.request('/admin/hero-image/upload', { method: 'POST', body: heroBody(id, csrf, bytes) })).status, 302);
+    const selected = await f.request('/admin/hero-image');
+    const resetId = heroForm(selected.text.slice(selected.text.indexOf('<form action="/admin/hero-image/reset"')));
+    const resetBody = () => new URLSearchParams({ _csrf: csrf, heroOperationId: resetId });
+    const reset = await f.request('/admin/hero-image/reset', { method: 'POST', body: resetBody() });
+    assert.equal(reset.status, 503); assert.equal(JSON.parse(reset.text).state, 'accepted');
+    failReset = false;
+    const nextId = heroForm((await f.request('/admin/hero-image')).text);
+    assert.equal((await f.request('/admin/hero-image/upload', { method: 'POST', body: heroBody(nextId, csrf, bytes) })).status, 302);
+    assert.equal((await f.request('/admin/hero-image/reset', { method: 'POST', body: resetBody() })).status, 302);
+    const current = JSON.parse(await fs.readFile(path.join(f.uploadsPath, 'hero', '.current.json')));
+    assert.equal(current.current.generation, nextId); assert.equal(current.revision, 3);
+    assert.equal((await f.request(`/uploads/hero/m1-${id}/current-hero.webp`)).status, 200);
+    f.bounded();
+});
+
+test('FFG local Chromium submits the real hero form and preserves historical URLs through reset', async t => {
+    const f = await fixture(t, 'ffg'); await heroViews(f);
+    await f.request('/__synthetic/csrf');
+    const browser = await chromium.launch({ headless: true });
+    try {
+        const page = await browser.newPage({ extraHTTPHeaders: { cookie: f.cookie(), 'x-forwarded-proto': 'https' } });
+        await page.goto(f.baseURL + '/admin/hero-image');
+        const id = await page.locator('form.hero-upload-form input[name="heroOperationId"]').inputValue();
+        const bytes = await sharp({ create: { width: 120, height: 60, channels: 3, background: '#246842' } }).png().toBuffer();
+        await page.locator('input[name="heroImage"]').setInputFiles({ name: 'synthetic.png', buffer: bytes, mimeType: 'image/png' });
+        await Promise.all([page.waitForNavigation(), page.locator('form.hero-upload-form').evaluate(form => form.requestSubmit())]);
+        assert.equal(new URL(page.url()).pathname, '/admin/hero-image');
+        assert.equal(await page.locator('.hero-preview img').getAttribute('src'), `/uploads/hero/m1-${id}/current-hero.webp`);
+        for (const [url, selector] of [['/', '.hero-image'], ['/about', '.about-image']]) {
+            const response = await page.goto(f.baseURL + url); assert.equal(response.status(), 200);
+            assert.equal(await page.locator(selector).getAttribute('src'), `/uploads/hero/m1-${id}/current-hero.webp`);
+            assert.equal(await page.locator('meta[property="og:image"]').getAttribute('content'), f.baseURL.replace(/^http:/, 'https:') + `/uploads/hero/m1-${id}/current-hero-og.webp`);
+        }
+        await page.goto(f.baseURL + '/admin/hero-image');
+        await Promise.all([page.waitForNavigation(), page.locator('form.hero-reset-form').evaluate(form => form.requestSubmit())]);
+        assert.equal(await page.locator('.hero-preview img').getAttribute('src'), '/images/HeroCamp.webp');
+        assert.equal((await f.request(`/uploads/hero/m1-${id}/current-hero.webp`)).status, 200);
+        f.bounded();
+    } finally { await browser.close(); }
+});
 
 test('FFG actual hero upload error retains redirect and bounded diagnostic', async t => {
     const f = await fixture(t, 'ffg');

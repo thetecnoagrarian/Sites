@@ -6,6 +6,9 @@ import {
     publishHeroImage,
     resetHeroImage,
     resolveHeroImage,
+    allocateHeroOperation,
+    readHeroOperationReceipt,
+    readHeroIntegrityStatus,
     withHeroOperationLock
 } from '../utils/heroImageStore.js';
 
@@ -274,12 +277,19 @@ router.post('/users/:id/delete', isAdmin, asyncHandler(async (req, res) => {
 
 // GET route for hero image management page
 router.get('/hero-image', isAdmin, asyncHandler(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
     try {
         const heroImage = await resolveHeroImage(req.app.locals.uploadsPath);
+        const integrity = await readHeroIntegrityStatus(req.app.locals.uploadsPath);
+        const writable = integrity.state !== 'authority-unavailable';
         res.render('admin/hero-image', {
             title: 'Hero Image Management',
             heroImagePath: heroImage?.path,
             heroImagePersistent: heroImage?.persistent,
+            heroOperationId: writable ? await allocateHeroOperation(req.app.locals.uploadsPath, req.user.id) : null,
+            heroResetOperationId: writable && integrity.current
+                ? await allocateHeroOperation(req.app.locals.uploadsPath, req.user.id, 'reset') : null,
+            heroIntegrityWarning: ['degraded', 'authority-unavailable'].includes(integrity.state),
             success: req.flash('success'),
             error: req.flash('error'),
             user: req.user,
@@ -289,6 +299,25 @@ router.get('/hero-image', isAdmin, asyncHandler(async (req, res) => {
         logSafeError(error, { request: req, event: 'admin' });
         req.flash('error', 'Failed to load hero image page');
         res.redirect('/admin/dashboard');
+    }
+}));
+
+router.get('/hero-image/integrity', isAdmin, asyncHandler(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const status = await readHeroIntegrityStatus(req.app.locals.uploadsPath);
+    res.status(status.state === 'authority-unavailable' ? 503 : 200).json(status);
+}));
+
+router.get('/hero-image/operations/:id', isAdmin, asyncHandler(async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    try {
+        const receipt = await readHeroOperationReceipt(req.app.locals.uploadsPath, req.params.id, req.user.id);
+        res.json(receipt ? { state: 'accepted', operationId: receipt.operationId, action: receipt.action,
+            generation: receipt.generation, revision: receipt.revision, acceptedAt: receipt.acceptedAt }
+            : { state: 'not-accepted' });
+    } catch (error) {
+        logSafeError(error, { request: req, event: 'admin' });
+        res.status(error.code === 'HERO_REJECTED' ? 404 : 503).json({ state: 'unknown', error: 'Hero operation status unavailable' });
     }
 }));
 
@@ -320,11 +349,15 @@ router.post('/hero-image/upload', isAdmin, (req, res, next) => {
             return res.status(403).json({ error: 'Invalid CSRF token' });
         }
 
+        let acceptedReceipt;
         try {
-            const result = await withHeroOperationLock(() => publishHeroImage({
+            const result = await withHeroOperationLock(req.app.locals.uploadsPath, () => publishHeroImage({
                 inputPath: req.file.path,
-                uploadsPath: req.app.locals.uploadsPath
+                uploadsPath: req.app.locals.uploadsPath,
+                operationId: req.body.heroOperationId,
+                ownerUserId: req.user.id
             }));
+            acceptedReceipt = result.receipt;
             
             // Format file sizes for display
             const heroSizeMB = (result.heroSize / (1024 * 1024)).toFixed(2);
@@ -336,6 +369,13 @@ router.post('/hero-image/upload', isAdmin, (req, res, next) => {
             res.redirect('/admin/hero-image');
         } catch (error) {
             logSafeError(error, { request: req, event: 'admin' });
+            if (acceptedReceipt && (res.headersSent || res.destroyed)) return res.destroy();
+            if (acceptedReceipt) return res.status(503).set('Cache-Control', 'no-store').json({
+                state: 'accepted', operationId: acceptedReceipt.operationId, revision: acceptedReceipt.revision,
+                error: 'Hero accepted; response handling failed. Check the operation status before retrying.' });
+            if (error.code === 'HERO_OUTCOME_UNKNOWN') return res.status(503).set('Cache-Control', 'no-store').json({
+                state: 'unknown', operationId: req.body.heroOperationId,
+                error: 'Hero outcome unknown. Check the operation status before retrying.' });
             req.flash('error', 'Failed to process hero image. Confirm it is a JPEG, PNG, or WebP within the documented limits.');
             res.redirect('/admin/hero-image');
         } finally {
@@ -345,11 +385,23 @@ router.post('/hero-image/upload', isAdmin, (req, res, next) => {
 });
 
 router.post('/hero-image/reset', isAdmin, asyncHandler(async (req, res) => {
+    let acceptedReceipt;
     try {
-        await withHeroOperationLock(() => resetHeroImage(req.app.locals.uploadsPath));
+        const result = await withHeroOperationLock(req.app.locals.uploadsPath, () => resetHeroImage(req.app.locals.uploadsPath, {
+            operationId: req.body.heroOperationId, ownerUserId: req.user.id
+        }));
+        acceptedReceipt = result.receipt;
         req.flash('success', 'Hero image reset to the repository default.');
+        return res.redirect('/admin/hero-image');
     } catch (error) {
         logSafeError(error, { request: req, event: 'admin' });
+        if (acceptedReceipt && (res.headersSent || res.destroyed)) return res.destroy();
+        if (acceptedReceipt) return res.status(503).set('Cache-Control', 'no-store').json({
+            state: 'accepted', operationId: acceptedReceipt.operationId, revision: acceptedReceipt.revision,
+            error: 'Hero reset accepted; response handling failed. Check the operation status before retrying.' });
+        if (error.code === 'HERO_OUTCOME_UNKNOWN') return res.status(503).set('Cache-Control', 'no-store').json({
+            state: 'unknown', operationId: req.body.heroOperationId,
+            error: 'Hero outcome unknown. Check the operation status before retrying.' });
         req.flash('error', 'Failed to reset the hero image. Please try again.');
     }
     res.redirect('/admin/hero-image');

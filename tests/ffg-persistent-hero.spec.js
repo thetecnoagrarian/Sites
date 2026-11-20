@@ -21,17 +21,20 @@ const currentState = () => containerJson(`
   import { createHash } from 'node:crypto';
   import { readFile, readdir } from 'node:fs/promises';
   const manifest = JSON.parse(await readFile('/app/data/uploads/hero/.current.json', 'utf8'));
-  const base = '/app/data/uploads/hero/' + manifest.generation;
+  if (manifest.version !== 2 || manifest.current?.kind !== 'managed') throw new Error('Expected managed hero authority');
+  const generation = manifest.current.generation;
+  if (!manifest.publications[generation]) throw new Error('Expected explicit hero grant');
+  const base = '/app/data/uploads/.media/hero/' + generation;
   const sourceNames = (await readdir(base + '/.source')).sort();
   if (sourceNames.length !== 1) throw new Error('Expected exactly one retained hero source');
   const sourceName = sourceNames[0];
   const digest = async file => createHash('sha256').update(await readFile(file)).digest('hex');
   console.log(JSON.stringify({
-    generation: manifest.generation,
+    generation,
     sourceName,
-    sourceUrl: '/uploads/hero/' + manifest.generation + '/.source/' + sourceName,
-    displayUrl: '/uploads/hero/' + manifest.generation + '/current-hero.webp',
-    socialUrl: '/uploads/hero/' + manifest.generation + '/current-hero-og.webp',
+    sourceUrl: '/uploads/hero/m1-' + generation + '/.source/' + sourceName,
+    displayUrl: '/uploads/hero/m1-' + generation + '/current-hero.webp',
+    socialUrl: '/uploads/hero/m1-' + generation + '/current-hero-og.webp',
     sourceHash: await digest(base + '/.source/' + sourceName),
     displayHash: await digest(base + '/current-hero.webp'),
     socialHash: await digest(base + '/current-hero-og.webp')
@@ -138,6 +141,8 @@ test('FFG persistent seasonal hero browser lifecycle', async ({ page }) => {
   expect(second.displayUrl).not.toBe(first.displayUrl);
   expect(second.socialUrl).not.toBe(first.socialUrl);
   await verifyPublicState(page, second);
+  expect((await page.request.get(`${BASE_URL}${first.displayUrl}`)).status()).toBe(200);
+  expect((await page.request.get(`${BASE_URL}${first.socialUrl}`)).status()).toBe(200);
 
   await upload(page, 'failed-replacement.png', Buffer.from('not an image'), 'image/png');
   expect(currentState()).toEqual(second);
@@ -152,4 +157,7 @@ test('FFG persistent seasonal hero browser lifecycle', async ({ page }) => {
   const response = await page.goto(`${BASE_URL}/`);
   await expect(page.locator('.hero-image')).toHaveAttribute('src', '/images/HeroCamp.webp');
   expect(ogImage(await response.text())).toBe(`${BASE_URL}/images/HeroCamp-og.webp`);
+  for (const url of [first.displayUrl, first.socialUrl, second.displayUrl, second.socialUrl]) {
+    expect((await page.request.get(`${BASE_URL}${url}`)).status()).toBe(200);
+  }
 });

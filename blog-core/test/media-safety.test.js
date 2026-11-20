@@ -22,6 +22,7 @@ import { ownedUploadDirectory, reserveUploadFilename, recordOwnedUpload,
 import ffgAdmin from '../../fruitionforestgarden/src/routes/admin.js';
 import ttaAdmin from '../../thetecnoagrarian/src/routes/admin.js';
 import logger from '../src/utils/logger.js';
+import { allocateHeroOperation, createHeroPublicationProvider, managedGenerationPath } from '../../fruitionforestgarden/src/utils/heroImageStore.js';
 
 const hash = file => createHash('sha256').update(readFileSync(file)).digest('hex');
 const image = { thumbnail: '/uploads/old-thumbnail.webp', medium: '/uploads/old-medium.webp',
@@ -102,7 +103,10 @@ async function fixture(t, site = 'ffg', { beforeVerify, fileSize, omitCleanupRou
     app.use('/admin', site === 'ffg' ? ffgAdmin : ttaAdmin);
     const publicPath = path.join(directory, 'public');
     mkdirSync(publicPath);
-    mountMediaServing(app, { publicPath, uploadsPath: uploads, publicationProviders: { post: createPostMediaProvider(db) } });
+    const hero = site === 'ffg' ? createHeroPublicationProvider(uploads) : null;
+    mountMediaServing(app, { publicPath, uploadsPath: uploads,
+        publicationProviders: { post: createPostMediaProvider(db), ...(hero ? { hero: hero.authorize } : {}) },
+        publicationIntegrityVerifiers: hero ? { hero: hero.verifyOpenedFile } : {} });
     server = app.listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));
     const baseUrl = `http://127.0.0.1:${server.address().port}`;
@@ -360,18 +364,24 @@ test('TTA new-post upload remains functional and cleans only its private raw inp
 
 test('actual FFG hero upload/reset retains generated media and source, cleaning only raw input', async t => {
     const f = await fixture(t);
-    const result = await f.post('/hero-image/upload', { _csrf: 'synthetic-csrf' }, 'heroImage');
+    const operationId = await allocateHeroOperation(f.uploads, f.session.userId);
+    const result = await f.post('/hero-image/upload', { _csrf: 'synthetic-csrf', heroOperationId: operationId }, 'heroImage');
     assert.equal(result.response.status, 302);
     const manifest = path.join(f.uploads, 'hero', '.current.json');
-    const { generation } = JSON.parse(await fs.readFile(manifest, 'utf8'));
-    const source = path.join(f.uploads, 'hero', generation, '.source', 'current-source.png');
+    const { current } = JSON.parse(await fs.readFile(manifest, 'utf8'));
+    const generation = current.generation;
+    const source = path.join(managedGenerationPath(f.uploads, generation), '.source', 'current-source.png');
     assert.deepEqual(await fs.readFile(source), f.png);
     await result.waitForCleanup();
     assert.deepEqual(await fs.readdir(path.join(f.uploads, 'temp')), []);
-    await f.post('/hero-image/reset', {});
-    await assert.rejects(fs.stat(manifest), { code: 'ENOENT' });
+    const resetId = await allocateHeroOperation(f.uploads, f.session.userId, 'reset');
+    await f.post('/hero-image/reset', { heroOperationId: resetId });
+    const reset = JSON.parse(await fs.readFile(manifest, 'utf8'));
+    assert.equal(reset.current, null); assert.ok(reset.publications[generation]);
     assert.deepEqual(await fs.readFile(source), f.png);
-    assert.ok(await fs.readFile(path.join(f.uploads, 'hero', generation, 'current-hero.webp')));
+    assert.ok(await fs.readFile(path.join(managedGenerationPath(f.uploads, generation), 'current-hero.webp')));
+    const historical = await fetch(`${f.baseUrl}/uploads/hero/m1-${generation}/current-hero.webp`);
+    assert.equal(historical.status, 200); await historical.arrayBuffer();
     f.assertRetained();
 });
 

@@ -411,6 +411,41 @@ rollback floor. If an
 operator intends a permanent default, use the compatible admin reset before
 rollback; do not delete volume content as a substitute.
 
+#### Managed hero v2 boundary (November 19, 2026 local implementation)
+
+This records a local development change, not a production rollout. Compatible
+code reads v1 hero manifests without rewriting them. A new managed publication
+or reset atomically upgrades the canonical `hero/.current.json` to v2, preserving
+the observed legacy selection and all subsequent grants/receipts. The v2 reset
+keeps the manifest and records a null selection. Fresh authority initialization is
+allowed only without managed residue; never reconstruct grants from directories
+or bootstrap over missing/corrupt authority.
+
+Run one FFG writer process per uploads root. If publication or reset returns
+recovery required, use authenticated receipt lookup after authority reads and
+directory sync become available. An identical retry can confirm the existing
+receipt without rewriting it or selecting an older hero.
+
+Before any separately authorized rollout, verify a coherent database/uploads
+backup and restore, including hidden `.media/hero` candidates, retained sources
+and canonical authority. Check actual ingress for static bypasses read-only;
+inventory legacy plain-UUID content separately without inferring publication.
+Verify file/directory sync behavior on the target Linux/container filesystem.
+Local child-process interruption tests do not prove power-loss durability.
+
+Capacity/admission review must account for retained failures, published history,
+receipts and operations allocated by editor visits. No automatic cleanup, quota
+or history truncation is introduced. Confirm bounded diagnostics are captured
+durably with an explicit retention policy; stdout alone is insufficient.
+
+Once v2 is accepted, require a v2-capable FFG rollback image. Older readers reject
+the v2 shape and older writers/reset behavior can lose authority history. An
+older-image-only rollback is therefore unsafe without a separately reviewed
+coherent recovery pair. Restore preserves exact content hashes, not original
+inode numbers. Repair missing/corrupt published bytes from the original accepted
+bytes; do not silently regenerate, substitute or unpublish them. Preserve legacy
+URLs until a separate authorized cutover. No production action is implied here.
+
 Use this normal verification sequence for a permanent downloadable asset:
 
 1. Place it under the appropriate site `src/public` tree.

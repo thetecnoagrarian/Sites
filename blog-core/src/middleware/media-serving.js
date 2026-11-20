@@ -36,7 +36,7 @@ async function checkedStaticPath(root, segments) {
 // same order as createBlogApp. Providers must return literal true only for a
 // committed publication grant. Absence/error/anything else fails closed.
 export function mountMediaServing(app, { publicPath, uploadsPath, privateUploadPathPatterns = [],
-    publicationProviders = {}, production = process.env.NODE_ENV === 'production' }) {
+    publicationProviders = {}, publicationIntegrityVerifiers = {}, production = process.env.NODE_ENV === 'production' }) {
     const publicStatic = express.static(publicPath, { maxAge: production ? '1h' : 0, immutable: false });
     const uploadsStatic = express.static(uploadsPath, { maxAge: production ? '7d' : 0, immutable: false });
     app.use(async (req, res, next) => {
@@ -74,19 +74,22 @@ export function mountMediaServing(app, { publicPath, uploadsPath, privateUploadP
                     const stat = await handle.stat({ bigint: true });
                     if (!stat.isFile() || stat.nlink !== 1n || !stat.size
                         || stat.dev !== checked.stat.dev || stat.ino !== checked.stat.ino) return deny(res);
+                    const verify = publicationIntegrityVerifiers[descriptor.kind];
+                    if (Object.hasOwn(publicationIntegrityVerifiers, descriptor.kind)
+                        && (typeof verify !== 'function' || await verify(descriptor, handle, stat) !== true)) return deny(res);
                     // Authorization precedes freshness/304 handling, including HEAD.
                     res.type('image/webp').set({ 'Cache-Control': production ? 'public, max-age=604800' : 'public, max-age=0',
                         'Content-Length': String(stat.size), 'Last-Modified': stat.mtime.toUTCString() });
                     res.set('ETag', `W/"${stat.size.toString(16)}-${stat.mtimeNs.toString(16)}"`);
                     if (req.fresh) return res.status(304).end();
                     if (req.method === 'HEAD') return res.end();
-                    await pipeline(handle.createReadStream({ autoClose: false }), res);
+                    await pipeline(handle.createReadStream({ start: 0, autoClose: false }), res);
                 } finally { await handle.close(); }
                 return;
             }
             // Compatibility only: existing unversioned URLs retain static
             // serving. This is not proof of historical publication or a grant
-            // for any new managed candidate; current writers are not integrated.
+            // for any new managed candidate.
             const serveUploads = async () => {
                 await checkedStaticPath(uploadsPath, parts.slice(1));
                 const originalUrl = req.url;

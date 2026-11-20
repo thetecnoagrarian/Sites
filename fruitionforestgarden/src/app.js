@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createBlogApp, logSafeError } from '@ffg/blog-core';
 import analyticsMiddleware from './middleware/analytics.js';
+import { createHeroPublicationProvider } from './utils/heroImageStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +22,9 @@ const config = {
 
 async function startApp() {
     try {
+        const hero = createHeroPublicationProvider(config.uploadsPath);
+        config.mediaPublicationProviders = { hero: hero.authorize };
+        config.mediaPublicationIntegrityVerifiers = { hero: hero.verifyOpenedFile };
         // Create the blog app
         const { app, setupFinalHandlers } = createBlogApp(config);
 

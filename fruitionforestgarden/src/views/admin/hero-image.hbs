@@ -1,6 +1,9 @@
 {{#> layouts/admin }}
 <div class="admin-container">
     <h1>Hero Image Management</h1>
+    {{#if heroIntegrityWarning}}
+        <div class="message error">The selected hero or its publication record needs inspection. A display fallback does not remove its publication history.</div>
+    {{/if}}
 
     {{#if success}}
         <div class="message success">{{success}}</div>
@@ -29,6 +32,7 @@
         <h2>Upload New Hero Image</h2>
         <form action="/admin/hero-image/upload" method="POST" enctype="multipart/form-data" class="hero-upload-form">
             <input type="hidden" name="_csrf" value="{{csrfToken}}">
+            <input type="hidden" name="heroOperationId" value="{{heroOperationId}}">
             
             <div class="form-group">
                 <label for="heroImage">Select Image File</label>
@@ -44,7 +48,7 @@
             </div>
 
             <div class="form-group">
-                <sl-button type="submit" variant="primary">
+                <sl-button type="submit" variant="primary" {{#unless heroOperationId}}disabled{{/unless}}>
                     <sl-icon slot="prefix" name="upload"></sl-icon>
                     Upload and Process Hero Image
                 </sl-button>
@@ -52,12 +56,13 @@
         </form>
     </section>
 
-    {{#if heroImagePersistent}}
+    {{#if heroResetOperationId}}
     <section class="admin-section">
         <h2>Reset Seasonal Hero</h2>
         <p>Resetting immediately returns the public site to the immutable repository default. The uploaded seasonal hero will no longer be active.</p>
         <form action="/admin/hero-image/reset" method="POST" class="hero-reset-form">
             <input type="hidden" name="_csrf" value="{{csrfToken}}">
+            <input type="hidden" name="heroOperationId" value="{{heroResetOperationId}}">
             <sl-button type="submit" variant="danger">Reset hero to repository default</sl-button>
         </form>
     </section>

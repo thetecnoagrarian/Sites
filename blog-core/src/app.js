@@ -88,6 +88,7 @@ const buildSitemapXml = (urls) => {
  * @param {Object} config.handlebarsHelpers - Additional Handlebars helpers (optional)
  * @param {RegExp[]} config.privateUploadPathPatterns - Upload URL paths to return as 404 (optional)
  * @param {Object} config.mediaPublicationProviders - Optional additional providers; managed posts always use SQLite
+ * @param {Object} config.mediaPublicationIntegrityVerifiers - Optional checks of the securely opened managed file, before headers/304
  * @returns {express.Application} - Configured Express app
  */
 export function createBlogApp(config) {
@@ -101,7 +102,8 @@ export function createBlogApp(config) {
         baseUrl,
         handlebarsHelpers = {},
         privateUploadPathPatterns = [],
-        mediaPublicationProviders = {}
+        mediaPublicationProviders = {},
+        mediaPublicationIntegrityVerifiers = {}
     } = config;
     const canonicalBaseUrl = normalizeBaseUrl(baseUrl);
 
@@ -322,7 +324,8 @@ export function createBlogApp(config) {
     });
     
     mountMediaServing(app, { publicPath: staticPath, uploadsPath,
-        privateUploadPathPatterns, publicationProviders: { ...mediaPublicationProviders, post: createPostMediaProvider(db) } });
+        privateUploadPathPatterns, publicationProviders: { ...mediaPublicationProviders, post: createPostMediaProvider(db) },
+        publicationIntegrityVerifiers: mediaPublicationIntegrityVerifiers });
 
     // Register Handlebars helpers
     const defaultHelpers = {

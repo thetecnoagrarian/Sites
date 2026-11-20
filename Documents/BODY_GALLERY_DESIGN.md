@@ -147,11 +147,11 @@ other posts, raw-HTML links and unsaved/concurrent edits without attempting to
 enumerate every reference. Body-gallery association removal remains backend-only.
 No automatic garbage collection or reference counter is introduced.
 
-The audit also found that FFG hero replacement/reset deleted previous generation
-directories, including retained source material. They now change the selected
-manifest without deleting generations. Reset removes only the selection
-manifest; it still returns to the repository defaults. Failed/unpublished hero
-artifacts are conservatively retained and reported as potentially remaining.
+The retention audit found that older FFG hero replacement/reset deleted previous
+generations, including their retained sources. The legacy reset removes the
+selection manifest. The local v2 reset commits a null selection in the manifest
+and retains all accepted grants and receipts. Both return to the repository
+defaults. Local v2 also retains failed or unpublished candidate artifacts.
 
 Raw uploads use exclusively created hidden request directories beneath the
 configured `uploads/temp` root. The shared media-serving boundary denies that
@@ -172,9 +172,9 @@ and require the SQLite authority below. Failed saves, pending overwrites,
 cancellations and abandoned operations retain candidates privately. Legacy files
 are not reclassified or deleted. Only proven request-owned private raw inputs
 are automatically cleaned; incomplete inputs and interrupted processing can
-leave private residue for review. Hero publication still uses its original
-generation/selection mechanism and remains a separate unresolved boundary. No
-historical filename reconstruction or protected-source deletion is introduced.
+leave private residue for review. The local FFG hero writer uses the separate
+filesystem authority described below. Production cutover and review of legacy
+media remain open. No historical filenames or publication facts are inferred.
 
 Retention can grow without a fixed bound as uploads, replacements and failed
 operations accumulate; backups also grow. Existing host disk-capacity preflights
@@ -204,7 +204,8 @@ all three WebP variants/dimensions/hashes, and rejects malformed metadata or
 changed directory identities. Partial/failed preparations stay private, with no
 automatic deletion. Hero candidates can use the existing hero processor without
 changing its selection manifest. The shared editorial router now uses private
-post preparation; the hero writer is not integrated with managed publication.
+post preparation. The November 19, 2026 local FFG hero implementation uses a
+separate filesystem authority described below, without changing post acceptance.
 
 `media-serving.js` owns both static registrations in their existing order. It
 denies `.media`, `.source`, temporary uploads, ambiguous encodings/traversal and
@@ -214,7 +215,8 @@ symlink traversal before static serving. New reserved URL families are flat
 Each request must receive literal `true` from its configured post/hero publication
 callback before private bytes or conditional/304 responses are served.
 `createBlogApp` installs the SQLite-backed post provider on its existing database
-connection. Hero publication-index/provider integration remains unimplemented.
+connection. FFG supplies its filesystem-backed hero provider and an optional
+opened-file integrity verifier; TTA and post authorization remain independent.
 Missing/error/malformed grants deny; no speculative cache is used.
 
 Migration `0003_media_publications.sql` and the matching fresh schema add one
@@ -368,17 +370,110 @@ before rollout. URL spelling containing ambiguous encodings and filesystem
 symlinks are intentionally unsupported. Filesystem checks assume trusted local
 writers; they do not sandbox a privileged process replacing paths between calls.
 
-**Phase 2 remains blocked pending review and hero correction.** The FFG hero writer
-can still expose an unselected generation through legacy serving before manifest
-acceptance; this post-only authority does not repair it. Retention still grows
+**Phase 2 requires independent review and production gates.** The local FFG hero
+implementation below keeps new candidates private until manifest acceptance.
+Legacy directories retain compatibility serving; their historical publication
+facts and confidentiality cutover still require a separate inventory. Retention grows
 without bound. The existing 25-file/50 MiB-per-file defaults permit about 1.22 GiB
 of raw inputs per request, without aggregate/in-flight admission budgets. Setting
 those budgets is a separate pre-deployment gate, not an arbitrary limit change
 in this slice. No cleanup job, gallery HTTP upload/editor/rendering, dependency,
 nginx or Docker change is introduced. Private storage stays in uploads for
 recursive backup coverage. Release also requires final post-authority review,
-hero-index work, legacy cutover checks, isolated Docker and restore verification,
+hero-authority review, legacy cutover checks, isolated Docker and restore verification,
 and separately authorized migration/deployment with compatible rollback anchors.
+
+### Managed FFG hero publication (November 19, 2026 local implementation)
+
+The native-first choice is one project-owned filesystem snapshot using existing
+Node filesystem primitives, private-media helpers, Sharp profiles and serving
+middleware. A second SQLite authority would split selection from grants and
+introduce cross-store commit ambiguity. No dependency, SQLite migration, image
+profile change, garbage collector or gallery feature is added here.
+
+`uploads/hero/.current.json` is the sole authority. Strict v2 has exactly six
+top-level keys: `version: 2`, `revision`, `current`, `legacySelection`,
+`publications` and `operations`. `current` is null or `{kind, generation}` with
+kind `legacy` or `managed`. V1 `{generation}` remains readable without a write
+or a managed grant. The first accepted managed publication or reset preserves
+that observed UUID in `legacySelection`; no earlier selection history is inferred.
+
+Each publication is keyed by its server-issued UUID and contains `operationId`,
+`ownerUserId`, raw `inputSha256`, a retained-source record and the two canonical
+variant records. Source records contain decoded format/extension, dimensions,
+byte count and SHA-256; variants contain dimensions, byte count and SHA-256.
+Display dimensions follow the unchanged 1920-pixel maximum-width/no-enlargement
+profile; social remains 1200 x 630. Future profile changes require a deliberate
+version/validation decision. Persistent identity is content-based so restoring
+the exact files onto different inodes remains possible. During verification,
+device/inode, size, mtime/ctime and single-link checks detect replacement or change.
+
+Accepted receipts contain `operationId`, `action`, `ownerUserId`, `inputSha256`,
+`generation`, `previousSelection`, `revision` and `acceptedAt`. Revisions are
+contiguous and the previous-selection chain must reconstruct the current value.
+Reset uses a fixed action digest and null generation. Receipt, grant and current
+selection commit together. Owner/action/input-bound retries return the existing
+receipt without appending history or reselecting a superseded generation.
+
+Allocation creates private `.media/hero/<UUID>` candidates. Ownership, input
+binding and prepared-record sidecars there support retries but never authorize
+serving. Upload inputs must satisfy the existing owned raw-input checks.
+Preparation hashes and checks the source and both WebPs, rejects symlinks and
+hardlink aliases, syncs the exact files and relevant directories, and retains
+failed/ambiguous candidates. An interrupted partial preparation is not overwritten
+on retry; it stays private and requires a fresh operation or separate recovery.
+
+A shared coordinator identifies each canonical uploads root by filesystem
+identity. It serializes authority reads and writes across ESM instances in the
+application process. Per-operation queues prevent duplicate preparation and
+release completed operation references. Distinct roots have separate queues.
+The deployment requires one writer process. Acceptance exclusively writes a fresh
+same-directory temporary file, syncs it, atomically renames it over the authority
+and syncs the parent. No later media move is necessary. Managed requests during
+that write fail closed with no-store rather than observing an unresolved snapshot.
+
+Every authorization rereads/strictly validates the canonical manifest; there is
+no cross-request grant cache. A newly observed or recovered v2 manifest is
+file/parent-synced before it can authorize serving. Only that durability identity
+is remembered. An attempted rename is reconciled through the canonical receipt;
+unreadable, invalid or unsynced authority returns an explicit recovery-required
+outcome on publish, reset, retry and receipt lookup. A confirmed receipt resolves
+the retry without rewriting authority. An ambiguous rename is a definite failure
+only if a verified reread confirms the exact predecessor. Candidates are retained.
+Explicit allocation can initialize an empty authority only when no managed residue
+exists. Missing authority with residue, corruption, observed v2 downgrade or
+revision regression fails closed; recovery must not fabricate an empty history.
+
+Application snapshots use `JSON.stringify` on validated objects, so they never
+emit duplicate keys. The canonical reader also rejects duplicate object members,
+including escaped spellings of the same key, so a malformed snapshot cannot
+silently choose among conflicting grants, selections or receipts.
+
+Exact managed URLs require grant membership even for historical generations.
+The shared boundary securely opens the file, then FFG's verifier hashes that
+same descriptor and checks recorded bytes/stable identity before GET, HEAD or
+conditional 304. Denials never fall through to public-tree shadows. Private
+`.media`, `.source`, temporary paths and malformed/encoded aliases stay denied.
+Legacy plain-UUID URLs retain the compatibility branch; this is not a claim
+that old directories contain reviewed publications. Filesystem race protection
+assumes trusted local writers, not a hostile privileged process.
+
+Home/About/social resolution may use the existing visual fallback when selected
+bytes are unavailable. It never substitutes bytes at a historical managed URL
+or revokes its grant. Bounded diagnostics and authenticated read-only integrity
+status (`GET /admin/hero-image/integrity`, without operation allocation) distinguish
+authority, display, social and retained-source problems;
+owned-operation receipt lookup supports response-loss reconciliation. Source loss
+is diagnosable while intact accepted derivatives can still serve. Runtime log
+collection/retention must be verified separately; stdout is not itself durable storage.
+
+Synthetic tests cover both storage layouts, real middleware/admin routes, browser
+form/Home/About/reset behavior, barriers for competing operations, filesystem
+fault injection and child-process interruption. SIGKILL/restart is not a power-loss
+claim. Linux/container directory-sync behavior, coherent database/uploads restore,
+legacy inventory, capacity/admission budgets, bounded log capture and a v2-capable
+rollback floor remain pre-deployment gates. Retained generations and receipts grow
+without an automatic quota, history truncation or deletion policy.
 
 ## Deferred boundaries
 
