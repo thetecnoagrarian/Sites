@@ -1,0 +1,14 @@
+{{#> layouts/admin}}
+<section class="admin-content">
+    <h1>Gallery drafts</h1>
+    <p>Open a private draft to continue editing or publish it.</p>
+    <ul>
+        {{#each drafts}}
+        <li><a href="{{editUrl}}">{{#if title}}{{title}}{{else}}Untitled draft{{/if}}</a></li>
+        {{else}}
+        <li>No saved drafts or uploads yet.</li>
+        {{/each}}
+    </ul>
+    <a href="/admin/posts/new">New post</a>
+</section>
+{{/layouts/admin}}

@@ -18,8 +18,9 @@ import { compileTrustedRateLimitMatcher } from './utils/trusted-rate-limit.js';
 import { setDatabase } from './models/db.js';
 import { initializeDatabase } from './database/init.js';
 import { attachUser } from './middleware/auth.js';
-import { createUploadMiddleware } from './middleware/upload.js';
+import { createGalleryPhotoUpload, createUploadMiddleware } from './middleware/upload.js';
 import { mountMediaServing } from './middleware/media-serving.js';
+import { isGalleryMediaRequest } from './admin/gallery-drafts.js';
 import { createPostMediaProvider } from './models/media-publication.js';
 import Post from './models/post.js';
 import Category from './models/category.js';
@@ -89,6 +90,7 @@ const buildSitemapXml = (urls) => {
  * @param {RegExp[]} config.privateUploadPathPatterns - Upload URL paths to return as 404 (optional)
  * @param {Object} config.mediaPublicationProviders - Optional additional providers; managed posts always use SQLite
  * @param {Object} config.mediaPublicationIntegrityVerifiers - Optional checks of the securely opened managed file, before headers/304
+ * @param {boolean} config.galleryAdminTraffic - Use separate FFG editor limits for authenticated gallery media requests
  * @returns {express.Application} - Configured Express app
  */
 export function createBlogApp(config) {
@@ -103,7 +105,8 @@ export function createBlogApp(config) {
         handlebarsHelpers = {},
         privateUploadPathPatterns = [],
         mediaPublicationProviders = {},
-        mediaPublicationIntegrityVerifiers = {}
+        mediaPublicationIntegrityVerifiers = {},
+        galleryAdminTraffic = false
     } = config;
     const canonicalBaseUrl = normalizeBaseUrl(baseUrl);
 
@@ -288,6 +291,7 @@ export function createBlogApp(config) {
     const upload = createUploadMiddleware(path.join(uploadsPath, 'temp'));
     // Export upload middleware for routes that need it
     app.locals.upload = upload;
+    if (galleryAdminTraffic) app.locals.galleryPhotoUpload = createGalleryPhotoUpload(path.join(uploadsPath, 'temp'));
     app.locals.uploadsPath = uploadsPath;
 
     // Make CSRF token available to all templates
@@ -484,6 +488,8 @@ export function createBlogApp(config) {
     // Rate limiting for production security
     const matchesTrustedRateLimitClient = compileTrustedRateLimitMatcher(process.env.TRUSTED_IPS);
     app.use(rateLimit({
+        skip: req => galleryAdminTraffic && req.user?.role === 'admin' && req.session?.userId === req.user.id
+            && isGalleryMediaRequest(req.method, req.path),
         windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes default
         max: (req) => {
             // Retain the current forwarded-header identity policy in this slice.

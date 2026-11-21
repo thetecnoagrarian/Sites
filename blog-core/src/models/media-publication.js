@@ -1,5 +1,6 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { getDatabase } from './db.js';
+import { BODY_GALLERY_LIMITS, normalizeBodyGallery } from './body-gallery.js';
 import { MEDIA_ID, managedMediaUrl, verifyStoredPostCandidate, hashPrivateRawUpload } from '../utils/private-media.js';
 
 const idPattern = new RegExp(`^${MEDIA_ID}$`);
@@ -7,6 +8,7 @@ const sha = value => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
 const positive = value => Number.isSafeInteger(value) && value > 0;
 const capabilities = new WeakMap();
 const variants = ['thumbnail', 'medium', 'large'];
+const maxCandidates = 25 + BODY_GALLERY_LIMITS.items;
 export const PENDING_INPUT_MAX_BYTES = 8 * 1024 * 1024;
 const inputFields = ['content', 'categoryIds', 'authorIds', 'publisherId', 'loginUserId',
     'publisherAction', 'authorshipAction', 'authorshipReviewState', 'authorshipReviewNote',
@@ -17,8 +19,17 @@ const stable = value => JSON.stringify(value, (key, item) => item && typeof item
 export const mediaDigest = value => createHash('sha256').update(stable(value)).digest('hex');
 const fail = message => { const error = new Error(message); error.code = 'MEDIA_REJECTED'; throw error; };
 const inputDigest = input => { const { mediaAcceptance, ...value } = input; return mediaDigest(value); };
-const requiredImages = input => [...new Set(input.content.images.flatMap(image => variants.map(v =>
+const mediaImages = input => [...input.content.images, ...(input.content.body_gallery?.items ?? []).map(item => item.asset)];
+const requiredImages = input => [...new Set(mediaImages(input).flatMap(image => variants.map(v =>
     /^\/uploads\/m1-([0-9a-f-]{36})-[a-z]+\.webp$/.exec(image[v] ?? '')?.[1]).filter(Boolean)))];
+const candidateMatchesAsset = (candidate, asset) => variants.every(key => candidate.image[key] === asset[key])
+    && candidate.image.originalWidth === asset.originalWidth && candidate.image.originalHeight === asset.originalHeight;
+function assertCandidateAssociations(input, candidates) {
+    const gallery = input.content.body_gallery?.items ?? [];
+    const highlights = candidates.filter(candidate => !gallery.some(item => candidateMatchesAsset(candidate, item.asset)));
+    if (highlights.length > 25) fail('Too many highlights');
+    if (highlights.length && stable(input.content.images) !== stable(highlights.map(item => item.image))) fail('Candidate association changed');
+}
 function keys(value, expected) {
     if (!value || typeof value !== 'object' || Array.isArray(value)
         || Object.keys(value).length !== expected.length || Object.keys(value).some(key => !expected.includes(key))) fail('Malformed media record');
@@ -29,7 +40,8 @@ function pendingInputRecord(input) {
             || Object.keys(value).some(key => !fields.includes(key))) fail('Invalid pending editorial fields');
     };
     allowed(input, inputFields);
-    allowed(input.content, ['title', 'body', 'description', 'excerpt', 'created_at', 'images', 'captions']);
+    allowed(input.content, ['title', 'body', 'description', 'excerpt', 'created_at', 'images', 'captions', 'body_gallery']);
+    if (Object.hasOwn(input.content, 'body_gallery')) normalizeBodyGallery(input.content.body_gallery);
     if (inputFields.filter(key => !['content', 'categoryIds', 'authorIds', 'publisherId', 'loginUserId'].includes(key))
         .some(key => input[key] != null && typeof input[key] !== 'string')
         || !['string', 'number'].includes(typeof input.publisherId)
@@ -90,9 +102,9 @@ function operationRecord(row) {
     keys(data.context, ['action', 'postId']);
     if (!['create', 'update'].includes(data.context.action)
         || (data.context.action === 'create' ? data.context.postId !== null : !positive(data.context.postId))
-        || !Array.isArray(data.candidates) || data.candidates.length > 25) fail('Malformed operation context');
+        || !Array.isArray(data.candidates) || data.candidates.length > maxCandidates) fail('Malformed operation context');
     data.candidates.forEach(candidateRecord);
-    if (!Array.isArray(data.required) || data.required.length > 25
+    if (!Array.isArray(data.required) || data.required.length > maxCandidates
         || data.required.some(id => typeof id !== 'string' || !idPattern.test(id))
         || new Set(data.required).size !== data.required.length
         || data.candidates.some(item => !data.required.includes(item.id))) fail('Malformed required media');
@@ -155,7 +167,8 @@ export function prepareMediaOperation(db, id, ownerId, submission, input, candid
         if (['prepared', 'published'].includes(row.state) && row.data.submission === submission) return row;
         if (row.state !== 'allocated' || !sha(submission)) fail('Media operation cannot be prepared again');
         candidates.forEach(candidateRecord);
-        if (candidates.length > 25) fail('Too many candidates');
+        if (candidates.length > maxCandidates) fail('Too many candidates');
+        assertCandidateAssociations(input, candidates);
         const required = requiredImages(input);
         updateOperation(db, row, 'prepared', { ...row.data, submission, inputHash: inputDigest(input), candidates, required });
         return readMediaOperation(db, id, ownerId);
@@ -177,8 +190,8 @@ export function markPendingOverwrite(db, id, ownerId, pending, input) {
         }
         // Only the server-supplied target revision may differ from prepared input.
         if (inputDigest({ ...input, revisionToken: undefined }) !== row.data.inputHash) fail('Prepared editorial input changed');
-        if (stable(row.data.required) !== stable(requiredImages(input))
-            || (row.data.candidates.length && stable(input.content.images) !== stable(row.data.candidates.map(item => item.image)))) fail('Candidate association changed');
+        if (stable(row.data.required) !== stable(requiredImages(input))) fail('Candidate association changed');
+        assertCandidateAssociations(input, row.data.candidates);
         const data = { ...row.data, pending, inputHash: inputDigest(input) };
         const result = db.prepare(`UPDATE media_publications SET data = ?, pending_input = ?
             WHERE id = ? AND owner_user_id = ? AND state = 'prepared' AND data = ? AND pending_input IS NULL`)
@@ -199,9 +212,8 @@ export function readPendingOverwrite(db, id, ownerId) {
             || inputDigest(snapshot.input) !== operation.data.inputHash
             || snapshot.input.loginUserId !== ownerId
             || snapshot.input.revisionToken !== operation.data.pending.revisionToken
-            || stable(requiredImages(snapshot.input)) !== stable(operation.data.required)
-            || (operation.data.candidates.length && stable(snapshot.input.content.images)
-                !== stable(operation.data.candidates.map(item => item.image)))) fail('Pending snapshot binding changed');
+            || stable(requiredImages(snapshot.input)) !== stable(operation.data.required)) fail('Pending snapshot binding changed');
+        assertCandidateAssociations(snapshot.input, operation.data.candidates);
     } catch {
         const error = new Error('Pending snapshot could not be verified');
         error.code = 'MEDIA_REJECTED';
@@ -222,6 +234,7 @@ export async function verifyMediaAcceptance({ db, uploadsPath, id, ownerId, inpu
     if (db.pragma('synchronous', { simple: true }) < 2) fail('Media acceptance requires SQLite FULL or EXTRA synchronous durability');
     const row = readMediaOperation(db, id, ownerId);
     if (stable(row.data.required) !== stable(requiredImages(input))) fail('Required media binding changed');
+    assertCandidateAssociations(input, row.data.candidates);
     const binding = mediaDigest({ action, postId, inputHash: inputDigest(input), reopenAuthorship });
     if (row.state === 'published') {
         if (row.data.receipt.binding !== binding) fail('Changed submission cannot reuse an accepted operation');
@@ -238,7 +251,7 @@ export async function verifyMediaAcceptance({ db, uploadsPath, id, ownerId, inpu
     const existingUrls = new Set();
     const verifiedExisting = new Set();
     const provider = createPostMediaProvider(db);
-    for (const image of input.content.images) for (const variant of variants) {
+    for (const image of mediaImages(input)) for (const variant of variants) {
         const url = image[variant] ?? '';
         if (!/^\/uploads\/m1-/i.test(url) || newUrls.has(url)) continue;
         const match = /^\/uploads\/m1-([0-9a-f-]{36})-[a-z]+\.webp$/.exec(url);
@@ -280,7 +293,7 @@ export function assertMediaOverwrite(db, token, input, revisionToken, reopenAuth
 }
 export function acceptMediaPublication(db, token, input, action, targetId, resultId) {
     const validateExisting = allowed => {
-        for (const image of input.content.images) for (const variant of variants) {
+        for (const image of mediaImages(input)) for (const variant of variants) {
             if (/^\/uploads\/m1-/i.test(image[variant] ?? '') && !allowed?.has(image[variant])) fail('Managed media requires verified acceptance');
         }
     };
@@ -289,8 +302,8 @@ export function acceptMediaPublication(db, token, input, action, targetId, resul
     const cap = capability(db, token, input, action, targetId);
     const row = readMediaOperation(db, cap.id, cap.ownerId);
     mediaReceipt(db, token, input, action, targetId);
-    if (row.data.candidates.length && stable(input.content.images) !== stable(row.data.candidates.map(item => item.image))) fail('Candidate association changed');
-    if (!row.data.candidates.length) validateExisting(cap.existingUrls);
+    assertCandidateAssociations(input, row.data.candidates);
+    validateExisting(new Set([...cap.existingUrls, ...row.data.candidates.flatMap(item => variants.map(v => item.image[v]))]));
     const receipt = { action, postId: resultId, binding: cap.binding, acceptedAt: new Date().toISOString() };
     updateOperation(db, row, 'published', { ...row.data, receipt });
     readMediaOperation(db, row.id, row.owner_user_id); // Validate the final receipt before any commit.

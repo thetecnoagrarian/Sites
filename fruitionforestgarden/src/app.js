@@ -11,6 +11,7 @@ const __dirname = path.dirname(__filename);
 // Site-specific configuration
 const config = {
     siteName: 'Fruition Forest Garden',
+    galleryAdminTraffic: true,
     port: process.env.PORT || 3001,
     databasePath: process.env.DATABASE_PATH || path.join(__dirname, 'database/blog.db'),
     uploadsPath: process.env.UPLOADS_PATH || path.join(__dirname, 'public/uploads'),

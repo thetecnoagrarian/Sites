@@ -2,9 +2,9 @@
 
 ## Scope and selection
 
-Phase 1 implements shared backend metadata, normalization, persistence and
-editorial change detection. It adds no HTTP gallery writes, editor controls,
-uploads, placement parser, public rendering or media deletion. The existing
+Phase 1 established shared backend metadata, normalization, persistence and
+editorial change detection. The local FFG editor and rendering slice described
+below builds on that contract. The existing
 Shoelace highlights slideshow and its `images`/`captions` fields are unchanged.
 Passing synthetic tests does not establish deployment readiness.
 
@@ -13,8 +13,7 @@ raw article HTML. Encoding the canonical collection in HTML would require
 parsing and lossless editor round trips for validation, revisions and reference
 checks. Overloading the highlights arrays would change their existing consumers.
 One nullable JSON column and a small shared module avoid those coupled changes;
-no additional dependency is needed. Native browser rendering remains a future
-decision under `CODEX_WORKFLOW.md`, not part of this persistence contract.
+no additional dependency is needed.
 
 ## Version 1
 
@@ -91,8 +90,9 @@ On update or duplicate-title overwrite, **omitting** the property preserves the
 existing stored value, including malformed data. An explicit null or valid empty
 collection clears it. Explicit undefined and malformed supplied values reject
 the operation. The shared editorial transaction prevents partial post,
-category, authorship or publication writes on failure. Existing HTTP form
-mapping omits this field, so it cannot accept gallery writes in Phase 1.
+category, authorship or publication writes on failure. The local FFG editor
+builds this field from owner-bound prepared media or items on the same post.
+Other HTTP callers continue to omit it.
 
 Gallery changes participate in revision fingerprints, stale-save rejection,
 no-op comparison and meaningful internal `modified_at` detection. Reordering,
@@ -144,7 +144,8 @@ Highlight replacement/removal, FFG overwrite/cancellation, and both active
 post-delete routes retain files even if no structured reference is found.
 Post/category deletion is transactional. This also protects body galleries,
 other posts, raw-HTML links and unsaved/concurrent edits without attempting to
-enumerate every reference. Body-gallery association removal remains backend-only.
+enumerate every reference. The FFG editor can remove a gallery association
+without deleting its previously published derivatives.
 No automatic garbage collection or reference counter is introduced.
 
 The retention audit found that older FFG hero replacement/reset deleted previous
@@ -475,21 +476,66 @@ legacy inventory, capacity/admission budgets, bounded log capture and a v2-capab
 rollback floor remain pre-deployment gates. Retained generations and receipts grow
 without an automatic quota, history truncation or deletion policy.
 
-## Deferred boundaries
+## FFG documentary editor and publication (local implementation)
 
-Future placement is one explicit, structurally validated standalone marker in
-the article. Placement parsing, marker insertion and public rendering are not
-implemented; do not append galleries automatically or evaluate article HTML as
-Handlebars. A later rendering phase must preserve complete documentary photos
-and test accessibility, loading budgets and 65/100-item collections.
+Migration `0004_gallery_drafts` adds private, owner-bound editor records to the
+shared schema. A draft binds the intended post or new-post action to one current
+editorial operation. It stores a bounded form snapshot and prepared candidate
+metadata. Drafts stay outside public Post queries and have no media grants.
+A separate SQLite draft revision advances when the saved fields change or a
+photo is staged. Save and publication compare that revision before changing
+draft content. A conflict leaves unsaved text, image order, captions and file
+selections in the submitting tab. The editor offers a link to open the latest
+draft in a new tab. The existing post revision still governs updates to a
+published article. Identical accepted publication requests replay the receipt.
 
-Before enabling gallery uploads or asset reuse, establish server-side asset
-authorization and existence checks, plus gallery draft/staging lifetime rules.
-The pure URL check does not prove any of those facts or prove that differently
-named files are physically distinct. Missing files must not silently remove
-items/captions from persisted data.
+Reopening an existing draft leaves its publication operation intact. The
+editor shows a pending attempt and makes **Resume editing draft** available
+after it stops running. This owner-only POST retires the unresolved attempt
+and keeps the saved draft and private photos. A live attempt cannot be retired
+through that action in the writer process. An accepted receipt or pending
+duplicate-title confirmation takes precedence over reopening the editor.
 
-Committed-media retention removes ordinary editorial check-then-unlink races;
-it does not prove asset ownership, eliminate abandoned files or authorize
-gallery HTTP writes. Garbage collection, gallery upload batching, editor UX,
-HTTP payload limits and image-loading behavior remain separate work.
+The FFG editor queues uploads one at a time in selection order. Retried uploads
+bind to the same request identity and input digest. It uses the existing private
+raw upload handling, Sharp sizes and quality, candidate verification and
+synchronization. Gallery processing honors camera orientation metadata.
+Editors submit selected item IDs, descriptions and captions, plus the staged
+IDs the tab saw. Removing a photo keeps its ID in that tab's seen list. A save
+does not acknowledge undisplayed receipts, so photos uploaded in another tab
+or whose upload response was lost can reappear on reopen. The server
+derives the asset URLs and dimensions from the draft or the same post's existing
+gallery. It refuses arbitrary paths and cross-draft or cross-post selections.
+The gallery allows 100 associated photos. A draft can retain up to 200 staged
+attempts so removal does not prevent normal replacement work. Failed and unused
+private derivatives remain private pending a separately reviewed cleanup policy.
+
+The publication transaction writes the article, gallery, receipt and new grants
+together. A failed transaction cannot make new managed media public. Removing
+a gallery association leaves its accepted grant and exact derivatives intact.
+Private thumbnails and preview derivatives use an authenticated owner-only
+route with byte verification and no-store responses. FFG-only per-editor budgets
+permit 130 upload attempts and 400 private image requests per 15 minutes, with
+one active photo upload per editor. Each photo request allows one file and
+the two named text fields `_csrf` and `uploadId`, each up to 512 bytes.
+The effective file limit is the configured limit capped at 50 MiB. The
+streamed request limit is that file limit plus 16 KiB of multipart overhead.
+Extra fields or parts are rejected. Public traffic and other admin routes retain
+the existing limits. Save draft and Preview article support documentary photos
+and existing highlights. New highlights are selected when publishing.
+
+Use **Insert gallery marker at cursor** to place one standalone
+`<div data-body-gallery></div>` on a line outside other HTML elements.
+Publication validates placement with the existing HTML tokenizer. The renderer
+keeps the prose on either side and never evaluates it as a template. Preview
+uses the public article template with private image URLs and sanitized draft
+prose. The responsive grid retains aspect ratios, renders native keyboard
+links to the larger derivative, and lazy-loads medium WebPs. The curated
+highlights slideshow remains separate.
+
+Before first production use, verify migrations through `0004`, writable media
+storage, native Linux/Docker browser behavior at 65–100 items, authorization,
+capacity for a full selection plus retained staging, and a coherent database
+and uploads restore with a compatible rollback image. A pre-`0004` runner
+cannot roll back against the upgraded ledger. Existing hero and legacy-media
+cutover gates still apply if those changes are deployed in the same image.

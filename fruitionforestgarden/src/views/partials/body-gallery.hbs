@@ -1,0 +1,24 @@
+<section class="documentary-gallery" aria-label="Documentary photographs">
+    {{#each items}}
+    <figure>
+        <a href="{{href}}">
+            <img src="{{src}}" alt="{{alt}}" loading="lazy" decoding="async"
+                 {{#if asset.originalWidth}}width="{{asset.originalWidth}}" height="{{asset.originalHeight}}"{{/if}}>
+        </a>
+        {{#if caption}}<figcaption>{{caption}}</figcaption>{{/if}}
+    </figure>
+    {{/each}}
+</section>
+<style>
+.documentary-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+.documentary-gallery figure { margin: 0; min-width: 0; }
+.documentary-gallery a { display: block; }
+.documentary-gallery a:focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+.documentary-gallery img { display: block; width: 100%; height: auto; }
+.documentary-gallery figcaption { padding-block: .4rem; overflow-wrap: anywhere; }
+</style>

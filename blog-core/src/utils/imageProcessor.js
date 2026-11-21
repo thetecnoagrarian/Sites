@@ -9,7 +9,7 @@ const IMAGE_SIZES = {
   large: { maxWidth: 1920, maxHeight: 1920 }
 };
 
-export const processImage = async (inputPath, filename, outputDir) => {
+export const processImage = async (inputPath, filename, outputDir, { orient = false } = {}) => {
   try {
     console.log('Processing image');
     
@@ -18,7 +18,7 @@ export const processImage = async (inputPath, filename, outputDir) => {
     
     // Get image metadata
     const metadata = await sharp(inputPath).metadata();
-    const { width, height } = metadata;
+    const { width, height } = orient ? metadata.autoOrient : metadata;
     const aspectRatio = width / height;
     
     // Generate base filename without extension
@@ -33,7 +33,9 @@ export const processImage = async (inputPath, filename, outputDir) => {
       
       // Resize image maintaining aspect ratio and convert to WebP
       // WebP provides 25-35% better compression than JPEG at similar quality
-      await sharp(inputPath)
+      const pipeline = sharp(inputPath);
+      if (orient) pipeline.autoOrient();
+      await pipeline
         .resize(maxWidth, maxHeight, {
           fit: 'inside',
           withoutEnlargement: true

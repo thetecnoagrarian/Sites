@@ -13,7 +13,7 @@ import { BASELINE_VARIANTS, expectedSignature, schemaSignature } from '../src/da
 
 const runner = createMigrationRunner();
 const syntheticMigration = {
-    id: '0004_test_only_probe',
+    id: '0005_test_only_probe',
     sql: 'CREATE TABLE migration_probe (id INTEGER PRIMARY KEY, marker TEXT NOT NULL);'
 };
 
@@ -124,7 +124,7 @@ test('recognized baseline is inspected and planned without creating or changing 
         baselineVariant: 'canonical_0000',
         variantRecorded: false,
         applied: [],
-        pending: ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications']
+        pending: ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications', '0004_gallery_drafts']
     });
     assert.deepEqual(runner.inspect(path), planned);
     assert.equal(digest(path), before);
@@ -151,13 +151,13 @@ for (const [variant, fixtureName] of [
             assert.equal(result.baselineVariant, variant);
             assert.equal(result.variantRecorded, false);
             assert.deepEqual(result.pending,
-                ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications']);
+                ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications', '0004_gallery_drafts']);
             assert.equal(digest(path), before);
         }
         initializeDatabase(path).close();
         const first = runner.apply(path);
         assert.deepEqual(first.appliedNow,
-            ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications']);
+            ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications', '0004_gallery_drafts']);
         assert.equal(first.recordedVariantNow, true);
         assert.equal(first.baselineVariant, variant);
         assert.deepEqual(readFixtureData(path), data);
@@ -178,8 +178,8 @@ for (const [variant, fixtureName] of [
         assert.equal(digest(path), after);
 
         const next = createMigrationRunner([...loadMigrations(), syntheticMigration]);
-        assert.deepEqual(next.plan(path).pending, ['0004_test_only_probe']);
-        assert.deepEqual(next.apply(path).appliedNow, ['0004_test_only_probe']);
+        assert.deepEqual(next.plan(path).pending, ['0005_test_only_probe']);
+        assert.deepEqual(next.apply(path).appliedNow, ['0005_test_only_probe']);
         assert.equal(next.inspect(path).baselineVariant, variant);
         assert.deepEqual(readFixtureData(path), data);
     });
@@ -188,15 +188,16 @@ for (const [variant, fixtureName] of [
 test('0003 adds publication authority without backfill and rejects a frozen 0002 runner afterward', t => {
     const directory = fixture(t);
     const old = createMigrationRunner(loadMigrations().slice(0, 3));
+    const media = createMigrationRunner(loadMigrations().slice(0, 4));
     const path = baselineDatabase(directory, 'publication-upgrade.db');
     addFixtureData(path);
     old.apply(path);
     const before = readFixtureData(path);
     const beforeDigest = digest(path);
-    assert.deepEqual(runner.plan(path).pending, ['0003_media_publications']);
+    assert.deepEqual(media.plan(path).pending, ['0003_media_publications']);
     initializeDatabase(path).close();
     assert.equal(digest(path), beforeDigest);
-    assert.deepEqual(runner.apply(path).appliedNow, ['0003_media_publications']);
+    assert.deepEqual(media.apply(path).appliedNow, ['0003_media_publications']);
     assert.deepEqual(readFixtureData(path), before);
     const db = new Database(path);
     try {
@@ -209,6 +210,28 @@ test('0003 adds publication authority without backfill and rejects a frozen 0002
     } finally { db.close(); }
     assert.throws(() => old.inspect(path), /Unknown, out-of-order, or changed migration/);
     assert.throws(() => old.apply(path), /Unknown, out-of-order, or changed migration/);
+});
+
+test('0004 adds empty private drafts without modifying posts or backfilling grants', t => {
+    const previous = createMigrationRunner(loadMigrations().slice(0, 4));
+    const path = baselineDatabase(fixture(t), 'gallery-drafts.db');
+    addFixtureData(path);
+    previous.apply(path);
+    const content = readFixtureData(path);
+    const digestBefore = digest(path);
+    assert.deepEqual(runner.plan(path).pending, ['0004_gallery_drafts']);
+    initializeDatabase(path).close();
+    assert.equal(digest(path), digestBefore);
+    assert.deepEqual(runner.apply(path).appliedNow, ['0004_gallery_drafts']);
+    assert.deepEqual(readFixtureData(path), content);
+    const db = new Database(path);
+    try {
+        assert.equal(db.prepare('SELECT count(*) n FROM gallery_drafts').get().n, 0);
+        assert.equal(db.prepare('SELECT count(*) n FROM media_publications').get().n, 0);
+        assert.equal(db.pragma('integrity_check', { simple: true }), 'ok');
+        assert.deepEqual(db.pragma('foreign_key_check'), []);
+    } finally { db.close(); }
+    assert.throws(() => previous.inspect(path), /Unknown, out-of-order, or changed migration/);
 });
 
 test('previous canonical ledger gains variant metadata only on explicit apply', (t) => {
@@ -227,7 +250,7 @@ test('previous canonical ledger gains variant metadata only on explicit apply', 
     assert.equal(runner.inspect(path).variantRecorded, false);
     assert.equal(digest(path), before);
     const recorded = runner.apply(path);
-    assert.deepEqual(recorded.appliedNow, ['0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications']);
+    assert.deepEqual(recorded.appliedNow, ['0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications', '0004_gallery_drafts']);
     assert.equal(recorded.recordedVariantNow, true);
     assert.equal(runner.inspect(path).baselineVariant, 'canonical_0000');
     assert.equal(runner.inspect(path).variantRecorded, true);
@@ -363,7 +386,7 @@ test('known site analytics tables coexist with the shared baseline', (t) => {
     db.close();
     assert.equal(runner.inspect(path).state, 'recognized-untracked-baseline');
     assert.deepEqual(runner.apply(path).appliedNow,
-        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications']);
+        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications', '0004_gallery_drafts']);
     const reopened = new Database(path, { readonly: true });
     try {
         assert.equal(reopened.prepare(`SELECT COUNT(*) AS count FROM sqlite_schema
@@ -450,7 +473,7 @@ test('recognized baseline is recorded once and survives reopen with fixture data
     const data = readFixtureData(path);
     const first = runner.apply(path);
     assert.deepEqual(first.appliedNow,
-        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications']);
+        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications', '0004_gallery_drafts']);
     assert.deepEqual(first.pending, []);
     assert.deepEqual(readFixtureData(path), data);
 
@@ -458,7 +481,7 @@ test('recognized baseline is recorded once and survives reopen with fixture data
     assert.deepEqual(runner.apply(path).appliedNow, []);
     assert.equal(digest(path), after);
     assert.deepEqual(runner.inspect(path).applied,
-        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications']);
+        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications', '0004_gallery_drafts']);
 });
 
 test('synthetic migration applies once, persists, and is isolated between two site databases', (t) => {
@@ -471,8 +494,8 @@ test('synthetic migration applies once, persists, and is isolated between two si
     const ttaData = readFixtureData(tta);
     const testRunner = createMigrationRunner([...loadMigrations(), syntheticMigration]);
 
-    assert.deepEqual(testRunner.plan(ffg).pending, ['0004_test_only_probe']);
-    assert.deepEqual(testRunner.apply(ffg).appliedNow, ['0004_test_only_probe']);
+    assert.deepEqual(testRunner.plan(ffg).pending, ['0005_test_only_probe']);
+    assert.deepEqual(testRunner.apply(ffg).appliedNow, ['0005_test_only_probe']);
     assert.deepEqual(runner.plan(tta).pending, []);
     assert.deepEqual(readFixtureData(ffg), ffgData);
     assert.deepEqual(readFixtureData(tta), ttaData);
@@ -482,18 +505,18 @@ test('synthetic migration applies once, persists, and is isolated between two si
     assert.equal(digest(ffg), after);
     assert.deepEqual(testRunner.inspect(ffg).applied,
         ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications',
-            '0004_test_only_probe']);
-    assert.deepEqual(testRunner.apply(tta).appliedNow, ['0004_test_only_probe']);
+            '0004_gallery_drafts', '0005_test_only_probe']);
+    assert.deepEqual(testRunner.apply(tta).appliedNow, ['0005_test_only_probe']);
     assert.deepEqual(readFixtureData(tta), ttaData);
 });
 
 test('a failed migration rolls back its schema and all new migration records', (t) => {
     const directory = fixture(t);
     const testRunner = createMigrationRunner([...loadMigrations(), {
-        id: '0004_test_only_probe',
+        id: '0005_test_only_probe',
         sql: 'CREATE TABLE temporary_probe (id INTEGER);'
     }, {
-        id: '0005_test_only_failure',
+        id: '0006_test_only_failure',
         sql: 'INSERT INTO missing_table VALUES (1);'
     }]);
 
@@ -517,7 +540,7 @@ test('a failed migration rolls back its schema and all new migration records', (
             if (tracked) {
                 assert.deepEqual(db.prepare('SELECT id FROM schema_migrations').all(),
                     [{ id: '0000_existing_schema' },
-                        { id: '0001_public_author_publication_model' }, { id: '0002_body_gallery' }, { id: '0003_media_publications' }]);
+                        { id: '0001_public_author_publication_model' }, { id: '0002_body_gallery' }, { id: '0003_media_publications' }, { id: '0004_gallery_drafts' }]);
             }
         } finally {
             db.close();
@@ -568,7 +591,7 @@ test('fresh schema and frozen existing baseline have equivalent shared objects',
     db.close();
     assert.deepEqual(runner.plan(fresh).pending, []);
     assert.deepEqual(runner.plan(baseline).pending,
-        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications']);
+        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications', '0004_gallery_drafts']);
     runner.apply(baseline);
     const signature = path => {
         const connection = new Database(path, { readonly: true });
@@ -640,7 +663,7 @@ test('CLI inspect and plan are read-only; CLI apply records all pending migratio
     const applied = run('apply');
     assert.equal(applied.status, 0, applied.stderr);
     assert.deepEqual(JSON.parse(applied.stdout).appliedNow,
-        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications']);
+        ['0000_existing_schema', '0001_public_author_publication_model', '0002_body_gallery', '0003_media_publications', '0004_gallery_drafts']);
 });
 
 for (const [variant, fixtureName] of [

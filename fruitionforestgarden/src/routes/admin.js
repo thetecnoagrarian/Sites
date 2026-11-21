@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { isAuthenticated, isAdmin, createEditorialAdminRouter, cleanupOwnedUploads, logSafeError, asyncHandler } from '@ffg/blog-core';
 import Analytics from '../models/analytics.js';
+import { galleryPlacement, safePreviewProse } from '../utils/bodyGalleryView.js';
 import {
     publishHeroImage,
     resetHeroImage,
@@ -166,7 +167,29 @@ router.post('/categories/:id/delete', isAdmin, asyncHandler(async (req, res) => 
 }));
 
 // Shared admin-only Public Person and editorial post workflow.
-router.use(createEditorialAdminRouter({ allowOverwrite: true }));
+router.use(createEditorialAdminRouter({
+    allowOverwrite: true,
+    bodyGallery: {
+        validatePlacement(body, items) {
+            galleryPlacement(typeof body === 'string' ? body : '', items, { required: true });
+        },
+        renderPreview(req, res, { previous, fields, items, draftUrl }) {
+            const body = typeof fields.body === 'string' ? fields.body : '';
+            let gallery;
+            try { gallery = galleryPlacement(body, items, { required: true, preview: true }); }
+            catch (error) { return res.status(400).render('error', { title: 'Gallery placement', message: error.message }); }
+            const captions = fields['captions[]'] ?? fields.captions ?? previous?.captions ?? [];
+            const imageList = (previous?.images ?? []).map((image, index) => ({
+                ...image, caption: (Array.isArray(captions) ? captions : [captions])[index] ?? ''
+            }));
+            const post = {
+                title: fields.title || 'Untitled draft', body: gallery ? '' : safePreviewProse(body),
+                created_at: fields.created_at, imageList, multipleImages: imageList.length > 1
+            };
+            res.render('posts/show', { title: post.title, post, gallery, draftUrl });
+        }
+    }
+}));
 
 // Analytics dashboard
 router.get('/analytics', isAdmin, asyncHandler(async (req, res) => {

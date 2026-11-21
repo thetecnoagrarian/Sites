@@ -13,6 +13,7 @@ import {
 } from '@ffg/blog-core';
 import buildOgTags, { SITE_DESCRIPTION } from '../middleware/ogTags.js';
 import { resolveHeroImage } from '../utils/heroImageStore.js';
+import { galleryPlacement } from '../utils/bodyGalleryView.js';
 
 const router = express.Router();
 
@@ -304,9 +305,13 @@ router.get('/post/:slug', asyncHandler(async (req, res) => {
 
         res.locals.post = post; // Make post available to template
         const ogTags = await buildOgTags(post, req);
+        const gallery = galleryPlacement(post.body, post.body_gallery?.items.map(item => ({
+            ...item, src: item.asset.medium, href: item.asset.large
+        })));
         res.render('posts/show', {
             title: post.title,
             post,
+            gallery,
             ogTags,
             metaDescription,
             canonicalUrl,

@@ -1,0 +1,38 @@
+<fieldset id="gallery-editor" class="form-group" data-draft="{{galleryDraftId}}" data-editor="{{galleryEditorData}}" {{#if galleryPublicationPending}}disabled{{/if}}>
+    <legend>Documentary gallery</legend>
+    {{#if galleryEditDisabled}}
+    <p role="alert">The stored gallery could not be read. Other edits preserve it until it is repaired.</p>
+    {{else}}
+    <p>Choose up to 100 photos. Give each photo a short description for readers who cannot see it. Captions are optional.</p>
+    <input type="hidden" name="bodyGalleryItems" data-gallery-selection disabled>
+    <label>Choose documentary photos <input type="file" accept="image/*" multiple data-gallery-files disabled></label>
+    <button type="button" data-gallery-placement disabled>Insert gallery marker at cursor</button>
+    <ol data-gallery-items class="gallery-editor-photos"></ol>
+    <ol data-gallery-uploads aria-label="Photo uploads"></ol>
+    <template data-gallery-item>
+        <li>
+            <img alt="" width="96" loading="lazy">
+            <label>Photo description <input type="text" maxlength="500" data-gallery-alt></label>
+            <label>Caption <input type="text" maxlength="2000" data-gallery-caption></label>
+            <label>Position <input type="number" min="1" step="1" data-gallery-position></label>
+            <button type="button" data-move="-1">Move up</button>
+            <button type="button" data-move="1">Move down</button>
+            <button type="button" data-remove>Remove photo</button>
+        </li>
+    </template>
+    {{/if}}
+    <button type="button" data-save-draft disabled>Save draft</button>
+    <button type="button" data-preview-draft disabled>Preview article</button>
+    <p role="status" data-gallery-status></p>
+    <a target="_blank" rel="noopener" data-current-draft hidden>Open current draft in a new tab</a>
+    <noscript>The documentary gallery editor requires JavaScript.</noscript>
+</fieldset>
+<style>
+.gallery-editor-photos { padding-inline-start: 1.5rem; }
+.gallery-editor-photos li { margin-block: 1rem; padding-block: .5rem; }
+.gallery-editor-photos label { display: block; margin-block: .25rem; }
+.gallery-editor-photos input[type="text"] { width: min(100%, 34rem); }
+.gallery-editor-photos input[type="number"] { width: 5rem; }
+.gallery-editor-photos img { display: block; max-width: 100%; height: auto; }
+</style>
+<script src="/js/gallery-editor.js" defer></script>

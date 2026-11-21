@@ -10,6 +10,7 @@ import Category from '../models/category.js';
 import { logSafeError, readDiagnosticProperty } from '../utils/error-diagnostics.js';
 import { preparePostCandidate, verifyStoredPostCandidate } from '../utils/private-media.js';
 import { getDatabase } from '../models/db.js';
+import { mountGalleryDrafts } from './gallery-drafts.js';
 import { allocateMediaOperation, readMediaOperation, prepareMediaOperation, markPendingOverwrite,
     cancelMediaOperation, verifyMediaAcceptance, submissionDigest, mediaDigest, publishedMediaCandidate,
     readPendingOverwrite } from '../models/media-publication.js';
@@ -98,7 +99,7 @@ function captionsFor(body, count, previous = []) {
     return Array.from({ length: count }, (_, index) => supplied[index] ?? previous[index] ?? '');
 }
 
-function flashError(req, res, error, target) {
+function flashError(req, res, error, target, redirect = path => res.redirect(path)) {
     logSafeError(error, { request: req });
     const code = readDiagnosticProperty(error, 'code');
     const message = readDiagnosticProperty(error, 'message');
@@ -116,13 +117,16 @@ function flashError(req, res, error, target) {
             operationId: req.body.mediaOperationId, state: 'unknown' });
     }
     req.flash('error', typeof message === 'string' ? message : 'Editorial action failed');
-    return res.redirect(target);
+    return redirect(target);
 }
 
-export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
+export function createEditorialAdminRouter({ allowOverwrite = false, bodyGallery = null } = {}) {
     const router = express.Router();
     router.use(isAdmin);
+    const drafts = bodyGallery && mountGalleryDrafts(router, bodyGallery);
     const confirmationUrl = id => `/admin/posts/confirm-overwrite?mediaOperationId=${encodeURIComponent(id)}`;
+    const publishRedirect = (req, res, url) => drafts && req.body.galleryDraftId && req.get('accept') === 'application/json'
+        ? res.set('Cache-Control', 'private, no-store').json({ redirect: url }) : res.redirect(url);
 
     const accepted = async (req, res, id) => {
         res.set('Cache-Control', 'no-store');
@@ -146,7 +150,7 @@ export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
         }
         try {
             req.flash('success', `Post accepted (ID ${operation.data.receipt.postId})`);
-            return res.redirect('/admin/dashboard');
+            return publishRedirect(req, res, '/admin/dashboard');
         } catch (error) {
             logSafeError(error, { request: req });
             return res.status(503).json({ operationId: id, state: 'published', receipt: operation.data.receipt,
@@ -156,18 +160,29 @@ export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
     const submission = async (req, action, postId = null) => {
         const db = getDatabase();
         const id = req.body.mediaOperationId;
-        const operation = readMediaOperation(db, id, req.user.id);
+        let operation = readMediaOperation(db, id, req.user.id);
         if (operation.data.context.action !== action || operation.data.context.postId !== postId) throw new Error('Media operation target changed');
-        if (operation.state === 'cancelled') throw new Error('Media operation was cancelled; reload the editor');
         const files = req.files ?? [];
+        let draft = drafts?.bind(req, operation, postId);
         const fingerprintInput = formInput(req.body, [], array(req.body['captions[]'] ?? req.body.captions));
+        if (draft) fingerprintInput.gallery = { draftId: draft.id, revision: req.body.galleryDraftRevision,
+            selection: req.body.bodyGalleryItems, known: req.body.galleryKnownPhotos };
         const digest = await submissionDigest(fingerprintInput, files, req.app.locals.uploadsPath);
+        if (draft) {
+            operation = readMediaOperation(db, id, req.user.id);
+            draft = drafts.bind(req, operation, postId);
+            if (operation.state === 'allocated') drafts.assertCurrent(req, draft);
+            else if (operation.state === 'cancelled' || operation.data.submission !== digest) throw drafts.conflict(draft);
+        }
+        if (operation.state === 'cancelled') throw new Error('Media operation was cancelled; reload the editor');
         if (operation.state !== 'allocated' && operation.data.submission !== digest) throw new Error('Changed submission cannot reuse a media operation');
         if (operation.state === 'published') return { id, published: true };
         const previous = action === 'update' ? createEditorialService().snapshot(postId) : null;
         const oldImages = files.length ? [] : previous?.post.images ?? [];
         let input = formInput(req.body, oldImages, captionsFor(req.body, files.length || oldImages.length,
             files.length ? [] : previous?.post.captions ?? []));
+        const gallery = drafts?.publish(req, draft, previous?.post);
+        if (gallery) input.content.body_gallery = gallery.gallery;
         if (action === 'create') input.loginUserId = req.user.id;
         let candidates = operation.data.candidates;
         if (operation.state === 'allocated') {
@@ -177,12 +192,26 @@ export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
                     uploadsPath: req.app.locals.uploadsPath, inputPath: file.path });
                 candidates.push({ id: result.candidate.id, image: result.image, files: result.files });
             }
+            candidates.push(...(gallery?.candidates ?? []));
         }
-        if (files.length) input.content.images = candidates.map(item => item.image);
+        if (files.length) input.content.images = candidates.slice(0, files.length).map(item => item.image);
         let stored = operation;
-        if (operation.state === 'allocated') stored = prepareMediaOperation(db, id, req.user.id, digest, input, candidates);
+        const prepare = () => prepareMediaOperation(db, id, req.user.id, digest, input, candidates);
+        if (operation.state === 'allocated') {
+            stored = draft ? db.transaction(() => {
+                const current = readMediaOperation(db, id, req.user.id);
+                const latest = drafts.bind(req, current, postId);
+                if (current.state === 'allocated') {
+                    drafts.assertCurrent(req, latest);
+                    drafts.save(req, latest);
+                } else if (current.state === 'cancelled' || current.data.submission !== digest) {
+                    throw drafts.conflict(latest);
+                }
+                return prepare();
+            }).immediate() : prepare();
+        }
         if (stored.state === 'published') return { id, published: true };
-        if (files.length) input.content.images = stored.data.candidates.map(item => item.image);
+        if (files.length) input.content.images = stored.data.candidates.slice(0, files.length).map(item => item.image);
         if (stored.data.pending) input.revisionToken = stored.data.pending.revisionToken;
         return { id, input, pending: stored.data.pending };
     };
@@ -237,13 +266,17 @@ export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
     });
 
     router.get('/posts/new', (req, res) => {
-        const people = PublicPerson.list({ includeArchived: true });
-        res.render('admin/new-post', {
-            mediaOperationId: allocateMediaOperation(getDatabase(), req.user.id, 'create'),
-            title: 'New Post', categories: Category.findAll(),
-            authorRows: authorRows(people), publisherOptions: personOptions(people),
-            user: req.user, csrfToken: req.csrfToken(), error: req.flash('error')
-        });
+        try {
+            const people = PublicPerson.list({ includeArchived: true });
+            const editor = drafts?.open(req, null) ?? { mediaOperationId: allocateMediaOperation(getDatabase(), req.user.id, 'create') };
+            if (editor.redirect) return res.redirect(editor.redirect);
+            if (drafts) res.set('Cache-Control', 'private, no-store');
+            res.render('admin/new-post', {
+                ...editor, title: 'New Post', categories: Category.findAll(),
+                authorRows: authorRows(people), publisherOptions: personOptions(people),
+                user: req.user, csrfToken: req.csrfToken(), error: req.flash('error')
+            });
+        } catch (error) { flashError(req, res, error, '/admin/dashboard'); }
     });
     router.get('/posts/:id/edit', (req, res) => {
         try {
@@ -252,8 +285,12 @@ export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
             const selected = snapshot.facts.authors.map(person => person.id);
             const categories = Category.findAll().map(category => ({ ...category,
                 selected: snapshot.categories.includes(category.id) }));
+            const postId = Number(req.params.id);
+            const editor = drafts?.open(req, postId, snapshot.post) ?? { mediaOperationId: allocateMediaOperation(getDatabase(), req.user.id, 'update', postId) };
+            if (editor.redirect) return res.redirect(editor.redirect);
+            if (drafts) res.set('Cache-Control', 'private, no-store');
             res.render('admin/new-post', {
-                mediaOperationId: allocateMediaOperation(getDatabase(), req.user.id, 'update', Number(req.params.id)),
+                ...editor,
                 title: 'Edit Post', post: snapshot.post, categories,
                 authorRows: authorRows(people, selected),
                 publisherOptions: personOptions(people, snapshot.facts.publisher_public_person_id),
@@ -280,15 +317,33 @@ export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
             next();
         })(req, res, next));
     };
+    const draftRedirect = (req, path) => drafts && typeof req.body.galleryDraftId === 'string'
+        && /^[0-9a-f-]{36}$/.test(req.body.galleryDraftId) ? `${path}?draft=${req.body.galleryDraftId}` : path;
+    const saveDraft = (req, res, postId) => {
+        res.set('Cache-Control', 'private, no-store');
+        try {
+            if (req.files?.length) return res.status(400).json({ error: 'Add new highlights when publishing. Save or preview the documentary draft separately.' });
+            const operation = readMediaOperation(getDatabase(), req.body.mediaOperationId, req.user.id);
+            const draft = drafts.bind(req, operation, postId);
+            if (!draft) return res.status(409).json({ error: 'Reopen the draft before editing.' });
+            return res.json(drafts.save(req, draft));
+        } catch (error) { return drafts.error(req, res, error); }
+    };
+    const publishError = (req, res, error, path) => error?.editUrl && drafts
+        ? drafts.error(req, res, error)
+        : flashError(req, res, error, draftRedirect(req, path), url => publishRedirect(req, res, url));
 
     router.post('/dashboard/posts/create', upload, asyncHandler(async (req, res) => {
+        let endPublication;
         try {
+            if (drafts && req.body.submitIntent === 'draft') return saveDraft(req, res, null);
+            endPublication = drafts?.beginPublication(req);
             const prepared = await submission(req, 'create');
             if (prepared.published) return await accepted(req, res, prepared.id);
             const { input, id } = prepared;
             if (prepared.pending) {
                 readPendingOverwrite(getDatabase(), id, req.user.id);
-                return res.redirect(confirmationUrl(id));
+                return publishRedirect(req, res, confirmationUrl(id));
             }
             input.mediaAcceptance = await verifyMediaAcceptance({ db: getDatabase(), uploadsPath: req.app.locals.uploadsPath,
                 id, ownerId: req.user.id, input, action: 'create' });
@@ -301,17 +356,21 @@ export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
                 input.revisionToken = error.revisionToken;
                 markPendingOverwrite(getDatabase(), id, req.user.id, { postId: error.existingPostId, revisionToken: error.revisionToken }, input);
                 req.flash('warning', 'Duplicate title: review the existing post before overwriting');
-                return res.redirect(confirmationUrl(id));
+                return publishRedirect(req, res, confirmationUrl(id));
             }
             return await accepted(req, res, id);
-        } catch (error) { flashError(req, res, error, '/admin/posts/new'); }
+        } catch (error) { publishError(req, res, error, '/admin/posts/new'); }
         finally {
+            endPublication?.();
             await cleanupOwnedUploads(req);
         }
     }));
 
     router.post('/dashboard/posts/:id/update', upload, asyncHandler(async (req, res) => {
+        let endPublication;
         try {
+            if (drafts && req.body.submitIntent === 'draft') return saveDraft(req, res, Number(req.params.id));
+            endPublication = drafts?.beginPublication(req);
             const prepared = await submission(req, 'update', Number(req.params.id));
             if (prepared.published) return await accepted(req, res, prepared.id);
             const { id, input } = prepared;
@@ -320,8 +379,9 @@ export function createEditorialAdminRouter({ allowOverwrite = false } = {}) {
             createEditorialService().update(req.params.id, input);
             return await accepted(req, res, id);
         } catch (error) {
-            flashError(req, res, error, `/admin/posts/${req.params.id}/edit`);
+            publishError(req, res, error, `/admin/posts/${req.params.id}/edit`);
         } finally {
+            endPublication?.();
             await cleanupOwnedUploads(req);
         }
     }));

@@ -3,6 +3,20 @@
     <div class="admin-header">
         <h1>{{#if post}}Edit Post{{else}}New Post{{/if}}</h1>
     </div>
+    {{#if galleryPublicationPending}}
+    <div class="alert">
+        {{#if galleryPublicationInProgress}}
+        <p>Publication is in progress. Check the draft again shortly.</p>
+        {{else}}
+        <p>A publication attempt is unresolved. Resume editing to retire the attempt and keep the saved draft.</p>
+        <form action="/admin/gallery-drafts/{{galleryDraftId}}/resume" method="POST">
+            <input type="hidden" name="_csrf" value="{{csrfToken}}">
+            <input type="hidden" name="mediaOperationId" value="{{mediaOperationId}}">
+            <button type="submit">Resume editing draft</button>
+        </form>
+        {{/if}}
+    </div>
+    {{/if}}
 
     <form action="{{#if post}}/admin/dashboard/posts/{{post.id}}/update{{else}}/admin/dashboard/posts/create{{/if}}" method="POST" enctype="multipart/form-data" class="post-form">
         <input type="hidden" name="_csrf" value="{{csrfToken}}">
@@ -101,10 +115,17 @@
 
         {{> editorial-facts}}
 
+        {{#if galleryDraftId}}
+        <input type="hidden" name="galleryDraftId" value="{{galleryDraftId}}">
+        <input type="hidden" name="galleryDraftRevision" value="{{galleryDraftRevision}}">
+        <input type="hidden" name="galleryKnownPhotos" value="[]">
+        {{> gallery-editor}}
+        {{/if}}
+
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="btn btn-primary" {{#if galleryPublicationPending}}disabled{{/if}}>
                 <i class="fas fa-check-circle"></i>
-                {{#if post}}Update{{else}}Create{{/if}} Post
+                {{#if galleryDraftId}}{{#if post}}Publish update{{else}}Publish post{{/if}}{{else}}{{#if post}}Update{{else}}Create{{/if}} Post{{/if}}
             </button>
             <a href="/admin" class="btn btn-secondary">
                 <i class="fas fa-times-circle"></i>
