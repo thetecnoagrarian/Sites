@@ -14,7 +14,7 @@ import { setDatabase } from '../src/models/db.js';
 import PublicPerson from '../src/models/public-person.js';
 import Post from '../src/models/post.js';
 import { createEditorialService } from '../src/models/editorial-service.js';
-import { allocateMediaOperation, createPostMediaProvider, readPendingOverwrite } from '../src/models/media-publication.js';
+import { allocateMediaOperation, createPostMediaGrantProvider, readPendingOverwrite } from '../src/models/media-publication.js';
 import { mountMediaServing } from '../src/middleware/media-serving.js';
 import { createUploadMiddleware, cleanupOwnedUploads } from '../src/middleware/upload.js';
 import { ownedUploadDirectory, reserveUploadFilename, recordOwnedUpload,
@@ -105,7 +105,7 @@ async function fixture(t, site = 'ffg', { beforeVerify, fileSize, omitCleanupRou
     mkdirSync(publicPath);
     const hero = site === 'ffg' ? createHeroPublicationProvider(uploads) : null;
     mountMediaServing(app, { publicPath, uploadsPath: uploads,
-        publicationProviders: { post: createPostMediaProvider(db), ...(hero ? { hero: hero.authorize } : {}) },
+        publicationProviders: { post: createPostMediaGrantProvider(db), ...(hero ? { hero: hero.authorize } : {}) },
         publicationIntegrityVerifiers: hero ? { hero: hero.verifyOpenedFile } : {} });
     server = app.listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));

@@ -36,9 +36,9 @@ async function fixture(t, nested = true) {
     await reserveUploadFilename(rawReq, 'input.png');
     await fs.writeFile(inputPath, png, { flag: 'wx' });
     await recordOwnedUpload(rawReq, { filename: 'input.png', path: inputPath });
-    const grants = new Set();
+    const grants = new Map();
     const calls = [];
-    const provider = async descriptor => { calls.push(descriptor); return grants.has(descriptor.url); };
+    const provider = async descriptor => { calls.push(descriptor); return grants.get(descriptor.url); };
     const providers = { post: provider, hero: provider };
     const app = express();
     mountMediaServing(app, { publicPath, uploadsPath, publicationProviders: providers, production: true,
@@ -150,10 +150,12 @@ test('managed serving is deny-by-default, never falls through, and authorizes be
     await denied(f, url);
     f.providers.post = () => ({ path: f.inputPath });
     await denied(f, url);
+    f.providers.post = () => true;
+    await denied(f, url);
     f.providers.post = () => { throw new Error('Synthetic private database detail'); };
     await denied(f, url);
     f.providers.post = provider;
-    f.grants.add(url);
+    f.grants.set(url, prepared.files.large);
     const result = await f.get(url);
     assert.equal(result.status, 200);
     assert.match(result.headers['content-type'], /^image\/webp/);
@@ -207,7 +209,7 @@ test('hero candidates use the existing processor but remain private, including r
     for (const filename of ['current-hero.webp', 'current-hero-og.webp']) {
         const url = managedMediaUrl('hero', candidate.id, filename);
         await denied(f, url);
-        f.grants.add(url);
+        f.grants.set(url, true);
         const served = await f.get(url);
         assert.equal(served.status, 200);
         assert.deepEqual(served.body, await fs.readFile(path.join(candidate.directory, filename)));
@@ -300,7 +302,7 @@ test('authorized requests still reject missing, symlinked and hardlinked private
     const f = await fixture(t);
     const prepared = await f.prepare();
     const url = prepared.image.large;
-    f.grants.add(url);
+    f.grants.set(url, prepared.files.large);
     const file = path.join(prepared.candidate.directory, path.basename(url));
     await fs.rename(file, `${file}-retained`);
     await denied(f, url);
@@ -319,7 +321,7 @@ test('private-root permission failure rejects preparation and public access', as
     await fs.chmod(media, 0o000);
     try {
         await assert.rejects(f.prepare());
-        f.grants.add(prepared.image.large);
+        f.grants.set(prepared.image.large, prepared.files.large);
         await denied(f, prepared.image.large);
     } finally { await fs.chmod(media, 0o700); }
 });
@@ -327,7 +329,7 @@ test('private-root permission failure rejects preparation and public access', as
 test('synthetic authorization overhead is observable without a new cache', async t => {
     const f = await fixture(t);
     const prepared = await f.prepare();
-    f.grants.add(prepared.image.medium);
+    f.grants.set(prepared.image.medium, prepared.files.medium);
     const timings = {};
     for (const [label, url] of [['legacy', '/uploads/legacy.webp'], ['authorized', prepared.image.medium], ['denied', prepared.image.large]]) {
         const start = performance.now();

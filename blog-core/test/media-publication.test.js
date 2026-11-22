@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { promises as fs } from 'node:fs';
+import { promises as fs, renameSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -16,7 +16,7 @@ import PublicPerson from '../src/models/public-person.js';
 import Post from '../src/models/post.js';
 import { createEditorialService } from '../src/models/editorial-service.js';
 import { allocateMediaOperation, readMediaOperation, prepareMediaOperation, markPendingOverwrite,
-    verifyMediaAcceptance, cancelMediaOperation, createPostMediaProvider, mediaDigest } from '../src/models/media-publication.js';
+    verifyMediaAcceptance, cancelMediaOperation, createPostMediaProvider, createPostMediaGrantProvider, mediaDigest } from '../src/models/media-publication.js';
 import { preparePostCandidate, createPrivateCandidate, managedMediaUrl } from '../src/utils/private-media.js';
 import { createUploadMiddleware } from '../src/middleware/upload.js';
 import { ownedUploadDirectory, reserveUploadFilename, recordOwnedUpload } from '../src/middleware/owned-upload.js';
@@ -53,7 +53,7 @@ async function fixture(t, site = 'ffg') {
     const session = { userId: owner };
     const messages = [];
     const requests = new Map();
-    const providers = { post: createPostMediaProvider(db) };
+    const providers = { post: createPostMediaGrantProvider(db) };
     const app = express();
     app.locals.uploadsPath = uploadsPath;
     app.locals.upload = createUploadMiddleware(path.join(uploadsPath, 'temp'));
@@ -75,8 +75,8 @@ async function fixture(t, site = 'ffg') {
     server = app.listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
-    const get = (url, headers = {}) => new Promise((resolve, reject) => {
-        const req = request({ hostname: '127.0.0.1', port: server.address().port, path: url, headers }, res => {
+    const get = (url, headers = {}, method = 'GET') => new Promise((resolve, reject) => {
+        const req = request({ hostname: '127.0.0.1', port: server.address().port, path: url, headers, method }, res => {
             const chunks = [];
             res.on('data', chunk => chunks.push(chunk));
             res.on('error', reject);
@@ -135,7 +135,7 @@ async function fixture(t, site = 'ffg') {
         db = new Database(dbPath, options);
         db.pragma('foreign_keys = ON');
         setDatabase(db);
-        providers.post = createPostMediaProvider(db);
+        providers.post = createPostMediaGrantProvider(db);
     };
     return { root, dbPath, get db() { return db; }, uploadsPath, inputPath, png, app, owner, other, providers,
         messages, session, get, post, fields, input, allocate, prepare, reopen };
@@ -439,6 +439,107 @@ test('an actual lost HTTP response is recovered by the same operation receipt', 
     assert.equal(operation(f, values.mediaOperationId).state, 'published');
     assert.equal((await f.post('/dashboard/posts/create', values)).status, 302);
     assert.equal(Post.count, 1);
+});
+
+for (const site of ['ffg', 'tta']) {
+    test(`${site} public post media requires the accepted size and digest before GET, HEAD and 304`, async t => {
+        const f = await fixture(t, site), values = f.fields();
+        assert.equal((await f.post('/dashboard/posts/create', values)).status, 302);
+        const published = operation(f, values.mediaOperationId);
+        const candidate = published.data.candidates[0];
+        const grant = createPostMediaGrantProvider(f.db);
+        for (const variant of variants) {
+            const url = candidate.image[variant];
+            const { bytes, sha256 } = candidate.files[variant];
+            assert.deepEqual(grant({ kind: 'post', id: candidate.id, variant, url }), { bytes, sha256 });
+            assert.equal((await f.get(url)).body.length, bytes);
+        }
+        const url = candidate.image.medium;
+        const target = path.join(f.uploadsPath, '.media', 'post', candidate.id, path.basename(url));
+        const original = await fs.readFile(target);
+        const valid = await f.get(url);
+        assert.equal(valid.status, 200);
+        assert.deepEqual(valid.body, original);
+        const conditional = { 'If-None-Match': valid.headers.get('etag') };
+        assert.equal((await f.get(url, {}, 'HEAD')).status, 200);
+        for (const method of ['GET', 'HEAD']) assert.equal((await f.get(url, conditional, method)).status, 304);
+
+        await fs.writeFile(path.join(f.uploadsPath, path.basename(url)), original);
+        const sameSize = Buffer.from(original);
+        sameSize[0] ^= 1;
+        for (const corrupt of [sameSize, Buffer.concat([original, Buffer.from([0])]), original.subarray(0, -1)]) {
+            await fs.writeFile(target, corrupt);
+            for (const method of ['GET', 'HEAD']) for (const headers of [{}, conditional, { 'If-None-Match': '*' }]) {
+                const response = await f.get(url, headers, method);
+                assert.equal(response.status, 404);
+                assert.equal(response.headers.get('cache-control'), 'no-store');
+                assert.equal(response.body.toString(), method === 'HEAD' ? '' : 'Not found');
+            }
+            assert.deepEqual(await fs.readFile(target), corrupt);
+            assert.deepEqual(operation(f, values.mediaOperationId), published);
+        }
+        await fs.unlink(target);
+        assert.equal((await f.get(url, conditional)).status, 404);
+        await fs.symlink(f.inputPath, target);
+        assert.equal((await f.get(url, conditional, 'HEAD')).status, 404);
+    });
+}
+
+test('post verification rejects open-time replacement and streams the verified inode after rename', async t => {
+    const f = await fixture(t);
+    const prepared = await f.prepare();
+    createEditorialService().create(prepared.input);
+    const candidate = prepared.candidates[0];
+    const url = candidate.image.large;
+    const target = await fs.realpath(path.join(f.uploadsPath, '.media', 'post', candidate.id, path.basename(url)));
+    const original = await fs.readFile(target);
+    const holding = target + '.accepted';
+    const impostor = target + '.impostor';
+    const changed = Buffer.from(original);
+    changed[0] ^= 1;
+    await fs.writeFile(impostor, changed);
+    const realOpen = fs.open;
+    const failure = t.mock.method(fs, 'open', async (filename, ...options) => {
+        if (filename === target) throw Object.assign(new Error('Synthetic inaccessible file'), { code: 'EACCES' });
+        return realOpen(filename, ...options);
+    });
+    const unreadable = await f.get(url);
+    assert.equal(unreadable.status, 404);
+    assert.equal(unreadable.headers.get('cache-control'), 'no-store');
+    assert.equal(unreadable.body.toString(), 'Not found');
+    failure.mock.restore();
+
+    const beforeOpen = t.mock.method(fs, 'open', async (filename, ...options) => {
+        if (filename === target) {
+            await fs.rename(target, holding);
+            await fs.rename(impostor, target);
+        }
+        return realOpen(filename, ...options);
+    });
+    assert.equal((await f.get(url)).status, 404);
+    beforeOpen.mock.restore();
+    await fs.rename(target, impostor);
+    await fs.rename(holding, target);
+
+    let reads = 0;
+    const afterCheck = t.mock.method(fs, 'open', async (filename, ...options) => {
+        const handle = await realOpen(filename, ...options);
+        if (filename === target) {
+            const stream = handle.createReadStream.bind(handle);
+            handle.createReadStream = options => {
+                if (++reads === 2) renameSync(impostor, target);
+                return stream(options);
+            };
+        }
+        return handle;
+    });
+    const verified = await f.get(url);
+    afterCheck.mock.restore();
+    assert.equal(reads, 2);
+    assert.equal(verified.status, 200);
+    assert.deepEqual(verified.body, original);
+    assert.deepEqual(await fs.readFile(target), changed);
+    assert.equal((await f.get(url)).status, 404);
 });
 
 test('SQLite provider denies exact-variant mismatches and malformed published records', async t => {

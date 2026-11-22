@@ -213,12 +213,14 @@ denies `.media`, `.source`, temporary uploads, ambiguous encodings/traversal and
 symlink traversal before static serving. New reserved URL families are flat
 `/uploads/m1-<UUID>-<thumbnail|medium|large>.webp` for posts and
 `/uploads/hero/m1-<UUID>/current-hero.webp` or `current-hero-og.webp` for heroes.
-Each request must receive literal `true` from its configured post/hero publication
-callback before private bytes or conditional/304 responses are served.
 `createBlogApp` installs the SQLite-backed post provider on its existing database
-connection. FFG supplies its filesystem-backed hero provider and an optional
-opened-file integrity verifier; TTA and post authorization remain independent.
-Missing/error/malformed grants deny; no speculative cache is used.
+connection. For an authorized variant, the provider returns the committed byte
+count (`bytes`) and SHA-256 digest (`sha256`). The serving middleware verifies
+both against the securely opened file before a successful GET, HEAD, or
+conditional `304` response. FFG's filesystem-backed hero provider retains its
+literal `true` authorization contract and separate opened-file integrity verifier.
+Legacy media retain their separate static-serving rules. Missing or malformed
+grants and provider errors deny access. No speculative cache is used.
 
 Migration `0003_media_publications.sql` and the matching fresh schema add one
 table. An operation row is keyed by its server-generated UUID; each accepted

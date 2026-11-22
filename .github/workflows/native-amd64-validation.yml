@@ -303,28 +303,21 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Run shared and focused native-package tests
+      - name: Run focused native-package and filesystem tests
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm \
             --workdir /app \
             --volume "$GITHUB_WORKSPACE/blog-core/test:/app/blog-core/test:ro" \
-            --entrypoint /bin/sh \
-            "$FFG_IMAGE" -lc 'node --test blog-core/test/*.test.js' \
-            2>&1 | tee "$RUNNER_TEMP/shared-core-tests.log"
-          docker run --rm \
-            --workdir /app \
-            --volume "$GITHUB_WORKSPACE/blog-core/test:/app/blog-core/test:ro" \
             --entrypoint node \
-            "$FFG_IMAGE" --test blog-core/test/better-sqlite3-compatibility.test.js \
-            2>&1 | tee "$RUNNER_TEMP/better-sqlite3-tests.log"
-          docker run --rm \
-            --workdir /app \
-            --volume "$GITHUB_WORKSPACE/blog-core/test:/app/blog-core/test:ro" \
-            --entrypoint node \
-            "$FFG_IMAGE" --test blog-core/test/morgan-security.test.js \
-            2>&1 | tee "$RUNNER_TEMP/morgan-tests.log"
+            "$FFG_IMAGE" --test \
+              blog-core/test/better-sqlite3-compatibility.test.js \
+              blog-core/test/migrations.test.js \
+              blog-core/test/body-gallery.test.js \
+              blog-core/test/private-media.test.js \
+              blog-core/test/morgan-security.test.js \
+            2>&1 | tee "$RUNNER_TEMP/native-core-tests.log"
           docker run --rm \
             --workdir /app \
             --volume "$GITHUB_WORKSPACE/tests/sanitize-html-security.test.js:/app/tests/sanitize-html-security.test.js:ro" \
@@ -354,9 +347,7 @@ jobs:
             echo
             echo "## Focused native regression tests"
             for result in \
-              "$RUNNER_TEMP/shared-core-tests.log" \
-              "$RUNNER_TEMP/better-sqlite3-tests.log" \
-              "$RUNNER_TEMP/morgan-tests.log" \
+              "$RUNNER_TEMP/native-core-tests.log" \
               "$RUNNER_TEMP/sanitize-html-tests.log"; do
               echo
               echo "### $(basename "$result" .log)"
@@ -366,6 +357,15 @@ jobs:
             done
           } >> "$GITHUB_STEP_SUMMARY" || \
             echo "::warning::Focused test commands passed, but their informational job summary could not be written"
+
+      - name: Run shared regressions and editor fault injection on the runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          # These fixtures use both site trees, and gallery fault injection uses
+          # the runner's installed Chromium. The real Mode B browser gate follows.
+          node --test --test-reporter=tap blog-core/test/*.test.js \
+            2>&1 | tee "$RUNNER_TEMP/runner-core-tests.log"
 
       - name: Start isolated Mode B stack
         shell: bash
@@ -463,6 +463,7 @@ jobs:
 
           export default {
             ...baseConfig,
+            testMatch: ['**/*.spec.js', '**/fixtures/ffg-mode-b-gallery.mjs'],
             use: {
               ...baseConfig.use,
               extraHTTPHeaders: {
@@ -559,6 +560,8 @@ jobs:
               await page.locator('input[name="title"]').fill(title);
               await page.locator('textarea[name="body"]').fill('Synthetic native AMD64 lifecycle body.');
               await page.locator('input[name="created_at"]').fill('2026-08-20');
+              await page.locator('select[name="authorIds[]"]').first().selectOption({ label: 'Mode B Author One' });
+              await page.locator('select[name="publisherId"]').selectOption({ label: 'Mode B Author One' });
               await Promise.all([
                 page.waitForNavigation(),
                 page.locator('form.post-form').evaluate((form) => form.requestSubmit())
@@ -634,6 +637,15 @@ jobs:
             grep -E '[0-9]+ (passed|failed|skipped)' "$RUNNER_TEMP/chromium-lifecycle.log" | tail -n 1
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run FFG gallery Chromium workflow against Mode B
+        shell: bash
+        run: |
+          set -euo pipefail
+          CI=1 FORCE_COLOR=0 npx playwright test \
+            --config=native-amd64-playwright.config.js tests/fixtures/ffg-mode-b-gallery.mjs \
+            --project=chromium --retries=0 --reporter=line \
+            2>&1 | tee "$RUNNER_TEMP/mode-b-gallery.log"
 
       - name: Run authenticated Multer regression with test-only limit
         shell: bash

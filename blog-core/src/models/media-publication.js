@@ -330,7 +330,7 @@ export function recoverMediaOutcome(db, token, input, action, postId, originalEr
     if (Object.isExtensible(originalError)) originalError.mediaOutcome = row.state === 'cancelled' ? 'cancelled' : 'rolled_back';
     throw originalError;
 }
-export function createPostMediaProvider(db = getDatabase()) {
+export function createPostMediaGrantProvider(db = getDatabase()) {
     const query = db.prepare(`SELECT a.id, a.data, a.owner_user_id, p.owner_user_id AS operation_owner,
         p.id AS parent_id, p.operation_id AS parent_operation, p.data AS operation_data
         FROM media_publications a JOIN media_publications p ON p.id = a.operation_id
@@ -338,18 +338,25 @@ export function createPostMediaProvider(db = getDatabase()) {
             AND p.record_type = 'operation' AND p.state = 'published'`);
     return descriptor => {
         try {
-            if (!db.open || db.inTransaction) return false;
-            if (descriptor.kind !== 'post' || !idPattern.test(descriptor.id)) return false;
-            const row = query.get(descriptor.id);
-            if (!row || !positive(row.owner_user_id) || row.owner_user_id !== row.operation_owner) return false;
+            if (!db.open || db.inTransaction) return null;
+            const { kind, id, variant, url } = descriptor;
+            if (kind !== 'post' || !idPattern.test(id) || !variants.includes(variant)) return null;
+            const row = query.get(id);
+            if (!row || !positive(row.owner_user_id) || row.owner_user_id !== row.operation_owner) return null;
             const parent = operationRecord({ id: row.parent_id, operation_id: row.parent_operation,
                 owner_user_id: row.operation_owner, record_type: 'operation', state: 'published', data: row.operation_data });
             const candidate = candidateRecord(JSON.parse(row.data));
-            return candidate.id === descriptor.id && variants.includes(descriptor.variant)
-                && descriptor.url === candidate.image[descriptor.variant]
-                && parent.data.candidates.some(item => stable(item) === stable(candidate));
-        } catch { return false; }
+            if (candidate.id !== id || candidate.image[variant] !== url
+                || !parent.data.candidates.some(item => stable(item) === stable(candidate))) return null;
+            const { bytes, sha256 } = candidate.files[variant];
+            return { bytes, sha256 };
+        } catch { return null; }
     };
+}
+
+export function createPostMediaProvider(db = getDatabase()) {
+    const getGrant = createPostMediaGrantProvider(db);
+    return descriptor => getGrant(descriptor) !== null;
 }
 
 export function publishedMediaCandidate(db, id) {

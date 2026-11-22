@@ -78,7 +78,7 @@ async function openPostForm(page, site) {
   await expect(page.locator('input[name="_csrf"]')).toHaveValue(/.+/);
 }
 
-async function submitPostForm(page, { title, files = [], nestedFieldName }) {
+async function submitPostForm(page, { title, files = [], nestedFieldName, expectRejection = false }) {
   await page.locator('input[name="title"]').fill(title);
   await page.locator('textarea[name="body"]').fill(`${title} synthetic body`);
   await page.locator('input[name="created_at"]').fill('2026-08-18');
@@ -99,6 +99,22 @@ async function submitPostForm(page, { title, files = [], nestedFieldName }) {
     }, nestedFieldName);
   }
 
+  if (expectRejection) {
+    const [response] = await Promise.all([
+      page.waitForResponse(response => response.request().method() === 'POST'
+        && new URL(response.url()).pathname === '/admin/dashboard/posts/create'),
+      page.waitForNavigation(),
+      // Inspect the server's upload rejection through a native form redirect.
+      // FFG's fetch redirect upgrades to HTTPS on the HTTP-only test stack.
+      page.locator('form.post-form').evaluate(form => {
+        if (!form.reportValidity()) throw new Error('Synthetic form is invalid');
+        form.submit();
+      })
+    ]);
+    expect(response.status()).toBe(302);
+    expect(response.headers().location).toBe('/admin/posts/new');
+    return;
+  }
   await Promise.all([
     page.waitForNavigation(),
     page.locator('form.post-form').evaluate((form) => form.requestSubmit())
@@ -136,7 +152,8 @@ async function runSharedUploadMatrix(page, site) {
     const before = tempFileCount(site.service);
     await submitPostForm(page, {
       title: `Mode B Multer ${site.key} Invalid MIME`,
-      files: [invalidFile]
+      files: [invalidFile],
+      expectRejection: true
     });
     await expect(page).toHaveURL(`${site.baseURL}/admin/posts/new`);
     expect(tempFileCount(site.service)).toBe(before);
@@ -147,7 +164,8 @@ async function runSharedUploadMatrix(page, site) {
     const before = tempFileCount(site.service);
     await submitPostForm(page, {
       title: `Mode B Multer ${site.key} Oversized`,
-      files: [oversizedImage]
+      files: [oversizedImage],
+      expectRejection: true
     });
     await expect(page).toHaveURL(`${site.baseURL}/admin/posts/new`);
     expect(tempFileCount(site.service)).toBe(before);
@@ -159,7 +177,8 @@ async function runSharedUploadMatrix(page, site) {
     const files = Array.from({ length: 26 }, (_, index) => imageFile(`${site.key}-limit-${index}.png`));
     await submitPostForm(page, {
       title: `Mode B Multer ${site.key} File Limit`,
-      files
+      files,
+      expectRejection: true
     });
     await expect(page).toHaveURL(`${site.baseURL}/admin/posts/new`);
     expect(tempFileCount(site.service)).toBe(before);

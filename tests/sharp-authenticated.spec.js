@@ -81,21 +81,37 @@ const containerJson = (service, script) => JSON.parse(execFileSync(
   { encoding: 'utf8' }
 ));
 
-const containerFiles = (service, directory, prefix, suffix = '') => containerJson(
+const uploadState = service => containerJson(
   service,
   `
     import { readdir } from 'node:fs/promises';
-    let files = [];
-    try {
-      files = (await readdir(${JSON.stringify(directory)}))
-        .filter((name) => name.startsWith(${JSON.stringify(prefix)}) && name.endsWith(${JSON.stringify(suffix)}))
-        .sort();
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
+    async function files(directory) {
+      try {
+        return (await readdir(directory, { recursive: true, withFileTypes: true })).filter(entry => entry.isFile());
+      } catch (error) {
+        if (error.code === 'ENOENT') return [];
+        throw error;
+      }
     }
-    console.log(JSON.stringify(files));
+    console.log(JSON.stringify({
+      derivatives: (await files('/app/data/uploads/.media/post')).filter(entry => entry.name.endsWith('.webp')).length,
+      raw: (await files('/app/data/uploads/temp')).length
+    }));
   `
 );
+
+const publishedImages = (service, title) => containerJson(service, `
+    import Database from 'better-sqlite3';
+    const db = new Database(process.env.DATABASE_PATH, { readonly: true });
+    console.log(db.prepare('SELECT images FROM posts WHERE title = ?').get(${JSON.stringify(title)}).images);
+    db.close();
+`);
+
+const currentHero = service => containerJson(service, `
+    import { readFile } from 'node:fs/promises';
+    const manifest = JSON.parse(await readFile('/app/data/uploads/hero/.current.json', 'utf8'));
+    console.log(JSON.stringify(manifest.current));
+`);
 
 const containerMetadata = (service, directory, filenames) => containerJson(
   service,
@@ -131,7 +147,7 @@ async function openPostForm(page, site) {
   await expect(page.locator('input[name="_csrf"]')).toHaveValue(/.+/);
 }
 
-async function submitPost(page, title, files) {
+async function submitPost(page, title, files, { expectUploadRejection = false } = {}) {
   await page.locator('input[name="title"]').fill(title);
   await page.locator('textarea[name="body"]').fill(`${title} synthetic body`);
   await page.locator('input[name="created_at"]').fill('2026-08-18');
@@ -139,32 +155,51 @@ async function submitPost(page, title, files) {
   await page.locator('select[name="publisherId"]').selectOption({ label: 'Mode B Author One' });
   await page.locator('input[name="image"]').setInputFiles(files);
 
+  if (expectUploadRejection) {
+    const [response] = await Promise.all([
+      page.waitForResponse(response => response.request().method() === 'POST'
+        && new URL(response.url()).pathname === '/admin/dashboard/posts/create'),
+      page.waitForNavigation(),
+      // Follow the Multer redirect as a form navigation on the HTTP test stack.
+      page.locator('form.post-form').evaluate(form => {
+        if (!form.reportValidity()) throw new Error('Synthetic form is invalid');
+        form.submit();
+      })
+    ]);
+    expect(response.status()).toBe(302);
+    expect(response.headers().location).toBe('/admin/posts/new');
+    return;
+  }
   await Promise.all([
     page.waitForNavigation(),
     page.locator('form.post-form').evaluate((form) => form.requestSubmit())
   ]);
 }
 
-async function verifyVariants(page, site, inputBase, expectedRatio) {
-  const files = containerFiles(site.service, '/app/data/uploads', inputBase, '.webp');
-  expect(files).toHaveLength(3);
+async function verifyVariants(request, site, image, expectedRatio) {
+  const id = /^\/uploads\/m1-([0-9a-f-]{36})-medium\.webp$/.exec(image.medium)?.[1];
+  expect(id).toBeTruthy();
+  const variants = Object.keys(VARIANT_LIMITS);
+  const files = variants.map(variant => {
+    expect(image[variant]).toBe(`/uploads/m1-${id}-${variant}.webp`);
+    return path.basename(image[variant]);
+  });
 
-  const metadata = containerMetadata(site.service, '/app/data/uploads', files);
-  for (const output of metadata) {
-    const variant = output.filename.match(/-(thumbnail|medium|large)\.webp$/)?.[1];
-    expect(variant).toBeTruthy();
+  const metadata = containerMetadata(site.service, `/app/data/uploads/.media/post/${id}`, files);
+  for (const [index, output] of metadata.entries()) {
+    const variant = variants[index];
     expect(output.format).toBe('webp');
     expect(output.width).toBeLessThanOrEqual(VARIANT_LIMITS[variant].width);
     expect(output.height).toBeLessThanOrEqual(VARIANT_LIMITS[variant].height);
     expect(Math.abs((output.width / output.height) - expectedRatio)).toBeLessThan(0.01);
 
-    const response = await page.request.get(`${site.baseURL}/uploads/${output.filename}`);
+    const response = await request.get(site.baseURL + image[variant]);
     expect(response.status()).toBe(200);
     expect(response.headers()['content-type']).toContain('image/webp');
   }
 }
 
-async function runPostProcessingMatrix(page, site) {
+async function runPostProcessingMatrix(page, request, site) {
   await loginNormally(page, site);
 
   const jpegBase = `sharp-${site.key}-${RUN_ID}-landscape`;
@@ -172,6 +207,7 @@ async function runPostProcessingMatrix(page, site) {
   const validTitle = `Mode B Sharp ${site.key} Valid ${RUN_ID}`;
 
   await test.step('JPEG and PNG produce three bounded WebP variants each', async () => {
+    const before = uploadState(site.service);
     await openPostForm(page, site);
     await submitPost(page, validTitle, [
       imageFile(`${jpegBase}.jpg`, 'image/jpeg', landscapeJpeg),
@@ -179,64 +215,60 @@ async function runPostProcessingMatrix(page, site) {
     ]);
 
     await expect(page).toHaveURL(`${site.baseURL}/admin/dashboard`);
-    await verifyVariants(page, site, jpegBase, 2);
-    await verifyVariants(page, site, pngBase, 0.5);
+    const images = publishedImages(site.service, validTitle);
+    expect(images).toHaveLength(2);
+    await verifyVariants(request, site, images[0], 2);
+    await verifyVariants(request, site, images[1], 0.5);
 
-    const publicPost = await page.request.get(
+    const publicPost = await request.get(
       `${site.baseURL}/post/mode-b-sharp-${site.key}-valid-${RUN_ID}`
     );
     expect(publicPost.status()).toBe(200);
 
-    const retainedSources = [
-      ...containerFiles(site.service, '/app/data/uploads/temp', jpegBase),
-      ...containerFiles(site.service, '/app/data/uploads/temp', pngBase)
-    ];
-    expect(retainedSources).toHaveLength(0);
+    await expect.poll(() => uploadState(site.service)).toEqual({ ...before, derivatives: before.derivatives + 6 });
   });
 
   await test.step('corrupt image MIME reaches Sharp but creates no post or variants', async () => {
-    const corruptBase = path.parse(corruptImage.name).name;
+    const before = uploadState(site.service);
     const corruptTitle = `Mode B Sharp ${site.key} Corrupt ${RUN_ID}`;
     await openPostForm(page, site);
     await submitPost(page, corruptTitle, [corruptImage]);
 
-    await expect(page).toHaveURL(`${site.baseURL}/admin/posts/new`);
-    expect(containerFiles(site.service, '/app/data/uploads', corruptBase, '.webp')).toEqual([]);
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/admin/posts/new');
+    await expect.poll(() => uploadState(site.service)).toEqual(before);
 
-    const publicPost = await page.request.get(
+    const publicPost = await request.get(
       `${site.baseURL}/post/mode-b-sharp-${site.key}-corrupt-${RUN_ID}`
     );
     expect(publicPost.status()).toBe(404);
-
-    const retainedSources = containerFiles(site.service, '/app/data/uploads/temp', corruptBase);
-    expect(retainedSources).toHaveLength(0);
   });
 
   await test.step('invalid non-image MIME creates no processed variants', async () => {
-    const invalidBase = path.parse(invalidMimeFile.name).name;
+    const before = uploadState(site.service);
     await openPostForm(page, site);
-    await submitPost(page, `Mode B Sharp ${site.key} Invalid MIME ${RUN_ID}`, [invalidMimeFile]);
+    await submitPost(page, `Mode B Sharp ${site.key} Invalid MIME ${RUN_ID}`, [invalidMimeFile], { expectUploadRejection: true });
 
     await expect(page).toHaveURL(`${site.baseURL}/admin/posts/new`);
-    expect(containerFiles(site.service, '/app/data/uploads', invalidBase, '.webp')).toEqual([]);
+    await expect.poll(() => uploadState(site.service)).toEqual(before);
   });
 
-  const health = await page.request.get(`${site.baseURL}/health`);
+  const health = await request.get(`${site.baseURL}/health`);
   expect(health.status()).toBe(200);
 }
 
 test.describe.configure({ mode: 'serial' });
 
 for (const site of TEST_SITES) {
-  test(`${site.name} authenticated Sharp post processing`, async ({ page }) => {
-    await runPostProcessingMatrix(page, site);
+  test(`${site.name} authenticated Sharp post processing`, async ({ page, request }) => {
+    await runPostProcessingMatrix(page, request, site);
   });
 }
 
-test('Fruition Forest Garden authenticated Sharp hero processing', async ({ page }) => {
+test('Fruition Forest Garden authenticated Sharp hero processing', async ({ page, request }) => {
   const site = TEST_SITES[0];
   const heroInput = imageFile(`sharp-ffg-${RUN_ID}-hero.jpg`, 'image/jpeg', landscapeJpeg);
   await loginNormally(page, site);
+  let acceptedHero;
 
   await test.step('hero and Open Graph outputs are valid WebP images', async () => {
     await page.goto(`${site.baseURL}/admin/hero-image`);
@@ -248,11 +280,10 @@ test('Fruition Forest Garden authenticated Sharp hero processing', async ({ page
     ]);
     await expect(page).toHaveURL(`${site.baseURL}/admin/hero-image`);
 
-    const generation = containerJson(site.service, `
-      import { readFile } from 'node:fs/promises';
-      console.log(await readFile('/app/data/uploads/hero/.current.json', 'utf8'));
-    `).generation;
-    const generationDir = `/app/data/uploads/hero/${generation}`;
+    acceptedHero = currentHero(site.service);
+    expect(acceptedHero.kind).toBe('managed');
+    const { generation } = acceptedHero;
+    const generationDir = `/app/data/uploads/.media/hero/${generation}`;
     const metadata = containerMetadata(site.service, generationDir, ['current-hero.webp', 'current-hero-og.webp']);
     expect(metadata).toEqual([
       { filename: 'current-hero.webp', format: 'webp', width: 1920, height: 960 },
@@ -260,17 +291,18 @@ test('Fruition Forest Garden authenticated Sharp hero processing', async ({ page
     ]);
 
     for (const filename of ['current-hero.webp', 'current-hero-og.webp']) {
-      const response = await page.request.get(`${site.baseURL}/uploads/hero/${generation}/${filename}`);
+      const response = await request.get(`${site.baseURL}/uploads/hero/m1-${generation}/${filename}`);
       expect(response.status()).toBe(200);
       expect(response.headers()['content-type']).toContain('image/webp');
     }
-    const source = await page.request.get(
-      `${site.baseURL}/uploads/hero/${generation}/.source/current-source.jpg`
+    const source = await request.get(
+      `${site.baseURL}/uploads/hero/m1-${generation}/.source/current-source.jpg`
     );
     expect(source.status()).toBe(404);
   });
 
   await test.step('corrupt hero input leaves valid outputs in place', async () => {
+    const before = uploadState(site.service);
     await page.goto(`${site.baseURL}/admin/hero-image`);
     await page.locator('input[name="heroImage"]').setInputFiles(corruptImage);
     await Promise.all([
@@ -279,22 +311,17 @@ test('Fruition Forest Garden authenticated Sharp hero processing', async ({ page
     ]);
     await expect(page).toHaveURL(`${site.baseURL}/admin/hero-image`);
 
-    const generation = containerJson(site.service, `
-      import { readFile } from 'node:fs/promises';
-      console.log(await readFile('/app/data/uploads/hero/.current.json', 'utf8'));
-    `).generation;
+    expect(currentHero(site.service)).toEqual(acceptedHero);
     const metadata = containerMetadata(
       site.service,
-      `/app/data/uploads/hero/${generation}`,
+      `/app/data/uploads/.media/hero/${acceptedHero.generation}`,
       ['current-hero.webp', 'current-hero-og.webp']
     );
     expect(metadata.every((output) => output.format === 'webp')).toBe(true);
 
-    const corruptBase = path.parse(corruptImage.name).name;
-    const retainedSources = containerFiles(site.service, '/app/data/uploads/temp', corruptBase);
-    expect(retainedSources).toHaveLength(0);
+    await expect.poll(() => uploadState(site.service)).toEqual(before);
   });
 
-  const health = await page.request.get(`${site.baseURL}/health`);
+  const health = await request.get(`${site.baseURL}/health`);
   expect(health.status()).toBe(200);
 });

@@ -21,7 +21,7 @@ import PublicPerson from '../src/models/public-person.js';
 import { createEditorialService } from '../src/models/editorial-service.js';
 import { createEditorialAdminRouter } from '../src/admin/editorial-router.js';
 import { allocateMediaOperation, prepareMediaOperation, markPendingOverwrite, readPendingOverwrite,
-    readMediaOperation, mediaDigest, PENDING_INPUT_MAX_BYTES, createPostMediaProvider,
+    readMediaOperation, mediaDigest, PENDING_INPUT_MAX_BYTES, createPostMediaProvider, createPostMediaGrantProvider,
     verifyMediaAcceptance } from '../src/models/media-publication.js';
 import { createUploadMiddleware } from '../src/middleware/upload.js';
 import { mountMediaServing } from '../src/middleware/media-serving.js';
@@ -102,7 +102,7 @@ async function fixture(t) {
         res.sendStatus(204);
     });
     app.use('/admin', createEditorialAdminRouter({ allowOverwrite: true }));
-    const providers = { post: createPostMediaProvider(db) };
+    const providers = { post: createPostMediaGrantProvider(db) };
     mountMediaServing(app, { publicPath: path.dirname(uploadsPath), uploadsPath, publicationProviders: providers, production: true });
     const server = app.listen(0, '127.0.0.1');
     await new Promise(resolve => server.once('listening', resolve));
@@ -169,7 +169,7 @@ async function fixture(t) {
     };
     const reopen = () => {
         if (db.open) db.close();
-        db = initializeDatabase(dbPath); setDatabase(db); store.client = db; providers.post = createPostMediaProvider(db);
+        db = initializeDatabase(dbPath); setDatabase(db); store.client = db; providers.post = createPostMediaGrantProvider(db);
     };
     return { get db() { return db; }, app, dbPath, uploadsPath, postId, owner, other, reader, client, submit, unbound, bind, input,
         operation, privateImages, reopen, base, holdSave(marker) {

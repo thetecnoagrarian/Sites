@@ -21,7 +21,7 @@ import { attachUser } from './middleware/auth.js';
 import { createGalleryPhotoUpload, createUploadMiddleware } from './middleware/upload.js';
 import { mountMediaServing } from './middleware/media-serving.js';
 import { isGalleryMediaRequest } from './admin/gallery-drafts.js';
-import { createPostMediaProvider } from './models/media-publication.js';
+import { createPostMediaGrantProvider } from './models/media-publication.js';
 import Post from './models/post.js';
 import Category from './models/category.js';
 import logger from './utils/logger.js';
@@ -328,7 +328,7 @@ export function createBlogApp(config) {
     });
     
     mountMediaServing(app, { publicPath: staticPath, uploadsPath,
-        privateUploadPathPatterns, publicationProviders: { ...mediaPublicationProviders, post: createPostMediaProvider(db) },
+        privateUploadPathPatterns, publicationProviders: { ...mediaPublicationProviders, post: createPostMediaGrantProvider(db) },
         publicationIntegrityVerifiers: mediaPublicationIntegrityVerifiers });
 
     // Register Handlebars helpers

@@ -1,4 +1,5 @@
 import express from 'express';
+import { createHash } from 'node:crypto';
 import { constants, promises as fs } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import { MEDIA_ID, checkedMediaPath, managedMediaSegments } from '../utils/private-media.js';
@@ -32,9 +33,22 @@ async function checkedStaticPath(root, segments) {
     return checked;
 }
 
-// Both public-tree and upload serving are registered here so tests exercise the
-// same order as createBlogApp. Providers must return literal true only for a
-// committed publication grant. Absence/error/anything else fails closed.
+async function verifyOpenedPostFile(grant, handle, stat) {
+    if (!Number.isSafeInteger(grant?.bytes) || grant.bytes < 1 || stat.size !== BigInt(grant.bytes)
+        || typeof grant.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(grant.sha256)) return false;
+    const hash = createHash('sha256');
+    let bytes = 0;
+    for await (const chunk of handle.createReadStream({ start: 0, end: grant.bytes - 1, autoClose: false })) {
+        bytes += chunk.length;
+        hash.update(chunk);
+    }
+    const after = await handle.stat({ bigint: true });
+    return bytes === grant.bytes && hash.digest('hex') === grant.sha256
+        && after.size === stat.size && after.mtimeNs === stat.mtimeNs;
+}
+
+// Managed post grants include the accepted size and digest. Hero authorization
+// and its opened-file verifier retain their existing provider contract.
 export function mountMediaServing(app, { publicPath, uploadsPath, privateUploadPathPatterns = [],
     publicationProviders = {}, publicationIntegrityVerifiers = {}, production = process.env.NODE_ENV === 'production' }) {
     const publicStatic = express.static(publicPath, { maxAge: production ? '1h' : 0, immutable: false });
@@ -67,23 +81,29 @@ export function mountMediaServing(app, { publicPath, uploadsPath, privateUploadP
                 if (!match) return deny(res);
                 const descriptor = Object.freeze({ kind: post ? 'post' : 'hero', id: match[1], variant: match[2], url: decoded });
                 const provider = publicationProviders[descriptor.kind];
-                if (typeof provider !== 'function' || await provider(descriptor) !== true) return deny(res);
+                if (typeof provider !== 'function') return deny(res);
+                const grant = await provider(descriptor);
+                if (post ? !grant || typeof grant !== 'object' : grant !== true) return deny(res);
                 const checked = await checkedMediaPath(uploadsPath, managedMediaSegments(descriptor), { singleLink: true });
                 const handle = await fs.open(checked.path, constants.O_RDONLY | constants.O_NOFOLLOW);
                 try {
                     const stat = await handle.stat({ bigint: true });
                     if (!stat.isFile() || stat.nlink !== 1n || !stat.size
                         || stat.dev !== checked.stat.dev || stat.ino !== checked.stat.ino) return deny(res);
+                    if (post && !await verifyOpenedPostFile(grant, handle, stat)) return deny(res);
                     const verify = publicationIntegrityVerifiers[descriptor.kind];
                     if (Object.hasOwn(publicationIntegrityVerifiers, descriptor.kind)
                         && (typeof verify !== 'function' || await verify(descriptor, handle, stat) !== true)) return deny(res);
-                    // Authorization precedes freshness/304 handling, including HEAD.
+                    // Authorization and integrity precede freshness and HEAD.
                     res.type('image/webp').set({ 'Cache-Control': production ? 'public, max-age=604800' : 'public, max-age=0',
                         'Content-Length': String(stat.size), 'Last-Modified': stat.mtime.toUTCString() });
                     res.set('ETag', `W/"${stat.size.toString(16)}-${stat.mtimeNs.toString(16)}"`);
                     if (req.fresh) return res.status(304).end();
                     if (req.method === 'HEAD') return res.end();
-                    await pipeline(handle.createReadStream({ start: 0, autoClose: false }), res);
+                    // Published inodes are immutable for cooperating writers.
+                    // Reuse the verified descriptor even if its pathname changes.
+                    const bounds = post ? { end: Number(stat.size) - 1 } : {};
+                    await pipeline(handle.createReadStream({ start: 0, autoClose: false, ...bounds }), res);
                 } finally { await handle.close(); }
                 return;
             }
