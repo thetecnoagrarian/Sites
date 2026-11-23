@@ -4,6 +4,7 @@ import { logSafeError } from '../utils/error-diagnostics.js';
 
 // Ownership never comes from a public URL, session payload or req.file.path.
 const owners = new WeakMap();
+const workByRequest = new WeakMap();
 const identity = stat => ({ dev: stat.dev, ino: stat.ino });
 const same = (stat, expected) => stat.dev === expected.dev && stat.ino === expected.ino;
 const report = (logger, error) => logSafeError(error, { event: 'upload-cleanup' }, {
@@ -84,12 +85,23 @@ export async function removeOwnedUpload(req, file, { logger = console } = {}) {
     }
 }
 
+export function trackOwnedUploadWork(req, work) {
+    const pending = workByRequest.get(req) ?? new Set();
+    workByRequest.set(req, pending);
+    pending.add(work);
+    const settled = () => pending.delete(work);
+    work.then(settled, settled);
+}
+
 export async function cleanupOwnedUploads(req, { logger = console } = {}) {
     if (!owners.has(req)) {
         if (req.file || req.files?.length) report(logger, 'No request ownership record');
         return false;
     }
     try {
+        // Multer can report an abort before writes settle and queue removals as they finish.
+        const pending = workByRequest.get(req);
+        while (pending?.size) await Promise.allSettled(pending);
         const owner = await owners.get(req);
         if (!owner.cleanup) owner.cleanup = (async () => {
             await verifyDirectory(owner);

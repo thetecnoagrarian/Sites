@@ -226,10 +226,10 @@ jobs:
               assert.equal(readPackage(`${betterPath}/package.json`).version, "12.11.1");
               assert.equal(existsSync(`${betterPath}/build/Release/better_sqlite3.node`), true);
               assert.deepEqual(sourceBuildMarkers, []);
-              assert.equal(readPackage(`${sharpPath}/package.json`).version, "0.35.3");
+              assert.equal(readPackage(`${sharpPath}/package.json`).version, "0.35.5");
               assert.equal(existsSync(sharpNativePath), true);
               assert.equal(existsSync(libvipsNativePath), true);
-              assert.equal(sharp.versions.vips, "8.18.3");
+              assert.equal(sharp.versions.vips, "8.18.7");
 
               const dbPath = `/tmp/native-amd64-${process.pid}.db`;
               let db = new Database(dbPath);

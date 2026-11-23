@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -325,6 +326,45 @@ test('cleanup uncertainty does not convert a successful editorial save into fail
     assert.equal(readFileSync(path.join(path.dirname(result.req.files[0].path), 'unrecognized'), 'utf8'), 'retain me');
     await assert.rejects(result.waitForCleanup({ timeoutMs: 50 }), /Route cleanup timed out/);
 });
+
+for (const site of ['ffg', 'tta']) {
+    test(`${site} removes completed and partial raw files after a post upload disconnects`, { timeout: 10000 }, async t => {
+        const f = await fixture(t, site);
+        const temp = path.join(f.uploads, 'temp');
+        const waitForEntries = async (predicate, message) => {
+            for (let attempt = 0; attempt < 150; attempt++) {
+                const entries = await fs.readdir(temp, { recursive: true, withFileTypes: true }).catch(error => {
+                    if (error.code === 'ENOENT') return [];
+                    throw error;
+                });
+                if (predicate(entries)) return;
+                await delay(20);
+            }
+            assert.fail(message);
+        };
+
+        const boundary = 'sites-synthetic-upload';
+        const part = name => Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="${name}"\r\nContent-Type: image/png\r\n\r\n`);
+        const upload = httpRequest(`${f.baseUrl}/admin/dashboard/posts/create`, {
+            method: 'POST', headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` }
+        });
+        const closed = new Promise(resolve => upload.once('close', resolve));
+        upload.on('error', () => {});
+        try {
+            upload.write(Buffer.concat([part('first.png'), f.png, Buffer.from('\r\n'), part('second.png'), f.png]));
+            await waitForEntries(entries => entries.filter(entry => entry.isFile()).length === 2,
+                'Expected both raw upload files before disconnecting');
+        } finally {
+            upload.destroy();
+            await closed;
+        }
+
+        await waitForEntries(entries => entries.length === 0, 'Expected the disconnected request to remove its raw files and directory');
+        assert.equal(Post.count, 0);
+        assert.equal(f.db.prepare('SELECT count(*) AS n FROM media_publications').get().n, 0);
+        f.assertRetained();
+    });
+}
 
 test('existing upload MIME and byte-limit rejection safely clean any owned raw files', async t => {
     const f = await fixture(t, 'ffg', { fileSize: 1 });

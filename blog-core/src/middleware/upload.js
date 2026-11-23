@@ -6,14 +6,14 @@ import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { promisify } from 'node:util';
 import { ownedUploadDirectory, reserveUploadFilename, recordOwnedUpload,
-    removeOwnedUpload, cleanupOwnedUploads } from './owned-upload.js';
+    removeOwnedUpload, cleanupOwnedUploads, trackOwnedUploadWork } from './owned-upload.js';
 export { cleanupOwnedUploads };
 
 const defaultFileSize = 50 * 1024 * 1024;
 const configuredFileSize = () => parseInt(process.env.MAX_FILE_SIZE) || defaultFileSize;
 
 // Configure multer for file uploads
-export const createUploadMiddleware = (uploadsPath, { limits, pendingWrites } = {}) => {
+export const createUploadMiddleware = (uploadsPath, { limits } = {}) => {
     const storage = multer.diskStorage({
         destination: (req, file, cb) => {
             ownedUploadDirectory(req, uploadsPath).then(directory => cb(null, directory), cb);
@@ -28,38 +28,32 @@ export const createUploadMiddleware = (uploadsPath, { limits, pendingWrites } = 
         }
     });
 
-    if (pendingWrites) {
-        const destination = promisify(storage.getDestination);
-        const filename = promisify(storage.getFilename);
-        storage._handleFile = (req, file, cb) => {
-            const write = (async () => {
-                const directory = await destination(req, file);
-                const name = await filename(req, file);
-                const info = { destination: directory, filename: name, path: path.join(directory, name) };
-                const handle = await fs.open(info.path, 'wx', 0o600);
-                const output = handle.createWriteStream({ autoClose: false });
-                try {
-                    // Record the inode before streaming so cancellation can clean up partial files.
-                    await recordOwnedUpload(req, info);
-                    await pipeline(file.stream, output);
-                    return { ...info, size: output.bytesWritten };
-                } finally {
-                    output.destroy();
-                    await handle.close();
-                }
-            })();
-            pendingWrites.set(req, write);
-            write.then(info => cb(null, info), cb);
-        };
-    } else {
-        const handleFile = storage._handleFile.bind(storage);
-        storage._handleFile = (req, file, cb) => handleFile(req, file, (error, info) => {
-            if (error) return cb(error);
-            recordOwnedUpload(req, info).then(() => cb(null, info), cb);
-        });
-    }
+    const destination = promisify(storage.getDestination);
+    const filename = promisify(storage.getFilename);
+    storage._handleFile = (req, file, cb) => {
+        const write = (async () => {
+            const directory = await destination(req, file);
+            const name = await filename(req, file);
+            const info = { destination: directory, filename: name, path: path.join(directory, name) };
+            const handle = await fs.open(info.path, 'wx', 0o600);
+            const output = handle.createWriteStream({ autoClose: false });
+            try {
+                // Record the inode before streaming so cancellation can clean up partial files.
+                await recordOwnedUpload(req, info);
+                await pipeline(file.stream, output);
+                return { ...info, size: output.bytesWritten };
+            } finally {
+                output.destroy();
+                await handle.close();
+            }
+        })();
+        trackOwnedUploadWork(req, write);
+        write.then(info => cb(null, info), cb);
+    };
     storage._removeFile = (req, file, cb) => {
-        removeOwnedUpload(req, file).then(() => {
+        const removal = removeOwnedUpload(req, file);
+        trackOwnedUploadWork(req, removal);
+        removal.then(() => {
             delete file.destination;
             delete file.filename;
             delete file.path;
@@ -90,11 +84,8 @@ export function createGalleryPhotoUpload(uploadsPath) {
     const configured = configuredFileSize();
     const fileSize = configured > 0 ? Math.min(configured, defaultFileSize) : defaultFileSize;
     const maxBytes = fileSize + 16 * 1024;
-    const pendingWrites = new WeakMap();
-    // Busboy reports when the part threshold is reached, so 4 permits 3 parts.
     const parse = createUploadMiddleware(uploadsPath, {
-        pendingWrites,
-        limits: { fileSize, files: 1, fields: 2, parts: 4, fieldSize: 513, fieldNameSize: 32, fieldNestingDepth: 0 }
+        limits: { fileSize, files: 1, fields: 2, parts: 3, fieldSize: 512, fieldNameSize: 32, fieldNestingDepth: 0 }
     }).single('photo');
 
     return async (req, res) => {
@@ -122,11 +113,10 @@ export function createGalleryPhotoUpload(uploadsPath) {
             let done = false;
             req.once('close', abort);
             // Multer may report a stream failure before its disk writer has finished.
-            parse(body, res, async error => {
+            parse(body, res, error => {
                 done = true;
                 req.removeListener('close', abort);
                 req.unpipe(body);
-                await pendingWrites.get(body)?.catch(() => {});
                 resolve({ error, fields: body.body, file: body.file, cleanup: () => cleanupOwnedUploads(body) });
             });
             if (!done) {
