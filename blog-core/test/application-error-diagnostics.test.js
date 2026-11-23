@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import test, { after } from 'node:test';
 import express from 'express';
 import { engine } from 'express-handlebars';
 import sharp from 'sharp';
@@ -21,6 +21,13 @@ import { createHeroPublicationProvider } from '../../fruitionforestgarden/src/ut
 
 const sentinels = ['ARTICLE', 'PENDING', 'CAPTION', 'PASSWORD', 'COOKIE', 'CSRF', 'TOKEN', 'QUERY', 'FILENAME', 'FILE_CONTENT'];
 const privateText = sentinels.map(value => `SYNTHETIC_ERROR_${value}`).join('|');
+const fixtureRoots = [];
+// The hero coordinator pins uploads-root identities for the writer process's lifetime.
+// Keep fixture roots allocated until all tests in this process have finished.
+after(async () => {
+    await Promise.all(fixtureRoots.map(root => fs.rm(root, { recursive: true, force: true })));
+});
+
 function privateError() {
     const error = new Error(privateText);
     error.stack = privateText; error.body = privateText; error.pending_input = privateText;
@@ -32,6 +39,7 @@ function privateError() {
 async function fixture(t, site, { trustedIPs, ordinaryLimit, authenticated = true,
     decorateRequest = () => {}, registerRoutes = () => {} } = {}) {
     const root = await fs.mkdtemp(path.join(tmpdir(), 'sites-final-diagnostics-'));
+    fixtureRoots.push(root);
     const publicPath = path.join(root, 'public'), uploadsPath = path.join(root, 'uploads'), viewsPath = path.join(root, 'views');
     await Promise.all([publicPath, uploadsPath, viewsPath].map(p => fs.mkdir(p, { recursive: true })));
     await Promise.all(['404', '500'].map(view => fs.writeFile(path.join(viewsPath, view + '.hbs'), view)));
@@ -120,7 +128,6 @@ async function fixture(t, site, { trustedIPs, ordinaryLimit, authenticated = tru
         console.log = original.log; console.error = original.consoleError;
         intervals.forEach(clearInterval); db.close(); setDatabase(null);
         if (previousMode === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previousMode;
-        await fs.rm(root, { recursive: true, force: true });
     });
     const base = `http://127.0.0.1:${server.address().port}`;
     let cookie = '';
@@ -473,22 +480,83 @@ test('FFG local Chromium submits the real hero form and preserves historical URL
     const browser = await chromium.launch({ headless: true });
     try {
         const page = await browser.newPage({ extraHTTPHeaders: { cookie: f.cookie(), 'x-forwarded-proto': 'https' } });
-        await page.goto(f.baseURL + '/admin/hero-image');
-        const id = await page.locator('form.hero-upload-form input[name="heroOperationId"]').inputValue();
+        const managementPath = '/admin/hero-image', managementUrl = f.baseURL + managementPath;
+        const submitHeroForm = async (form, action) => {
+            const postUrl = `${managementUrl}/${action}`;
+            const [, landing] = await Promise.all([
+                page.waitForResponse(response => response.request().method() === 'POST' && response.url() === postUrl)
+                    .then(response => {
+                        assert.equal(response.status(), 302, `Hero ${action} POST status`);
+                        assert.equal(response.headers().location, managementPath);
+                    }),
+                page.waitForResponse(response => {
+                    const from = response.request().redirectedFrom();
+                    return from?.method() === 'POST' && from.url() === postUrl && response.request().method() === 'GET';
+                }),
+                form.evaluate(element => element.requestSubmit())
+            ]);
+            assert.equal(landing.url(), managementUrl);
+            assert.equal(landing.status(), 200);
+            await page.waitForURL(managementUrl);
+        };
+        const readManifest = async () => JSON.parse(await fs.readFile(path.join(f.uploadsPath, 'hero', '.current.json')));
+        assert.equal((await page.goto(managementUrl)).status(), 200);
+        const upload = page.locator('form.hero-upload-form');
+        const id = await upload.locator('input[name="heroOperationId"]').inputValue();
+        assert.match(id, /^[0-9a-f-]{36}$/, 'Hero editor must allocate a publish operation');
         const bytes = await sharp({ create: { width: 120, height: 60, channels: 3, background: '#246842' } }).png().toBuffer();
         await page.locator('input[name="heroImage"]').setInputFiles({ name: 'synthetic.png', buffer: bytes, mimeType: 'image/png' });
-        await Promise.all([page.waitForNavigation(), page.locator('form.hero-upload-form').evaluate(form => form.requestSubmit())]);
-        assert.equal(new URL(page.url()).pathname, '/admin/hero-image');
-        assert.equal(await page.locator('.hero-preview img').getAttribute('src'), `/uploads/hero/m1-${id}/current-hero.webp`);
+        await submitHeroForm(upload, 'upload');
+
+        const operation = await f.request(`${managementPath}/operations/${id}`);
+        assert.equal(operation.status, 200);
+        assert.equal(operation.headers.get('cache-control'), 'no-store');
+        const receipt = JSON.parse(operation.text);
+        assert.equal(receipt.state, 'accepted');
+        assert.equal(receipt.operationId, id);
+        assert.equal(receipt.action, 'publish');
+        assert.equal(receipt.generation, id);
+        const published = await readManifest();
+        assert.deepEqual(published.current, { kind: 'managed', generation: id });
+        assert.equal(published.operations[id].revision, receipt.revision);
+
+        const heroPath = `/uploads/hero/m1-${id}`;
+        const readPublicVariant = async name => {
+            const response = await fetch(`${f.baseURL}${heroPath}/${name}`, { redirect: 'manual' });
+            assert.equal(response.status, 200);
+            assert.match(response.headers.get('content-type'), /^image\/webp\b/);
+            return Buffer.from(await response.arrayBuffer());
+        };
+        const variants = new Map();
+        for (const name of ['current-hero.webp', 'current-hero-og.webp']) {
+            const served = await readPublicVariant(name);
+            const stored = await fs.readFile(path.join(f.uploadsPath, '.media', 'hero', id, name));
+            assert.ok(served.length > 0 && served.equals(stored), `Public ${name} matches the stored derivative`);
+            variants.set(name, served);
+            const denied = await f.request(`/uploads/.media/hero/${id}/${name}`);
+            assert.equal(denied.status, 404);
+            assert.equal(denied.headers.get('cache-control'), 'no-store');
+        }
+        const raw = await f.request(`/uploads/hero/m1-${id}/.source/current-source.png`);
+        assert.equal(raw.status, 404);
+        assert.equal(raw.headers.get('cache-control'), 'no-store');
+
+        await page.locator(`.hero-preview img[src="${heroPath}/current-hero.webp"]`).waitFor({ state: 'attached' });
         for (const [url, selector] of [['/', '.hero-image'], ['/about', '.about-image']]) {
             const response = await page.goto(f.baseURL + url); assert.equal(response.status(), 200);
-            assert.equal(await page.locator(selector).getAttribute('src'), `/uploads/hero/m1-${id}/current-hero.webp`);
-            assert.equal(await page.locator('meta[property="og:image"]').getAttribute('content'), f.baseURL.replace(/^http:/, 'https:') + `/uploads/hero/m1-${id}/current-hero-og.webp`);
+            assert.equal(await page.locator(selector).getAttribute('src'), `${heroPath}/current-hero.webp`);
+            assert.equal(await page.locator('meta[property="og:image"]').getAttribute('content'), f.baseURL.replace(/^http:/, 'https:') + `${heroPath}/current-hero-og.webp`);
         }
-        await page.goto(f.baseURL + '/admin/hero-image');
-        await Promise.all([page.waitForNavigation(), page.locator('form.hero-reset-form').evaluate(form => form.requestSubmit())]);
-        assert.equal(await page.locator('.hero-preview img').getAttribute('src'), '/images/HeroCamp.webp');
-        assert.equal((await f.request(`/uploads/hero/m1-${id}/current-hero.webp`)).status, 200);
+        assert.equal((await page.goto(managementUrl)).status(), 200);
+        await submitHeroForm(page.locator('form.hero-reset-form'), 'reset');
+        await page.locator('.hero-preview img[src="/images/HeroCamp.webp"]').waitFor({ state: 'attached' });
+        const reset = await readManifest();
+        assert.equal(reset.current, null);
+        assert.deepEqual(reset.operations[id], published.operations[id]);
+        assert.deepEqual(reset.publications[id], published.publications[id]);
+        for (const [name, served] of variants) {
+            assert.ok((await readPublicVariant(name)).equals(served), `Historical ${name} retains the published bytes`);
+        }
         f.bounded();
     } finally { await browser.close(); }
 });
