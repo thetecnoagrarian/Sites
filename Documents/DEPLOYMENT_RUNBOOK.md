@@ -171,6 +171,14 @@ Runtime note:
 
 The gate uses a standard GitHub-hosted Ubuntu x64 runner, read-only repository contents permission, the isolated `sites-local-test` project, and `docker-compose.test.yml`. It performs fresh production-style builds, proves native AMD64 runtime and package selection, exercises better-sqlite3 and Sharp directly, starts both Mode B sites with synthetic fixtures, runs authenticated regressions and targeted Chromium lifecycle coverage, checks database integrity, reviews native failure signatures, and always removes its disposable Compose resources.
 
+The required nginx stage reuses the two immutable candidate images on separate
+internal Docker networks with no published ports. It measures the socket peer
+observed by each Express app, checks the valid-but-wrong peer failure mode, and
+recreates both test apps with their measured peer. Synthetic clients verify the
+forwarding contract, TLS session cookies, rate-limit attribution and media
+authorization. This measures the disposable Docker path. The actual production
+peer and ingress checks remain part of the separately authorized rollout.
+
 The workflow does not use production Compose, production secrets, production data, deployment permissions, or a deployment step. A passing result is technical evidence that the selected commit cleared the native AMD64 deployment-candidate gate. It does not authorize or perform production deployment; owner approval and the normal deployment workflow remain separately required.
 
 ### Node 24 Production Migration Closure
