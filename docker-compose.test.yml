@@ -20,6 +20,17 @@ services:
       RATE_LIMIT_WINDOW_MS: 900000
       RATE_LIMIT_MAX_REQUESTS: 100
       TRUSTED_IPS: "127.0.0.1,::1"
+      TRUSTED_INGRESS_PEERS: "${MODE_B_TRUSTED_INGRESS_PEERS:-}"
+    command: &mode_b_app
+      - /bin/sh
+      - -ec
+      - |
+        # Host-driven fixtures simulate HTTPS through this disposable bridge.
+        if [ -z "$${TRUSTED_INGRESS_PEERS}" ]; then
+          TRUSTED_INGRESS_PEERS="$$(ip -4 route | awk '$$1 == "default" && $$2 == "via" { print $$3; exit }')"
+          export TRUSTED_INGRESS_PEERS
+        fi
+        exec node src/app.js
     ports:
       - "127.0.0.1:4000:4000"
     volumes:
@@ -76,6 +87,8 @@ services:
       RATE_LIMIT_WINDOW_MS: 900000
       RATE_LIMIT_MAX_REQUESTS: 100
       TRUSTED_IPS: "127.0.0.1,::1"
+      TRUSTED_INGRESS_PEERS: "${MODE_B_TRUSTED_INGRESS_PEERS:-}"
+    command: *mode_b_app
     ports:
       - "127.0.0.1:4002:4002"
     volumes:

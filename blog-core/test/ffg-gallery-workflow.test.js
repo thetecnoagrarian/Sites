@@ -41,6 +41,12 @@ async function fixture(t, { multipartFileLimit, editorRequestLimit } = {}) {
     await fs.mkdir(publicPath);
     for (const folder of ['css', 'js', 'images']) await fs.cp(path.join(site, 'public', folder), path.join(publicPath, folder), { recursive: true });
     process.env.NODE_ENV = 'production';
+    const previousPeers = process.env.TRUSTED_INGRESS_PEERS;
+    process.env.TRUSTED_INGRESS_PEERS = '127.0.0.1';
+    t.after(() => {
+        if (previousPeers === undefined) delete process.env.TRUSTED_INGRESS_PEERS;
+        else process.env.TRUSTED_INGRESS_PEERS = previousPeers;
+    });
     process.env.SESSION_SECRET = 'synthetic-doc-gallery-test-session';
     delete process.env.TRUSTED_IPS;
     delete process.env.RATE_LIMIT_MAX_REQUESTS;

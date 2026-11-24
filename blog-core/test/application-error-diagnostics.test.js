@@ -13,6 +13,7 @@ import { createBlogApp } from '../src/app.js';
 import { getDatabase, setDatabase } from '../src/models/db.js';
 import { asyncHandler } from '../src/utils/asyncHandler.js';
 import { attachUser } from '../src/middleware/auth.js';
+import { compileIngressPeerTrust } from '../src/utils/client-ip.js';
 import logger from '../src/utils/logger.js';
 import User from '../src/models/user.js';
 import Post from '../src/models/post.js';
@@ -37,7 +38,7 @@ function privateError() {
 }
 
 async function fixture(t, site, { trustedIPs, ordinaryLimit, authenticated = true,
-    decorateRequest = () => {}, registerRoutes = () => {} } = {}) {
+    trustedIngressPeers = '127.0.0.1', mode = 'production', decorateRequest = () => {}, registerRoutes = () => {} } = {}) {
     const root = await fs.mkdtemp(path.join(tmpdir(), 'sites-final-diagnostics-'));
     fixtureRoots.push(root);
     const publicPath = path.join(root, 'public'), uploadsPath = path.join(root, 'uploads'), viewsPath = path.join(root, 'views');
@@ -54,8 +55,14 @@ async function fixture(t, site, { trustedIPs, ordinaryLimit, authenticated = tru
     await fs.mkdir(path.join(publicPath, 'uploads'), { recursive: true });
     await fs.writeFile(path.join(publicPath, 'uploads', `m1-${id}-large.webp`), privateText);
     await fs.writeFile(path.join(uploadsPath, `m1-${id}-large.webp`), privateText);
-    const previousMode = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    const previousMode = process.env.NODE_ENV, previousPeers = process.env.TRUSTED_INGRESS_PEERS;
+    process.env.NODE_ENV = mode;
+    if (trustedIngressPeers === null) delete process.env.TRUSTED_INGRESS_PEERS;
+    else process.env.TRUSTED_INGRESS_PEERS = trustedIngressPeers;
+    t.after(() => {
+        if (previousPeers === undefined) delete process.env.TRUSTED_INGRESS_PEERS;
+        else process.env.TRUSTED_INGRESS_PEERS = previousPeers;
+    });
     process.env.SESSION_SECRET = 'synthetic-fixture-only-session';
     // Every fixture owns synthetic configuration; no real environment file is read.
     if (trustedIPs === undefined) delete process.env.TRUSTED_IPS;
@@ -72,8 +79,7 @@ async function fixture(t, site, { trustedIPs, ordinaryLimit, authenticated = tru
     console.error = (...args) => {
         // Fixed library/runtime warnings are not Express's raw fallback.
         // They still must be free of the private sentinels.
-        if (args[0]?.code === 'ERR_ERL_PERMISSIVE_TRUST_PROXY'
-            || (typeof args[0] === 'string' && /^\(node:\d+\) \[DEP0044\] DeprecationWarning: The `util\.isArray` API is deprecated\./.test(args[0]))) {
+        if (typeof args[0] === 'string' && /^\(node:\d+\) \[DEP0044\] DeprecationWarning: The `util\.isArray` API is deprecated\./.test(args[0])) {
             const warning = formatWithOptions({ colors: false }, ...args);
             assert.equal(warning.includes('SYNTHETIC_ERROR_'), false);
             access.push(warning);
@@ -480,6 +486,7 @@ test('FFG local Chromium submits the real hero form and preserves historical URL
     const browser = await chromium.launch({ headless: true });
     try {
         const page = await browser.newPage({ extraHTTPHeaders: { cookie: f.cookie(), 'x-forwarded-proto': 'https' } });
+        await page.route('**/*', route => route.request().url().startsWith(f.baseURL + '/') ? route.continue() : route.abort());
         const managementPath = '/admin/hero-image', managementUrl = f.baseURL + managementPath;
         const submitHeroForm = async (form, action) => {
             const postUrl = `${managementUrl}/${action}`;
@@ -628,10 +635,8 @@ for (const site of ['ffg', 'tta']) for (const [name, trustedIPs, elevated] of [
         assert.equal(other.status, 200); assert.equal(other.headers.get('ratelimit-limit'), '3');
         const diagnostic = await f.request('/debug-ip', { headers: {
             'x-forwarded-for': elevated ? '192.0.2.22' : '192.0.2.24' } });
-        assert.equal(diagnostic.status, 200);
-        const data = JSON.parse(diagnostic.text);
-        assert.equal(data['is-trusted'], elevated);
-        assert.equal(Object.hasOwn(data, 'trusted-ips'), false, 'The diagnostic endpoint must not disclose the configured list');
+        assert.equal(diagnostic.status, 404);
+        assert.equal(diagnostic.text.includes('192.0.2.'), false);
         assert.equal(diagnostic.text.includes('SYNTHETIC_ERROR_TOKEN'), false);
         // Startup compilation is a deliberate snapshot; request-time environment
         // mutation cannot activate a partially compiled or newly supplied list.
@@ -642,6 +647,122 @@ for (const site of ['ffg', 'tta']) for (const [name, trustedIPs, elevated] of [
         f.bounded();
     });
 }
+
+test('ingress trust accepts exact normalized immediate peers, including IPv6, and excludes bridge neighbors', () => {
+    const trust = compileIngressPeerTrust('172.25.0.2, 2001:0DB8:0000:0000:0000:0000:0000:0002', true);
+    assert.equal(trust('172.25.0.2', 0), true);
+    assert.equal(trust('::ffff:172.25.0.2', 0), true);
+    assert.equal(trust('2001:db8::2', 0), true);
+    assert.equal(trust('172.25.0.3', 0), false);
+    assert.equal(trust('172.25.0.2', 1), false);
+    assert.equal(trust('2001:db8::2', 1), false);
+});
+
+test('production rejects missing or invalid ingress peers before creating uploads or opening SQLite', async t => {
+    const root = await fs.mkdtemp(path.join(tmpdir(), 'sites-ingress-startup-'));
+    t.after(() => fs.rm(root, { recursive: true, force: true }));
+    const previousMode = process.env.NODE_ENV, previousPeers = process.env.TRUSTED_INGRESS_PEERS;
+    process.env.NODE_ENV = 'production';
+    const uploadsPath = path.join(root, 'uploads'), databasePath = path.join(root, 'synthetic.db');
+    try {
+        for (const config of [undefined, '   ', 'localhost', '172.25.0.0/24', '[::1]', '127.0.0.1:8080',
+            'fe80::1%fixture', '127.0.0.1,', '127.0.0.1,SYNTHETIC_ERROR_CONFIGURATION']) {
+            if (config === undefined) delete process.env.TRUSTED_INGRESS_PEERS;
+            else process.env.TRUSTED_INGRESS_PEERS = config;
+            assert.throws(() => createBlogApp({ uploadsPath, databasePath }), {
+                code: 'ERR_TRUSTED_INGRESS_PEERS',
+                message: 'TRUSTED_INGRESS_PEERS requires a comma-separated list of exact IP addresses'
+            });
+        }
+        assert.deepEqual(await fs.readdir(root), []);
+    } finally {
+        if (previousMode === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previousMode;
+        if (previousPeers === undefined) delete process.env.TRUSTED_INGRESS_PEERS;
+        else process.env.TRUSTED_INGRESS_PEERS = previousPeers;
+    }
+});
+
+function registerIngressProbe(app) {
+    app.get('/__synthetic/ingress', (req, res) => res.json({
+        ip: req.ip, clientIp: req.clientIp, ips: req.ips, protocol: req.protocol, hostname: req.hostname
+    }));
+}
+
+for (const site of ['ffg', 'tta']) {
+    test(`${site}: canonical IPv4, mapped IPv4 and IPv6 share their respective rate buckets and exemptions`, async t => {
+        const f = await fixture(t, site, { trustedIPs: '::ffff:192.0.2.22,2001:0DB8:0:0:0:0:0:22,::ffff:c000:216:5678',
+            registerRoutes: registerIngressProbe });
+        for (const [addresses, canonical] of [
+            [['192.0.2.22', '::ffff:c000:216'], '192.0.2.22'],
+            [['2001:db8::22', '2001:0DB8:0000:0000:0000:0000:0000:0022'], '2001:db8::22'],
+            [['::ffff:c000:216:5678', '0:0:0:0:FFFF:C000:0216:5678'], '::ffff:c000:216:5678']
+        ]) {
+            for (const [index, address] of addresses.entries()) {
+                const result = await f.request('/__synthetic/ingress', { headers: {
+                    'x-forwarded-for': address, 'x-forwarded-host': 'canonical.example.invalid'
+                } });
+                assert.equal(result.status, 200);
+                assert.deepEqual(JSON.parse(result.text), { ip: canonical, clientIp: canonical, ips: [canonical],
+                    protocol: 'https', hostname: 'canonical.example.invalid' });
+                assert.equal(result.headers.get('ratelimit-limit'), '10000');
+                assert.equal(result.headers.get('ratelimit-remaining'), String(9999 - index));
+            }
+        }
+        assert.ok(f.access.some(line => line.startsWith('192.0.2.22 - ')));
+        assert.ok(f.access.some(line => line.startsWith('2001:db8::22 - ')));
+        const filtered = await f.request('/wp-admin', { headers: { 'x-forwarded-for': '::ffff:c000:216' } });
+        assert.equal(filtered.status, 404);
+        assert.ok(f.access.includes('Sensitive file access attempt: /wp-admin from 192.0.2.22'));
+        f.bounded();
+    });
+
+    test(`${site}: ingress lists, missing addresses and malformed values share the ordinary socket bucket`, async t => {
+        const f = await fixture(t, site, { trustedIPs: '192.0.2.22,127.0.0.1', ordinaryLimit: 4,
+            registerRoutes: registerIngressProbe });
+        for (const [index, address] of [undefined, '192.0.2.22, 198.51.100.7', '[2001:db8::22]',
+            '192.0.2.22:8080', 'SYNTHETIC_ERROR_HEADER'].entries()) {
+            const result = await f.request('/__synthetic/ingress', {
+                headers: address === undefined ? {} : { 'x-forwarded-for': address }
+            });
+            assert.equal(result.headers.get('ratelimit-limit'), '4');
+            assert.equal(result.status, index < 4 ? 200 : 429);
+            if (index < 4) {
+                assert.deepEqual(JSON.parse(result.text), { ip: '127.0.0.1', clientIp: '127.0.0.1', ips: [],
+                    protocol: 'https', hostname: '127.0.0.1' });
+            }
+            assert.equal(result.headers.get('ratelimit-remaining'), String(Math.max(0, 3 - index)));
+        }
+        assert.equal(f.access.join('\n').includes('SYNTHETIC_ERROR_HEADER'), false);
+        f.bounded();
+    });
+
+    test(`${site}: an untrusted direct peer cannot select another client identity or secure protocol`, async t => {
+        const f = await fixture(t, site, { trustedIngressPeers: '172.25.0.2', trustedIPs: '192.0.2.22',
+            ordinaryLimit: 2, authenticated: false, registerRoutes: registerIngressProbe });
+        for (const [index, address] of ['192.0.2.22', '2001:db8::22', '198.51.100.7'].entries()) {
+            const result = await f.request('/__synthetic/ingress', { headers: {
+                'x-forwarded-for': address, 'x-real-ip': address, 'x-forwarded-host': 'untrusted.example.invalid',
+                forwarded: 'for=192.0.2.22;proto=https'
+            } });
+            assert.equal(result.headers.get('ratelimit-limit'), '2');
+            assert.equal(result.status, index < 2 ? 200 : 429);
+            assert.equal(result.headers.get('set-cookie'), null);
+            if (index < 2) {
+                assert.deepEqual(JSON.parse(result.text), { ip: '127.0.0.1', clientIp: '127.0.0.1', ips: [],
+                    protocol: 'http', hostname: '127.0.0.1' });
+            }
+        }
+        f.bounded();
+    });
+}
+
+test('local development with no ingress peers uses the direct socket', async t => {
+    const f = await fixture(t, 'ffg', { mode: 'test', trustedIngressPeers: null, registerRoutes: registerIngressProbe });
+    const result = await f.request('/__synthetic/ingress', { headers: { 'x-forwarded-for': '192.0.2.22' } });
+    assert.equal(result.status, 200);
+    assert.deepEqual(JSON.parse(result.text), { ip: '127.0.0.1', clientIp: '127.0.0.1', ips: [],
+        protocol: 'http', hostname: '127.0.0.1' });
+});
 
 for (const site of ['ffg', 'tta']) {
     test(`${site}: actual login, session authentication and CSRF remain intact`, async t => {

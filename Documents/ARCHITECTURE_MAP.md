@@ -130,7 +130,8 @@ Provides `createBlogApp(config)`, the shared Express application factory. Confir
   Missing/empty/whitespace-only configuration grants no elevated exemptions.
   Any compilation failure rejects the entire list, retains ordinary limits and
   emits one bounded diagnostic during initialization; requests do not recompile it.
-  `/debug-ip` reuses this matcher and omits the raw configuration field.
+  The proxy-trust candidate resolves one normalized address for rate limits,
+  exemptions and request attribution. The former `/debug-ip` route is removed.
 - Health check endpoint.
 - Global error handling and final 404 handler setup.
 
@@ -658,10 +659,11 @@ Trusted-rate exemptions intentionally retain legacy literal, opaque and
 regex-bearing wildcard matching. Whole-list compilation is not semantic IP
 validation and does not establish regex complexity safety. Configuration is
 captured during app initialization; changing it requires a new app instance.
-The forwarded-header trust-chain weakness remains unresolved and must be
-hardened before production release. Future strict validation requires a separate
-compatibility assessment. This local source correction is not deployment
-authorization. Deployment-specific origins remain a separate review item.
+The proxy-trust candidate accepts one forwarded client address from an exact
+configured immediate peer. Production still needs the paired nginx change and
+peer verification in [the deployment runbook](DEPLOYMENT_RUNBOOK.md#client-ip-trust-configuration-and-rollout).
+Future strict validation of legacy exemption rules and deployment-specific
+origins remain separate review items.
 
 ## 12. Architecture Boundaries for Future Codex Work
 

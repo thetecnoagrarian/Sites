@@ -36,7 +36,7 @@ try {
             Analytics.recordPageView(
                 req.path,
                 req.get('User-Agent'),
-                req.ip,
+                req.clientIp,
                 req.get('Referrer')
             );
 

@@ -758,6 +758,7 @@ Before any deployment, confirm:
 - [ ] Exact Dockerfile confirmed.
 - [ ] Required env files exist by path, without opening them.
 - [ ] `[SESSION_SECRET]`, `[DATABASE_PATH]`, and `[UPLOADS_PATH]` are expected to be supplied by env/config.
+- [ ] For the proxy-trust candidate, each production app has `TRUSTED_INGRESS_PEERS` set to its verified immediate nginx peer addresses.
 - [ ] If elevated rate-limit exemptions are intended, `[TRUSTED_IPS]` is supplied explicitly and its complete list compiles. Missing/empty/whitespace-only configuration uses ordinary limits; any compilation failure disables all exemptions.
 - [ ] Backup status confirmed without opening backup contents.
 - [ ] Rollback concept agreed.
@@ -766,20 +767,61 @@ Before any deployment, confirm:
 
 The November 18, 2026 local trusted-rate correction removes the source fallback;
 it does not change actual environment files or authorize deployment. The list is
-compiled once at app initialization. Both sites may start without it. An invalid
-list emits one bounded diagnostic without raw entries/errors and cannot grant a
-partial exemption. Ordinary/elevated limits and client-identity selection remain
-unchanged. Local tests must supply synthetic configuration deliberately.
-The `/debug-ip` response omits the raw trusted-list configuration and uses the
-same compiled eligibility result; it does not recompile request-time patterns.
+compiled once at app initialization. `TRUSTED_IPS` is optional. An invalid list
+emits one bounded diagnostic and disables all exemptions. Earlier Git copies
+of the removed defaults remain subject to restricted-content review.
 
 Legacy opaque and regex-bearing entries remain accepted for compatibility.
 Compilation is neither semantic address validation nor regex complexity safety.
-Strict validation needs a separate compatibility assessment. Forwarded-header
-identity remains an unresolved security gate before production release; this
-correction does not harden nginx/Express proxy trust. Earlier Git copies of the
-removed defaults remain and require explicit restricted-content review during
-checkpoint preparation; no history rewrite is performed by this correction.
+Strict validation needs a separate compatibility assessment.
+
+### Client-IP trust configuration and rollout
+
+`TRUSTED_INGRESS_PEERS` is a comma-separated list of exact, bare IPv4 or IPv6
+addresses for the immediate nginx peers Express actually sees. Whitespace
+around entries is allowed. CIDRs, hostnames, brackets, ports and IPv6 scope
+identifiers are rejected. IPv4-mapped IPv6 and equivalent IPv6 spellings
+normalize to the same address. An empty value disables forwarding trust in
+development and test. Production requires a nonempty list. Any invalid entry
+rejects startup with `ERR_TRUSTED_INGRESS_PEERS` before uploads and SQLite are
+initialized. The diagnostic omits the configured addresses.
+
+The app accepts one valid forwarded client address from a configured immediate
+peer only. Missing, malformed or multiple values use the transport address
+without granting an exemption for that proxy peer. Rate limiting and exact
+IP exemptions use the same normalized address, with existing ordinary and
+elevated limits and per-address IPv6 buckets. Review legacy wildcard rules
+against canonical address spellings. The authenticated FFG gallery quotas
+still use user ID. The app no longer exposes `/debug-ip`.
+
+1. **Identify the peers.** Measure the immediate socket peer for each site and
+   each IPv4/IPv6 path nginx uses, including any Docker translation. Confirm
+   that untrusted bridge peers cannot present that same transport identity.
+   Use exact observed addresses in operator-managed configuration. A private
+   range or Docker subnet is too broad. Stop if a CDN, load balancer or other
+   hop changes the observed identity contract.
+2. **Prepare both sides.** Stage the application setting and validate the
+   host-managed nginx configuration. Follow the sanitized template. Replace
+   XFF with `$remote_addr`, set `X-Forwarded-Proto` and `X-Forwarded-Host` from
+   nginx, and strip `Forwarded` and `X-Real-IP`. Apply this to canonical FFG,
+   the additional FFG virtual host and canonical TTA. Preserve canonical
+   redirects and keep uploads behind Express.
+3. **Rehearse in isolation.** Use disposable nginx and both candidate services.
+   Verify the effective peer and resolved IP, client bucket continuity, an
+   untrusted bridge peer, HTTPS session cookies, CSRF, and access to accepted
+   public media while private paths remain denied. The direct-host Mode B
+   harness uses its discovered test bridge gateway for existing HTTPS-header
+   fixtures. Set `MODE_B_TRUSTED_INGRESS_PEERS` to measured exact test peers if
+   the engine maps host traffic differently or the harness is behind test nginx.
+4. **Transition only after authorization.** Preserve the previous nginx config,
+   peer settings and immutable image anchors. Activate and verify header
+   replacement on all three routes first, then roll out the app and its peer
+   settings site by site. Verify canonical redirects, both application health
+   checks, HTTPS sessions, rate-limit attribution, ingress media routing,
+   and bridge-peer isolation. Keep replacement active during an app rollback.
+   If nginx cannot maintain the sanitized forwarding contract, restrict the
+   affected ingress before restoring old settings. Reopen public access only
+   after the forwarding values are under nginx control.
 
 ## 9. Safe Command Categories
 

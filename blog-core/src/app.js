@@ -13,6 +13,7 @@ import compression from 'compression';
 import multer from 'multer';
 import { mkdirSync } from 'fs';
 import { METHODS } from 'node:http';
+import { compileIngressPeerTrust, normalizeClientIp } from './utils/client-ip.js';
 import { compileTrustedRateLimitMatcher } from './utils/trusted-rate-limit.js';
 
 import { setDatabase } from './models/db.js';
@@ -26,6 +27,9 @@ import Post from './models/post.js';
 import Category from './models/category.js';
 import logger from './utils/logger.js';
 import { logSafeError, readDiagnosticProperty } from './utils/error-diagnostics.js';
+
+morgan.token('blog-client-ip', req => req.clientIp);
+const accessLogFormat = morgan.combined.replace(':remote-addr', ':blog-client-ip');
 
 export function createGlobalErrorHandler(log = logger) {
     return (err, req, res, next) => {
@@ -118,6 +122,9 @@ export function createBlogApp(config) {
         throw new Error('uploadsPath is required');
     }
 
+    const trustIngressPeer = compileIngressPeerTrust(process.env.TRUSTED_INGRESS_PEERS,
+        process.env.NODE_ENV === 'production');
+
     // Ensure uploads directory exists
     try {
         mkdirSync(uploadsPath, { recursive: true });
@@ -136,8 +143,17 @@ export function createBlogApp(config) {
 
     const app = express();
 
-    // Trust proxy if behind reverse proxy
-    app.set('trust proxy', true);
+    app.set('trust proxy', trustIngressPeer);
+    app.use((req, res, next) => {
+        const fromIngress = trustIngressPeer(req.socket.remoteAddress, 0);
+        const forwardedIp = fromIngress && normalizeClientIp(req.headers['x-forwarded-for']);
+        // Discard a list or malformed value in full before resolving req.ip.
+        if (forwardedIp) req.headers['x-forwarded-for'] = forwardedIp;
+        else delete req.headers['x-forwarded-for'];
+        req.clientIp = normalizeClientIp(req.ip);
+        req.clientIpEligibleForExemption = !fromIngress || Boolean(forwardedIp);
+        next();
+    });
 
     // Initialize database
     const db = initializeDatabase(databasePath);
@@ -202,7 +218,7 @@ export function createBlogApp(config) {
     }));
 
     // Logging middleware
-    app.use(morgan('combined', {
+    app.use(morgan(accessLogFormat, {
         stream: {
             write: (message) => logger.info(message.trim())
         }
@@ -452,7 +468,7 @@ export function createBlogApp(config) {
         }
         
         const userAgent = req.headers['user-agent'] || '';
-        const clientIP = req.headers['x-forwarded-for'] || req.ip;
+        const clientIP = req.clientIp ?? 'unknown';
         const pathLower = req.path.toLowerCase();
         
         // Block requests for sensitive files
@@ -492,19 +508,14 @@ export function createBlogApp(config) {
             && isGalleryMediaRequest(req.method, req.path),
         windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes default
         max: (req) => {
-            // Retain the current forwarded-header identity policy in this slice.
-            let clientIP = req.headers['x-forwarded-for'] || req.ip;
-            if (clientIP.includes(',')) clientIP = clientIP.split(',')[0].trim();
-            if (matchesTrustedRateLimitClient(clientIP)) return 10000;
+            const { clientIp, clientIpEligibleForExemption } = req;
+            if (clientIpEligibleForExemption && clientIp && matchesTrustedRateLimitClient(clientIp)) return 10000;
             return parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || (process.env.NODE_ENV === 'production' ? 25 : 1000);
         },
         standardHeaders: true,
         legacyHeaders: false,
         message: 'Too many requests from this IP, please try again later.',
-        keyGenerator: (req) => {
-            // Use X-Forwarded-For if available, otherwise use IP
-            return req.headers['x-forwarded-for'] || req.ip;
-        }
+        keyGenerator: req => req.clientIp ?? 'unknown'
     }));
 
     // Health check endpoint
@@ -515,22 +526,6 @@ export function createBlogApp(config) {
             uptime: process.uptime(),
             environment: process.env.NODE_ENV || 'development',
             siteName
-        });
-    });
-
-    // Debug endpoint to check IP detection (remove after testing)
-    app.get('/debug-ip', (req, res) => {
-        const xForwardedFor = req.headers['x-forwarded-for'];
-        const reqIP = req.ip;
-        let clientIP = xForwardedFor || reqIP;
-        if (clientIP && clientIP.includes(',')) {
-            clientIP = clientIP.split(',')[0].trim();
-        }
-        res.json({
-            'x-forwarded-for': xForwardedFor,
-            'req.ip': reqIP,
-            'detected-client-ip': clientIP,
-            'is-trusted': matchesTrustedRateLimitClient(clientIP)
         });
     });
 
