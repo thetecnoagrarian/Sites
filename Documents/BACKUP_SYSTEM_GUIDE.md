@@ -488,6 +488,33 @@ display/social URLs and homepage/social metadata references through the
 isolated application, and require the corresponding retained `.source` URL to
 remain denied by Express.
 
+### Native AMD64 synthetic recovery rehearsal
+
+The manual native validation workflow has a separate recovery suite for the
+candidate validated by run `45385872300`. Select `suite=recovery` and enter
+`b0605dedf62a68184f6cc00ac198900c1d041c80` after review and separate dispatch
+authorization. The workflow ref supplies the test harness. Exact candidate and
+historical checkouts supply four fresh production-style Linux AMD64 images,
+which the runner executes by recorded image ID. The default validation suite
+keeps its existing behavior.
+
+The recovery job creates synthetic data through the historical application
+models and candidate HTTP routes. It follows the stopped-site writer census
+in the deployment runbook, runs the unchanged host backup orchestration with
+a read-only source volume, and restores verified `blog.db` and
+`uploads.tar.gz` into fresh volumes. Application containers use network mode
+`none` with no published ports. A successful run records summary evidence for
+forward recovery, Case B, permissions, synchronization calls, and capacity.
+The workflow retains no database, archive, password, session, or media artifact.
+
+Case A still requires an independently verified immutable application image
+that can read and write the migration `0004` ledger, managed media grants and
+receipts, and FFG hero v2 authority without losing or reinterpreting accepted
+state. Case B restores the matching `0000`–`0001` historical checkpoint and
+drops subsequent writes. Successful file and directory synchronization calls
+establish behavior on the runner filesystem. Physical power-loss durability
+requires separate evidence.
+
 ### November 6, 2026 disposable restore evidence
 
 Run `restore-20261106-41ec8a8` restored both sites sequentially into fresh

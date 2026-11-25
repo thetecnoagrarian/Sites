@@ -8,6 +8,14 @@ on:
         required: true
         type: string
 
+      suite:
+        description: "Validation runs the existing native gate. Recovery rehearses the pinned FFG/TTA candidate."
+        type: choice
+        options:
+          - validation
+          - recovery
+        default: validation
+
 permissions:
   contents: read
 
@@ -17,6 +25,7 @@ concurrency:
 
 jobs:
   validate-native-amd64:
+    if: ${{ inputs.suite != 'recovery' }}
     name: Validate native Linux musl AMD64 candidate
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -831,3 +840,45 @@ jobs:
             echo
             echo "Production deployment remains blocked."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  rehearse-recovery:
+    name: Rehearse isolated recovery on native Linux AMD64
+    if: ${{ inputs.suite == 'recovery' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Verify the recovery target
+        shell: bash
+        env:
+          TARGET_REVISION: ${{ inputs.target_revision }}
+        run: test "$TARGET_REVISION" = b0605dedf62a68184f6cc00ac198900c1d041c80
+
+      - name: Checkout the rehearsal harness
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          path: harness
+
+      - name: Checkout the validated candidate
+        uses: actions/checkout@v4
+        with:
+          ref: b0605dedf62a68184f6cc00ac198900c1d041c80
+          persist-credentials: false
+          path: candidate
+
+      - name: Checkout the historical source
+        uses: actions/checkout@v4
+        with:
+          ref: b50a41f02aeda58d36798997ff8bd2f9fe56a018
+          persist-credentials: false
+          path: historical
+
+      - name: Rehearse stopped-site recovery
+        working-directory: harness
+        run: bash tests/native-amd64-recovery.sh ../candidate ../historical
+
+      - name: Clean up rehearsal resources
+        if: ${{ always() && hashFiles('harness/tests/native-amd64-recovery.sh') != '' }}
+        working-directory: harness
+        run: bash tests/native-amd64-recovery.sh --cleanup
