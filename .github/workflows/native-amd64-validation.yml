@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       target_revision:
-        description: "Target application SHA. Node 24 candidate: 63298610611fa0612987241e91a5e001fcc74362; do not enter the workflow revision."
+        description: "Full 40-character application commit SHA to validate or rehearse."
         required: true
         type: string
 
       suite:
-        description: "Validation runs the existing native gate. Recovery rehearses the pinned FFG/TTA candidate."
+        description: "Validation runs the existing native gate. Recovery rehearses the requested FFG/TTA candidate."
         type: choice
         options:
           - validation
@@ -846,12 +846,19 @@ jobs:
     if: ${{ inputs.suite == 'recovery' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    env:
+      TARGET_REVISION: ${{ inputs.target_revision }}
     steps:
       - name: Verify the recovery target
+        id: recovery-target
         shell: bash
-        env:
-          TARGET_REVISION: ${{ inputs.target_revision }}
-        run: test "$TARGET_REVISION" = b0605dedf62a68184f6cc00ac198900c1d041c80
+        run: |
+          set -euo pipefail
+          if [[ ! "${TARGET_REVISION:-}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::target_revision must be a full 40-character commit SHA"
+            exit 1
+          fi
+          printf 'sha=%s\n' "$(printf '%s' "$TARGET_REVISION" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Checkout the rehearsal harness
         uses: actions/checkout@v4
@@ -860,10 +867,10 @@ jobs:
           persist-credentials: false
           path: harness
 
-      - name: Checkout the validated candidate
+      - name: Checkout the exact recovery candidate
         uses: actions/checkout@v4
         with:
-          ref: b0605dedf62a68184f6cc00ac198900c1d041c80
+          ref: ${{ steps.recovery-target.outputs.sha }}
           persist-credentials: false
           path: candidate
 

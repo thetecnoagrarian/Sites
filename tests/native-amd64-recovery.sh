@@ -2,7 +2,6 @@
 set -euo pipefail
 umask 077
 
-candidate_sha=b0605dedf62a68184f6cc00ac198900c1d041c80
 historical_sha=b50a41f02aeda58d36798997ff8bd2f9fe56a018
 here=$(cd -- "$(dirname -- "$0")" && pwd -P)
 fixture="$here/fixtures/native-recovery-site.mjs"
@@ -156,13 +155,20 @@ if [[ "${1:-}" == --cleanup ]]; then
 fi
 
 [[ $# == 2 ]] || fail "supply candidate and historical checkout paths"
-[[ "$(git -C "$here/.." rev-parse HEAD)" == "${GITHUB_SHA:?}" ]] || fail "harness SHA mismatch"
+[[ -n "${TARGET_REVISION:-}" ]] || fail "missing candidate revision"
+[[ "$TARGET_REVISION" =~ ^[0-9a-fA-F]{40}$ ]] || fail "candidate revision must be a full 40-character commit SHA"
+candidate_sha=$(printf '%s' "$TARGET_REVISION" | tr '[:upper:]' '[:lower:]')
+[[ "${GITHUB_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || fail "invalid workflow revision"
+[[ "$(git -C "$here/.." rev-parse --verify 'HEAD^{commit}')" == "$GITHUB_SHA" ]] || fail "harness SHA mismatch"
 candidate=$(cd -- "$1" && pwd -P)
 historical=$(cd -- "$2" && pwd -P)
-[[ "$(git -C "$candidate" rev-parse HEAD)" == "$candidate_sha" ]] || fail "candidate SHA mismatch"
-[[ "$(git -C "$historical" rev-parse HEAD)" == "$historical_sha" ]] || fail "historical SHA mismatch"
+[[ "$candidate" != "$historical" ]] || fail "candidate and historical must use separate build contexts"
+[[ "$(git -C "$candidate" rev-parse --verify 'HEAD^{commit}')" == "$candidate_sha" ]] || fail "candidate SHA mismatch"
+[[ "$(git -C "$historical" rev-parse --verify 'HEAD^{commit}')" == "$historical_sha" ]] || fail "historical SHA mismatch"
 for source in "$candidate" "$historical"; do
-    [[ -z "$(git -C "$source" status --porcelain --untracked-files=all)" ]] || fail "dirty build context"
+    [[ "$(git -C "$source" rev-parse --show-toplevel)" == "$source" ]] || fail "build context must be a checkout root"
+    source_status=$(git -C "$source" status --porcelain --untracked-files=all) || fail "cannot inspect build context"
+    [[ -z "$source_status" ]] || fail "dirty build context"
 done
 architecture=$(docker version --format '{{.Server.Arch}}')
 [[ "$architecture" == amd64 || "$architecture" == x86_64 ]] || fail "Docker daemon is not native AMD64"
