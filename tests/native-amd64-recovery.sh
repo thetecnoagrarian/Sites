@@ -99,8 +99,205 @@ database_self_test() (
     printf 'SQLite controls passed: 1 clean database and 10 expected rejections.\n'
 )
 
+one_writer() {
+    local container=$1 volume=$2 site=$3 stage=$4
+    local format='{{.Id}} {{.State.Running}} {{.State.Pid}}'
+    local state_pattern='^([0-9a-f]{64}) (true|false) ([^[:space:]]+)$'
+    local before after id running pid after_id
+    local running_after=unknown pid_after=unknown pid_changed=unknown after_state=docker-inspect-after-failed
+    local expected report census_matches=no census_status=0 census_reason=none
+    local stdout_file="$scratch/writer-census.stdout"
+    local stderr_file="$scratch/writer-census.stderr" stderr_present=no
+    local context="site=$site stage=$stage expected=one-app-pid-O_RDWR-row"
+
+    if ! before=$(docker inspect --format "$format" "$container" 2>/dev/null); then
+        fail "writer census $context classification=docker-inspect-before-failed census-exit=not-run"
+    fi
+    [[ "$before" =~ $state_pattern ]] ||
+        fail "writer census $context classification=invalid-docker-inspect-output census-exit=not-run"
+    read -r id running pid <<< "$before"
+    context+=" container=$id running-before=$running"
+    [[ "$pid" =~ ^[1-9][0-9]*$ ]] ||
+        fail "writer census $context expected-pid=invalid classification=invalid-docker-pid census-exit=not-run"
+    context+=" expected-pid=$pid"
+    [[ "$running" == true ]] ||
+        fail "writer census $context classification=container-not-running-before census-exit=not-run"
+    expected="[[$pid, 2]]"
+
+    (
+        if { exec 3>"$stderr_file"; } 2>/dev/null; then
+            census "$volume" writer-census 2>&3 3>&-
+        else
+            census "$volume" writer-census 2>/dev/null
+        fi
+    ) >"$stdout_file" || census_status=$?
+    if after=$(docker inspect --format "$format" "$container" 2>/dev/null); then
+        after_state=invalid-docker-inspect-output
+        if [[ "$after" =~ $state_pattern ]]; then
+            read -r after_id running_after pid_after <<< "$after"
+            if [[ "$pid_after" =~ ^[0-9]+$ ]]; then
+                pid_changed=no
+                [[ "$pid_after" == "$pid" ]] || pid_changed=yes
+                after_state=unchanged
+                if [[ "$after_id" != "$id" ]]; then after_state=container-id-changed
+                elif [[ "$running_after" != true ]]; then after_state=container-not-running-after
+                elif [[ "$pid_after" == 0 ]]; then after_state=invalid-docker-pid-after
+                elif [[ "$pid_changed" == yes ]]; then after_state=application-pid-changed
+                fi
+            else
+                pid_after=invalid
+                after_state=invalid-docker-pid-after
+            fi
+        fi
+    fi
+
+    if [[ "$census_status" == 0 ]] && printf '%s\n' "$expected" | cmp -s "$stdout_file" -; then
+        census_matches=yes
+    fi
+    if [[ "$census_matches" == yes && "$after_state" == unchanged ]]; then
+        printf 'Writer census passed: %s census-exit=0 running-after=true pid-after=%s pid-changed=no observed=%s\n' \
+            "$context" "$pid_after" "$expected" || :
+        return 0
+    fi
+
+    [[ ! -s "$stderr_file" ]] || stderr_present=yes
+    context+=" census-exit=$census_status census-stderr=$stderr_present"
+    context+=" running-after=$running_after pid-after=$pid_after pid-changed=$pid_changed"
+    if [[ "$census_status" == 0 ]]; then
+        [[ "$census_matches" == yes ]] || census_reason=unexpected-normalized-census
+        if report=$(python3 "$host_check" writer-report "$stderr_file" "$pid" 2>/dev/null <"$stdout_file"); then
+            printf '%s\n' "$report" >&2
+        else
+            printf 'diagnostic report unavailable\n' >&2
+        fi
+    elif [[ "$census_status" == 2 ]] && grep -Fxq 'incomplete-process-enumeration' "$stderr_file" 2>/dev/null; then
+        census_reason=incomplete-process-enumeration
+        context+=" observed=unavailable"
+    else
+        census_reason=census-process-failure
+        context+=" observed=unavailable"
+    fi
+    fail "writer census $context census-classification=$census_reason container-classification=$after_state"
+}
+
+writer_self_test() (
+    scratch=$(mktemp -d "${TMPDIR:-/tmp}/recovery-writer.XXXXXX")
+    trap 'rm -rf -- "$scratch"' EXIT
+    local id mock_before mock_after normal extra_output=no test_group=original site=ffg stage=pre-publication-startup
+    printf -v id '%064d' 1
+    normal="$id true 321"
+    mock_before=$normal
+    mock_after=$normal
+
+    docker() {
+        local snapshot=$mock_before
+        [[ ! -s "$scratch/inspected" ]] || snapshot=$mock_after
+        printf '1\n' > "$scratch/inspected"
+        if [[ "$snapshot" == inspect-error ]]; then
+            printf 'private-path-sentinel\n' >&2
+            return 7
+        fi
+        printf '%s\n' "$snapshot"
+    }
+
+    census() {
+        [[ "$1/$2" == synthetic/writer-census ]] || return 18
+        python3 -c 'import json, runpy, sys
+rows = json.loads(sys.argv[2])
+if sys.argv[3] in ("valid", "unreadable", "unwritable"):
+    runpy.run_path(sys.argv[1])["emit_writer_census"](rows)
+else:
+    print(json.dumps([(pid, access) for pid, access, _ in rows]))' "$host_check" "$rows" "$mock_report" || return "$?"
+        case "$mock_report" in
+            malformed) printf '{private-path-sentinel}\n' >&2 ;;
+            unexpected) printf '["private-path-sentinel"]\n' >&2 ;;
+            unreadable)
+                rm -- "$scratch/writer-census.stderr"
+                mkdir -- "$scratch/writer-census.stderr"
+                ;;
+        esac
+        [[ "$mock_status" != 2 ]] || printf 'incomplete-process-enumeration\n' >&2
+        [[ "$extra_output" == no ]] || printf 'private-path-sentinel\n'
+        return "$mock_status"
+    }
+
+    check() {
+        local expected_status=$1 message=$2 rows=$3 mock_status=${4:-0} mock_report=${5:-valid}
+        local result status=0
+        : > "$scratch/inspected"
+        if [[ -d "$scratch/writer-census.stderr" ]]; then
+            rmdir -- "$scratch/writer-census.stderr"
+        fi
+        if [[ "$mock_report" == unwritable ]]; then
+            rm -f -- "$scratch/writer-census.stderr"
+            mkdir -- "$scratch/writer-census.stderr"
+        fi
+        result=$(one_writer synthetic synthetic "$site" "$stage" 2>&1) || status=$?
+        [[ "$status" == "$expected_status" && "$result" == *"site=$site stage=$stage"* &&
+            "$result" == *"$message"* && "$result" != *private-path-sentinel* ]] ||
+            fail "writer self-test expected $message in $site $stage (status $status): $result"
+        printf 'Writer diagnostic control passed: %s %s %s %s\n' "$test_group" "$site" "$stage" "$message"
+    }
+
+    local exact='[[321, 2, "database"]]'
+    check 0 'observed=[[321, 2]]' "$exact"
+    check 1 zero-relevant-descriptors '[]'
+    check 1 unexpected-process-identity '[[654, 2, "database"]]'
+    check 1 unexpected-access-mode '[[321, 0, "database"]]'
+    check 1 multiple-writer-processes '[[321, 2, "database"], [654, 2, "database"]]'
+    check 1 unexpected-descriptor-count-or-grouping '[[321, 2, "database"], [321, 2, "wal"]]'
+    check 1 '"omitted":1' '[[321,2,"database"],
+        [321,0,"uploads"],[321,0,"uploads"],[321,0,"uploads"],[321,0,"uploads"],
+        [321,0,"uploads"],[321,0,"uploads"],[321,0,"uploads"],[321,0,"uploads"]]'
+    local stable='census-stderr=yes running-after=true pid-after=321 pid-changed=no observed=unavailable'
+    check 1 "census-exit=19 $stable census-classification=census-process-failure" "$exact" 19 malformed
+    check 1 "census-exit=2 $stable census-classification=incomplete-process-enumeration" "$exact" 2 malformed
+    extra_output=yes
+    check 1 'census-classification=unexpected-normalized-census' "$exact"
+    extra_output=no
+    mock_before="$id true 0"
+    check 1 'classification=invalid-docker-pid census-exit=not-run' "$exact"
+    mock_before=inspect-error
+    check 1 'classification=docker-inspect-before-failed census-exit=not-run' "$exact"
+    mock_before=$normal
+    site=tta
+    stage=post-publication
+    mock_after="$id true 654"
+    check 1 'pid-changed=yes census-classification=none container-classification=application-pid-changed' "$exact"
+    mock_after="$id false 0"
+    check 1 container-not-running-after "$exact"
+    mock_after=inspect-error
+    check 1 docker-inspect-after-failed "$exact"
+
+    mock_after=$normal
+    local multiple='[[321, 2, "database"], [321, 2, "wal"]]'
+    test_group=A; check 0 'Writer census passed' "$exact"
+    test_group=B; check 0 'Writer census passed' "$exact" 0 missing
+    test_group=C; check 0 'Writer census passed' "$exact" 0 malformed
+    test_group=D; check 0 'Writer census passed' "$exact" 0 unreadable
+    test_group=E; check 1 zero-relevant-descriptors '[]'
+    test_group=F; check 1 'diagnostic report unavailable' '[]' 0 missing
+    test_group=G; check 1 'diagnostic report invalid' '[]' 0 malformed
+    test_group=H; check 1 'diagnostic report unavailable' '[]' 0 unreadable
+    test_group=I; check 1 census-classification=census-process-failure "$exact" 19
+    test_group=J; check 1 census-classification=census-process-failure "$exact" 19 malformed
+    test_group=K; check 0 'pid-changed=no' "$exact"
+    mock_after="$id true 654"
+    test_group=L; check 1 application-pid-changed "$exact"
+    mock_after=$normal
+    test_group=M; check 1 unexpected-descriptor-count-or-grouping "$multiple"
+    test_group=N; check 1 unexpected-descriptor-count-or-grouping "$multiple" 0 malformed
+    test_group=extra; check 1 'diagnostic report invalid' '[[321, 0, "database"]]' 0 unexpected
+    check 0 'Writer census passed' "$exact" 0 unwritable
+    check 1 'diagnostic report unavailable' '[]' 0 unwritable
+)
+
 if [[ "${1:-}" == --database-self-test ]]; then
     database_self_test
+    exit
+fi
+if [[ "${1:-}" == --writer-self-test ]]; then
+    writer_self_test
     exit
 fi
 
@@ -282,15 +479,9 @@ volume_path() {
 census() {
     local directory
     directory=$(volume_path "$1") || return 1
-    sudo -n python3 "$host_check" census "$directory"
+    sudo -n python3 "$host_check" "${2:-census}" "$directory"
 }
 containers_using() { docker ps -q --no-trunc --filter "volume=$1"; }
-one_writer() {
-    local pid
-    pid=$(docker inspect --format '{{.State.Pid}}' "$1")
-    [[ "$pid" =~ ^[1-9][0-9]*$ && "$(census "$2")" == "[[$pid, 2]]" ]] ||
-        fail "expected one read/write SQLite handle from the application process"
-}
 quiescent() {
     local mounted holders
     mounted=$(containers_using "$1") || return 2
@@ -317,7 +508,7 @@ assert_mount() {
         "$id" "$identity" "$3" "$4" >> "$GITHUB_STEP_SUMMARY"
 }
 start_app() {
-    local container=$1 image=$2 volume=$3 site=$4 ready=false site_dir=fruitionforestgarden
+    local container=$1 image=$2 volume=$3 site=$4 stage=$5 ready=false site_dir=fruitionforestgarden
     if [[ "$site" == tta ]]; then site_dir=thetecnoagrarian; fi
     docker run -d "${common[@]}" --name "$container" --restart=no --read-only \
         --tmpfs "/app/$site_dir/uploads:rw,nosuid,nodev,uid=1001,gid=1001,mode=0700" \
@@ -338,7 +529,7 @@ start_app() {
         sleep 1
     done
     [[ "$ready" == true ]] || fail "$site failed to become healthy"
-    one_writer "$container" "$volume"
+    one_writer "$container" "$volume" "$site" "$stage"
 }
 stop_app() {
     docker stop -t 10 "$1" >/dev/null
@@ -437,7 +628,7 @@ for site in ffg tta; do
         --mount "$(data_mount "$source")" --entrypoint sh "$old" \
         -ec 'chown 1001:1001 /app/data; chmod 700 /app/data'
     job "$old" "$source" '' seed "$site"
-    start_app "$app" "$old" "$source" "$site"
+    start_app "$app" "$old" "$source" "$site" historical-startup
     docker exec "$app" node /recovery.mjs http-pre "$site"
     stop_app "$app" "$source"
     checkpoint "$site" "$old" "$source" pre
@@ -445,9 +636,9 @@ for site in ffg tta; do
     restore "$site" "$new" pre "$migrated"
     job "$new" "$migrated" '' fs-probe "$site" | tee -a "$GITHUB_STEP_SUMMARY"
     job "$new" "$migrated" '' migrate "$site" | tee -a "$GITHUB_STEP_SUMMARY"
-    start_app "$app" "$new" "$migrated" "$site"
+    start_app "$app" "$new" "$migrated" "$site" pre-publication-startup
     docker exec "$app" node /recovery.mjs publish "$site"
-    one_writer "$app" "$migrated"
+    one_writer "$app" "$migrated" "$site" post-publication
     if checkpoint "$site" "$new" "$migrated" active; then
         fail "checkpoint proceeded with an admitted publication writer"
     else
@@ -460,7 +651,7 @@ for site in ffg tta; do
     checkpoint "$site" "$new" "$migrated" post
 
     restore "$site" "$old" pre "$rollback"
-    start_app "$app" "$old" "$rollback" "$site"
+    start_app "$app" "$old" "$rollback" "$site" rollback-startup
     docker exec "$app" node /recovery.mjs http-pre "$site"
     stop_app "$app" "$rollback"
     printf -- '- %s Case B booted with its historical image and pre-migration checkpoint; later writes were absent.\n' \
@@ -468,7 +659,7 @@ for site in ffg tta; do
 
     restore "$site" "$new" post "$restored"
     job "$new" "$restored" readonly fingerprint "$site" | cmp "$scratch/$site.fingerprint"
-    start_app "$app" "$new" "$restored" "$site"
+    start_app "$app" "$new" "$restored" "$site" forward-restored-startup
     docker exec "$app" node /recovery.mjs http-post "$site" | tee -a "$GITHUB_STEP_SUMMARY"
     stop_app "$app" "$restored"
     job "$new" "$restored" readonly fingerprint "$site" | cmp "$scratch/$site.fingerprint"

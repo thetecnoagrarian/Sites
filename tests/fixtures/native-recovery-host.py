@@ -38,7 +38,7 @@ def archive_check(file):
         members(archive)
 
 
-DB_NAMES = ("blog.db", "blog.db-wal", "blog.db-shm", "blog.db-journal")
+DB_CATEGORIES = {"blog.db": "database", "blog.db-wal": "wal", "blog.db-shm": "shm", "blog.db-journal": "journal"}
 
 
 def identity(info):
@@ -49,52 +49,57 @@ def publication_identities(volume):
     """Collect current inodes without traversing symlinks or other filesystems."""
     volume_stat = volume.stat()
     device = volume_stat.st_dev
-    entries = {identity(volume_stat)}
+    entries = {identity(volume_stat): "volume-root"}
 
-    def add(entry):
+    def add(entry, category):
         info = entry.lstat()
         if (info.st_dev != device
                 or not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode))):
             raise ValueError("Unexpected file type or mount in publication tree")
-        entries.add(identity(info))
+        entries.setdefault(identity(info), category)
 
     def walk_error(error):
         raise error
 
-    for name in DB_NAMES:
+    for name, category in DB_CATEGORIES.items():
         try:
-            add(volume / name)
+            add(volume / name, category)
         except FileNotFoundError:
             if name == "blog.db":
                 raise
     root = volume / "uploads"
-    add(root)
+    add(root, "uploads")
     for directory, subdirs, files in os.walk(root, followlinks=False, onerror=walk_error):
         for name in (*subdirs, *files):
-            add(Path(directory) / name)
+            add(Path(directory) / name, "uploads")
     return entries
 
 
-def publication_path(relative):
-    return (len(relative.parts) == 1 and relative.name in DB_NAMES
-            or relative.parts[:1] == ("uploads",))
+def publication_category(relative):
+    if relative.parts[:1] == ("uploads",):
+        return "uploads"
+    if len(relative.parts) == 1:
+        return DB_CATEGORIES.get(relative.name)
+    return None
 
 
 def deleted_publication(fd, proc, info, volume, volume_id):
     # A deleted inode vanishes from the walk. Use its kernel-reported path only
     # on the volume's device and, for the container alias, verify the bind root.
     if info.st_dev != volume_id[0]:
-        return False
+        return None
     target = os.readlink(fd)
     if not target.endswith(" (deleted)"):
-        return False
+        return None
     deleted = Path(target.removesuffix(" (deleted)"))
     if deleted.is_relative_to(volume):
-        return publication_path(deleted.relative_to(volume))
+        return publication_category(deleted.relative_to(volume))
     alias = Path("/app/data")
-    if deleted.is_relative_to(alias) and publication_path(deleted.relative_to(alias)):
-        return identity((proc / "root/app/data").stat()) == volume_id
-    return False
+    if deleted.is_relative_to(alias):
+        category = publication_category(deleted.relative_to(alias))
+        if category and identity((proc / "root/app/data").stat()) == volume_id:
+            return category
+    return None
 
 
 PROC = Path("/proc")
@@ -194,17 +199,19 @@ def list_live(directory, task, before):
 
 
 def task_descriptors(task, before, identities, volume, volume_id):
-    found = set()
+    found = {}
     for fd in list_live(task / "fd", task, before):
         try:
             info = fd.stat()
-            if identity(info) not in identities and not deleted_publication(fd, task, info, volume, volume_id):
+            inode = identity(info)
+            category = identities.get(inode) or deleted_publication(fd, task, info, volume, volume_id)
+            if category is None:
                 continue
             flags_line = next(line for line in (task / "fdinfo" / fd.name)
                               .read_text().splitlines() if line.startswith("flags:"))
             flags = int(flags_line.split()[1], 8)
             access = None if flags & os.O_PATH else flags & os.O_ACCMODE
-            found.add((fd.name, identity(info), access))
+            found[(fd.name, inode, access)] = category
         except GONE as error:
             if same_task(task, before) is None:
                 break
@@ -224,10 +231,10 @@ def group_descriptors(process, identities, volume, volume_id):
     for _ in range(3):
         before = task_state(process)
         if not live_leader(process, before):
-            return set()
+            return {}
         task_dir = process / "task"
         scanned = {}
-        found = set()
+        found = {}
         for task in list_live(task_dir, process, before):
             state = task_state(task)
             if state is not None and state.state not in EXIT_STATES:
@@ -250,7 +257,7 @@ def group_descriptors(process, identities, volume, volume_id):
     raise CensusIncomplete(f"Thread visibility for process {process.name} did not stabilize")
 
 
-def census(volume):
+def census(volume, *, detailed=False):
     require_host_procfs()
     volume = volume.resolve(strict=True)
     volume_id = identity(volume.stat())
@@ -261,8 +268,90 @@ def census(volume):
             # Most threads share an fd table. Count the same descriptor
             # identity only once per group, while inspecting each live task.
             found = group_descriptors(process, identities, volume, volume_id)
-            holders.extend((int(process.name), access) for _, _, access in found)
-    return sorted(holders, key=lambda handle: (handle[0], -1 if handle[1] is None else handle[1]))
+            holders.extend((int(process.name), access, category) for (_, _, access), category in found.items())
+    holders.sort(key=lambda handle: (handle[0], -1 if handle[1] is None else handle[1], handle[2]))
+    return holders if detailed else [(pid, access) for pid, access, _ in holders]
+
+
+WRITER_REPORT_ROWS = 8
+WRITER_REPORT_BYTES = 2048
+WRITER_CATEGORIES = {*DB_CATEGORIES.values(), "uploads", "volume-root"}
+
+
+def emit_writer_census(holders):
+    print(json.dumps([(pid, access) for pid, access, _ in holders]))
+    # The gate has its entire result on stdout. Even a formatting or write
+    # error on the optional channel must leave the census exit status alone.
+    try:
+        categories = [category for _, _, category in holders[:WRITER_REPORT_ROWS]]
+        os.write(2, (json.dumps(categories) + "\n").encode("ascii"))
+    except Exception:
+        pass
+
+
+def read_writer_categories(path, count):
+    try:
+        if not path.is_file():
+            return None, "unavailable"
+        with path.open("rb") as stream:
+            payload = stream.read(WRITER_REPORT_BYTES + 1)
+    except OSError:
+        return None, "unavailable"
+    if not payload:
+        return None, "unavailable"
+    try:
+        if len(payload) > WRITER_REPORT_BYTES:
+            return None, "invalid"
+        categories = json.loads(payload.decode("ascii"))
+        if (type(categories) is list and len(categories) == count
+                and all(type(category) is str and category in WRITER_CATEGORIES for category in categories)):
+            return categories, "available"
+    except (ValueError, RecursionError):
+        pass
+    return None, "invalid"
+
+
+def emit_writer_report(path, expected_pid):
+    # Rebuild the log from typed census rows and allowlisted categories.
+    # Never echo the auxiliary input or raw stderr.
+    try:
+        rows = json.load(sys.stdin)
+        if (type(rows) is not list or any(
+                type(row) is not list or len(row) != 2
+                or type(row[0]) is not int or not 0 < row[0] < 2**31
+                or (row[1] is not None and (type(row[1]) is not int or row[1] not in (0, 1, 2, 3)))
+                for row in rows)):
+            raise ValueError
+    except (ValueError, RecursionError):
+        print("diagnostic report unavailable: malformed census stdout")
+        return
+
+    sampled = rows[:WRITER_REPORT_ROWS]
+    categories, report_status = read_writer_categories(path, len(sampled))
+    if categories is None:
+        print(f"diagnostic report {report_status}")
+        categories = [None] * len(sampled)
+
+    conditions = []
+    if not rows:
+        conditions.append("zero-relevant-descriptors")
+    if len(rows) > 1:
+        conditions.append("unexpected-descriptor-count-or-grouping")
+    if any(pid != expected_pid for pid, _ in rows):
+        conditions.append("unexpected-process-identity")
+    if len({pid for pid, access in rows if access in (os.O_WRONLY, os.O_RDWR)}) > 1:
+        conditions.append("multiple-writer-processes")
+    if any(access != os.O_RDWR for _, access in rows):
+        conditions.append("unexpected-access-mode")
+    report = {
+        "conditions": conditions,
+        "descriptorCount": len(rows),
+        "observed": sampled,
+        "details": [{"pid": pid, "access": access, "category": category, "expectedProcess": pid == expected_pid}
+                    for (pid, access), category in zip(sampled, categories)],
+        "omitted": len(rows) - len(sampled),
+    }
+    print("writer-census-report " + json.dumps(report, separators=(",", ":")))
 
 
 def expect_incomplete(check, message):
@@ -531,7 +620,7 @@ def self_test():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=("archive", "archive-truncation", "census", "census-self-test",
+    parser.add_argument("mode", choices=("archive", "archive-truncation", "census", "writer-census", "writer-report", "census-self-test",
                                              "tree", "db-digest", "verify-digest", "uploads", "private", "self-test"))
     parser.add_argument("path", nargs="?", type=Path)
     parser.add_argument("expected", nargs="?")
@@ -553,6 +642,16 @@ def main():
         except (CensusIncomplete, OSError, ValueError, IndexError, StopIteration) as error:
             print(f"Incomplete Linux handle census: {error}", file=sys.stderr)
             return 2
+    elif args.mode == "writer-census":
+        try:
+            emit_writer_census(census(args.path, detailed=True))
+        except CensusIncomplete:
+            print("incomplete-process-enumeration", file=sys.stderr)
+            return 2
+        except (OSError, ValueError, IndexError, StopIteration):
+            return 1
+    elif args.mode == "writer-report":
+        emit_writer_report(args.path, int(args.expected))
     elif args.mode == "tree":
         print(json.dumps(volume_tree(args.path)))
     elif args.mode == "db-digest":
