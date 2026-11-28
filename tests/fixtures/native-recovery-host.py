@@ -297,19 +297,27 @@ def diagnostic_descriptor(fd, task, info, identities, volume, volume_id, categor
     return (fd.name, inode, access), (category, kind, deleted)
 
 
+def diagnostic_slot_exists(fd):
+    try:
+        fd.lstat()
+    except GONE:
+        return False
+    except OSError:
+        raise CensusIncomplete("Live descriptor metadata could not be classified") from None
+    return True
+
+
 def descriptor_slots(task, before):
     slots = []
     for fd in list_live(task / "fd", task, before):
         if not fd.name.isdecimal():
             raise CensusIncomplete("Invalid descriptor number")
-        try:
-            fd.lstat()
-        except GONE:
+        if diagnostic_slot_exists(fd):
+            slots.append(fd)
+        else:
             # Listing our own FD directory can expose the short-lived FD used
             # by the iterator. Only retain entries still visible afterwards.
             same_task(task, before)
-        else:
-            slots.append(fd)
     return sorted(slots, key=lambda fd: int(fd.name))
 
 
@@ -338,18 +346,16 @@ def task_descriptors(task, before, identities, volume, volume_id, categorize=Non
             current = same_task(task, before)
             if current is None or (categorize and current.state in EXIT_STATES):
                 break
-            try:
-                # A descriptor can close during a successful enumeration,
-                # including the descriptor used to list our own fd directory.
-                fd.lstat()
-            except GONE:
-                if categorize and same_task(task, before) is not None:
-                    try:
-                        fd.lstat()
-                    except GONE:
-                        continue
-                    raise CensusIncomplete("Descriptor number reappeared during inspection") from error
-                continue
+            if categorize:
+                if not diagnostic_slot_exists(fd):
+                    if same_task(task, before) is not None and diagnostic_slot_exists(fd):
+                        raise CensusIncomplete("Descriptor number reappeared during inspection") from error
+                    continue
+            else:
+                try:
+                    fd.lstat()
+                except GONE:
+                    continue
             raise CensusIncomplete(f"Live descriptor {fd} could not be classified") from error
         except (OSError, ValueError, StopIteration) as error:
             raise CensusIncomplete(f"Live descriptor {fd} could not be classified") from error
@@ -1289,8 +1295,17 @@ def descriptor_race_self_test(volume, category):
         assert lifetime_rows([(321, {**table, **table})], bytes(32))["total"] == 1
         real_stat = Path.stat
 
-        def denied(entry, *args, **kwargs):
+        def denied_slot(entry):
             if entry == fd:
+                raise PermissionError("Synthetic live descriptor denial")
+            return real_lstat(entry)
+
+        real_lstat = Path.lstat
+        with patch.object(Path, "lstat", denied_slot):
+            expect_incomplete(scan, "Live descriptor metadata could not be classified")
+
+        def denied(entry, *args, **kwargs):
+            if entry == fd and kwargs.get("follow_symlinks", True):
                 raise PermissionError("Synthetic live descriptor denial")
             return real_stat(entry, *args, **kwargs)
 
@@ -1336,7 +1351,7 @@ def descriptor_race_self_test(volume, category):
         moved = task.with_name("gone")
 
         def disappears(entry, *args, **kwargs):
-            if entry == fd:
+            if entry == fd and kwargs.get("follow_symlinks", True):
                 if disappears.exit_process:
                     task.rename(moved)
                 else:
