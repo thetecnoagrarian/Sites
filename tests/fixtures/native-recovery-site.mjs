@@ -3,8 +3,10 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { createInterface } from 'node:readline';
+import { PassThrough } from 'node:stream';
 
-const [mode, site] = process.argv.slice(2);
+const [mode, site, option, observationRun] = process.argv.slice(2);
 const appRoot = '/app';
 const data = '/app/data';
 const uploads = path.join(data, 'uploads');
@@ -169,7 +171,38 @@ async function migrate() {
     announce('migration', { applied: result.applied, pending: result.pending, journal: 'delete', integrity: 'ok' });
 }
 
-async function publish(client) {
+const publicationStages = ['article-receipt', 'hero-redirect', 'hero-receipt'];
+
+async function observePublication(publish, run, input = process.stdin, emit = line => console.log(line), ackMs = 15000) {
+    assert.match(run, /^[0-9a-f]{32}$/);
+    const reader = createInterface({ input, terminal: false });
+    const lines = reader[Symbol.asyncIterator]();
+    let seq = 0;
+    const readAcknowledgement = async () => {
+        let timer;
+        try {
+            return await Promise.race([lines.next(), new Promise((_, reject) => {
+                timer = setTimeout(() => reject(new Error('Observation acknowledgement timed out')), ackMs);
+            })]);
+        } finally { clearTimeout(timer); }
+    };
+    try {
+        await publish(async (stage, gallery) => {
+            assert.equal(stage, publicationStages[seq], 'Unexpected publication stage');
+            const marker = { run, seq: ++seq, stage, nonce: randomBytes(16).toString('hex') };
+            emit(JSON.stringify({ ...marker, ...(gallery && { gallery }) }));
+            const ack = await readAcknowledgement();
+            assert(!ack.done && ack.value === JSON.stringify(marker), 'Missing or invalid observation acknowledgement');
+        });
+        assert.equal(seq, publicationStages.length, 'Missing publication stage');
+        assert((await readAcknowledgement()).done, 'Unexpected trailing observation acknowledgement');
+    } finally {
+        reader.close();
+        input.pause();
+    }
+}
+
+async function publish(client, milestone) {
     await login(client);
     const newPost = '/admin/posts/new';
     const create = '/admin/dashboard/posts/create';
@@ -217,6 +250,7 @@ async function publish(client) {
     const receipt = await (await expectStatus(await client('/admin/media-operations/' + values.mediaOperationId),
         200, 'read accepted post receipt')).json();
     assert.equal(receipt.state, 'published');
+    if (milestone) await milestone('article-receipt', JSON.parse(values.galleryKnownPhotos).map(digest));
 
     if (site === 'ffg') {
         const privateDraft = await getText(client, newPost);
@@ -237,10 +271,15 @@ async function publish(client) {
         const response = await expectStatus(await client('/admin/hero-image/upload',
             { method: 'POST', body: upload }), 302, 'publish managed hero');
         assert.equal(response.headers.get('location'), '/admin/hero-image');
+        if (milestone) {
+            await response.arrayBuffer();
+            await milestone('hero-redirect');
+        }
         const result = await (await expectStatus(await client('/admin/hero-image/operations/' + operation),
             200, 'hero receipt')).json();
         assert.equal(result.state, 'accepted');
         assert.equal(result.generation, operation);
+        if (milestone) await milestone('hero-receipt');
     }
 }
 
@@ -541,7 +580,32 @@ if (mode === '--self-test') {
         globalThis.fetch = async () => new Response(null, { status: 302, headers: { location: '/login' } });
         await assert.rejects(() => getText(anonymous, '/protected'), /returned HTTP 302, expected 200/);
     } finally { globalThis.fetch = originalFetch; }
-    console.log('Recovery fixture parsing, loopback, grant membership and anonymous-client controls passed');
+    const run = 'a'.repeat(32);
+    const mark = async milestone => { for (const stage of publicationStages) await milestone(stage); };
+    const exercise = transform => {
+        const input = new PassThrough();
+        return observePublication(mark, run, input, line => transform(JSON.parse(line), input), 100);
+    };
+    const send = (input, value) => input.write(JSON.stringify(value) + '\n');
+    await exercise((marker, input) => {
+        send(input, marker);
+        if (marker.seq === publicationStages.length) input.end();
+    });
+    let earlier;
+    for (const transform of [
+        (marker, input) => send(input, marker.seq === 1 ? (earlier = marker) : earlier),
+        (marker, input) => { send(input, marker); if (marker.seq === 1) send(input, marker); },
+        (marker, input) => send(input, { ...marker, seq: 2, stage: 'hero-redirect' }),
+        (marker, input) => send(input, { ...marker, run: 'b'.repeat(32) }),
+        (_, input) => input.write('invalid\n'),
+        (_, input) => input.end()
+    ]) await assert.rejects(exercise(transform), /invalid observation acknowledgement/);
+    await assert.rejects(exercise((marker, input) => {
+        send(input, marker);
+        if (marker.seq === publicationStages.length) send(input, marker);
+    }), /trailing observation acknowledgement/);
+    await assert.rejects(exercise(() => {}), /acknowledgement timed out/);
+    console.log('Recovery fixture parsing, loopback, grant membership, anonymous-client and milestone controls passed');
 } else {
     assert(siteName, 'Expected FFG or TTA');
     assert.equal(process.getuid(), 1001);
@@ -550,7 +614,12 @@ if (mode === '--self-test') {
     if (mode === 'seed' || mode === 'publish' || mode.startsWith('http-')) {
         assert.match(process.env.RECOVERY_PASSWORD ?? '', /^[a-f0-9]{48}$/);
     }
-    const actions = { seed, migrate, publish: () => publish(makeClient()), fingerprint: stateFingerprint,
+    assert((option === undefined && observationRun === undefined) ||
+        (option === '--observe-lifetime' && observationRun && site === 'ffg' && mode === 'publish'),
+        'Unknown synthetic fixture option');
+    const actions = { seed, migrate,
+        publish: () => option ? observePublication(milestone => publish(makeClient(), milestone), observationRun) : publish(makeClient()),
+        fingerprint: stateFingerprint,
         'http-pre': () => verifyHttp(false), 'http-post': () => verifyHttp(true),
         'http-health': () => getText(makeClient(), '/health'), faults, 'fs-probe': fsProbe, capacity };
     assert(Object.hasOwn(actions, mode), 'Unknown synthetic fixture operation');

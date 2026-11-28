@@ -292,12 +292,284 @@ else:
     check 1 'diagnostic report unavailable' '[]' 0 unwritable
 )
 
+watchdog_notice() {
+    local destination=$1
+    shift
+    local -a notice=(timeout --foreground -k 0.1s 0.1s printf "$@")
+    # Redirect the waiting shell as well as the child. A foreground signal
+    # can make Bash itself write a diagnostic before it runs the EXIT trap.
+    if [[ "$destination" == 2 ]]; then
+        { "${notice[@]}" >&3 3>&-; } 3>&2 2>/dev/null || :
+    else
+        { "${notice[@]}" >&"$destination"; } 2>/dev/null || :
+    fi
+}
+
+watchdog_command() {
+    local limit=$1
+    shift
+    # Preserve the controller's bounded stderr, but keep the watchdog and
+    # Bash's own signal notices off the console pipes.
+    { exec 3>&2; } || exec 3>/dev/null
+    exec 2>/dev/null
+    exec timeout --foreground -k 3s "$limit" bash -c 'exec "$@" 2>&3 3>&-' bash "$@"
+}
+
+lifetime() {
+    local limit status=0
+    case "$2" in
+        init:*|sample:*) limit=11s ;;
+        publish:*) limit=183s ;;
+        idle) limit=53s ;;
+        *) return 2 ;;
+    esac
+    watchdog_command "$limit" python3 "$host_check" lifetime "$scratch/ffg-lifetime.json" "$1" "$2" &
+    diagnostic_watchdog=$!
+    wait "$diagnostic_watchdog" 2>/dev/null || status=$?
+    diagnostic_watchdog=
+    if [[ "$status" == 124 || "$status" == 137 ]]; then
+        watchdog_notice 2 'FFG lifetime observation failed: controller-timeout\n'
+    fi
+    return "$status"
+}
+
+stop_owned_job() {
+    local pid=$1 attempt
+    kill -TERM "$pid" 2>/dev/null || :
+    for ((attempt = 0; attempt < 50; attempt++)); do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid" 2>/dev/null || :
+            return 0
+        fi
+        sleep 0.1
+    done
+    kill -KILL "$pid" 2>/dev/null || :
+    for ((attempt = 0; attempt < 10; attempt++)); do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            wait "$pid" 2>/dev/null || :
+            return 0
+        fi
+        sleep 0.1
+    done
+    return 1
+}
+
+observe_shutdown() {
+    local volume=$1 directory=$2 stage=$3 mounted holders status=0
+    if ! mounted=$(timeout -k 1s 10s docker ps -q --no-trunc --filter "volume=$volume" 2>/dev/null); then
+        watchdog_notice 2 'FFG shutdown safety failed: %s mount-check-unavailable\n' "$stage"
+        status=1
+    elif [[ -n "$mounted" ]]; then
+        watchdog_notice 2 'FFG shutdown safety failed: %s running-volume-mount\n' "$stage"
+        status=1
+    fi
+    # Sample even after a mount failure to report the descriptor result separately.
+    lifetime "$directory" "sample:$stage" || status=1
+    if ! holders=$(timeout -k 1s 12s sudo -n timeout -k 1s 10s python3 "$host_check" census "$directory" 2>/dev/null); then
+        watchdog_notice 2 'FFG shutdown safety failed: %s canonical-census-unavailable\n' "$stage"
+        status=1
+    elif [[ "$holders" != '[]' ]]; then
+        watchdog_notice 2 'FFG shutdown safety failed: %s surviving-publication-descriptors\n' "$stage"
+        status=1
+    fi
+    if [[ "$status" == 0 ]]; then
+        watchdog_notice 1 'FFG shutdown safety passed: %s no running mounts and zero publication descriptors\n' "$stage"
+    fi
+    return "$status"
+}
+
+stop_observed_app() {
+    local container=$1 volume=$2 directory=$3 id removed status=0
+    local format='{{.State.Running}} {{.State.Pid}} {{.HostConfig.RestartPolicy.Name}}'
+    if [[ -n "${observed_removal_id:-}" ]]; then
+        # A signal can arrive after rm but before the final descriptor census.
+        id=$observed_removal_id
+        if ! removed=$(timeout -k 1s 10s docker ps -aq --no-trunc --filter "id=$id" 2>/dev/null); then
+            watchdog_notice 2 'FFG shutdown safety failed: application-removal-unverified\n'
+            return 1
+        fi
+    else
+        if ! id=$(timeout -k 1s 10s docker inspect --format '{{.Id}} {{.HostConfig.RestartPolicy.Name}}' "$container" 2>/dev/null) ||
+            [[ ! "$id" =~ ^[0-9a-f]{64}\ no$ ]]; then
+            watchdog_notice 2 'FFG shutdown safety failed: restart-policy-or-container-identity\n'
+            return 1
+        fi
+        id=${id% no}
+        if ! timeout -k 1s 20s docker stop -t 10 "$id" >/dev/null 2>&1 ||
+            [[ "$(timeout -k 1s 10s docker inspect --format "$format" "$id" 2>/dev/null)" != 'false 0 no' ]]; then
+            watchdog_notice 2 'FFG shutdown safety failed: application-did-not-stop\n'
+            return 1
+        fi
+        watchdog_notice 1 'FFG application stopped with restart disabled and PID zero\n'
+        observe_shutdown "$volume" "$directory" after-stop || status=1
+        observed_removal_id=$id
+        removed=$id
+    fi
+    if [[ -n "$removed" ]] && {
+        ! timeout -k 1s 10s docker rm "$id" >/dev/null 2>&1 ||
+        ! removed=$(timeout -k 1s 10s docker ps -aq --no-trunc --filter "id=$id" 2>/dev/null) ||
+        [[ -n "$removed" ]]
+    }; then
+        watchdog_notice 2 'FFG shutdown safety failed: application-removal-unverified\n'
+        return 1
+    fi
+    watchdog_notice 1 'FFG application removal verified\n'
+    observe_shutdown "$volume" "$directory" after-removal || status=1
+    observed_container= observed_removal_id=
+    return "$status"
+}
+
+publish_observed_ffg() {
+    local container=$1 volume=$2 lifetime_volume application_pid writer_status=not-run diagnostic_status=0 idle_status=0
+    if ! lifetime_volume=$(volume_path "$volume" bounded 2>/dev/null); then
+        watchdog_notice 2 'FFG lifetime observation failed: unable to resolve diagnostic volume\n'
+        exit 1
+    fi
+    observed_volume=$volume observed_directory=$lifetime_volume observed_container=$container
+    if application_pid=$(timeout -k 1s 10s docker inspect --format '{{.State.Pid}}' "$container" 2>/dev/null); then
+        lifetime "$lifetime_volume" "init:$application_pid" && lifetime "$lifetime_volume" sample:startup &&
+            lifetime "$lifetime_volume" "publish:$container" || diagnostic_status=$?
+    else
+        watchdog_notice 2 'FFG lifetime observation failed: application-pid-unavailable\n'
+        diagnostic_status=1
+    fi
+    if [[ "$diagnostic_status" == 0 ]]; then
+        # Run the canonical check before idle observations can change the result.
+        writer_status=0
+        (one_writer "$container" "$volume" ffg post-publication) || writer_status=$?
+        lifetime "$lifetime_volume" sample:publication-complete || diagnostic_status=$?
+        lifetime "$lifetime_volume" idle || idle_status=$?
+        [[ "$diagnostic_status" != 0 ]] || diagnostic_status=$idle_status
+    fi
+    if [[ "$writer_status" != 0 || "$diagnostic_status" != 0 ]]; then
+        stop_observed_app "$container" "$volume" "$lifetime_volume" ||
+            watchdog_notice 2 'FFG shutdown safety failed during diagnostic teardown\n'
+        watchdog_notice 2 'FFG recovery stopped before checkpoint: writer-status=%s diagnostic-status=%s\n' \
+            "$writer_status" "$diagnostic_status"
+        if [[ "$writer_status" != 0 && "$writer_status" != not-run ]]; then exit "$writer_status"; fi
+        exit "$diagnostic_status"
+    fi
+}
+
+lifetime_shell_self_test() (
+    local mock_mount= mock_holders='[]' mock_removed=no mock_id result status=0 real_watchdog
+    real_watchdog=$(declare -f watchdog_notice lifetime)
+    printf -v mock_id '%064d' 1
+    timeout() { if [[ "$1" == --foreground ]]; then shift; fi; shift 3; "$@"; }
+    sudo() { printf '%s\n' "$mock_holders"; }
+    volume_path() { printf '/synthetic-volume\n'; }
+    lifetime() { :; }
+    docker() {
+        case "$1" in
+            inspect)
+                case "$3" in
+                    '{{.Id}} {{.HostConfig.RestartPolicy.Name}}') printf '%s no\n' "$mock_id" ;;
+                    '{{.State.Running}} {{.State.Pid}} {{.HostConfig.RestartPolicy.Name}}') printf 'false 0 no\n' ;;
+                    '{{.State.Pid}}') printf '321\n' ;;
+                    *) return 2 ;;
+                esac ;;
+            stop) : ;;
+            rm) mock_removed=yes ;;
+            ps)
+                if [[ "$2" == -aq ]]; then
+                    [[ "$mock_removed" == yes ]] || printf '%s\n' "$mock_id"
+                else
+                    printf '%s' "$mock_mount"
+                fi ;;
+            *) return 2 ;;
+        esac
+    }
+
+    result=$(stop_observed_app app volume /synthetic-volume 2>&1) ||
+        fail "shutdown control rejected a closed volume"
+    [[ "$result" == *'passed: after-stop'* && "$result" == *'passed: after-removal'* ]] ||
+        fail "shutdown control omitted a closed observation"
+
+    mock_mount=unexpected
+    result=$(stop_observed_app app volume /synthetic-volume 2>&1) || status=$?
+    [[ "$status" == 1 && "$result" == *'after-stop running-volume-mount'* &&
+       "$result" == *'after-removal running-volume-mount'* ]] || fail "shutdown control accepted a surviving mount"
+
+    mock_mount= mock_holders='[[321, 0]]' status=0
+    result=$(stop_observed_app app volume /synthetic-volume 2>&1) || status=$?
+    [[ "$status" == 1 && "$result" == *'after-stop surviving-publication-descriptors'* &&
+       "$result" == *'after-removal surviving-publication-descriptors'* ]] || fail "shutdown control accepted a surviving descriptor"
+
+    one_writer() { exit 47; }
+    status=0
+    result=$(publish_observed_ffg app volume 2>&1) || status=$?
+    [[ "$status" == 47 && "$result" == *'shutdown safety failed during diagnostic teardown'* &&
+       "$result" == *'stopped before checkpoint: writer-status=47 diagnostic-status=0'* ]] ||
+        fail "diagnostic teardown masked the writer failure"
+
+    mock_holders='[]' status=0
+    lifetime() {
+        if [[ "$2" == sample:publication-complete ]]; then
+            printf 'synthetic diagnostic formatting failure\n' >&2
+            return 9
+        fi
+    }
+    result=$(publish_observed_ffg app volume 2>&1) || status=$?
+    [[ "$status" == 47 && "$result" == *'synthetic diagnostic formatting failure'* &&
+       "$result" == *'passed: after-removal'* && "$result" == *'writer-status=47 diagnostic-status=9'* ]] ||
+        fail "formatter failure was hidden or changed the writer failure"
+
+    one_writer() { return 0; }
+    lifetime() {
+        case "$2" in
+            sample:publication-complete) return 124 ;;
+            idle) return 9 ;;
+        esac
+    }
+    status=0
+    result=$(publish_observed_ffg app volume 2>&1) || status=$?
+    [[ "$status" == 124 && "$result" == *'passed: after-removal'* &&
+       "$result" == *'writer-status=0 diagnostic-status=124'* ]] || fail "idle failure replaced the primary timeout"
+
+    # Exercise the real shell warning on a full pipe. Only the diagnostic
+    # command is stubbed. The warning must return without a reader draining it.
+    python3 -c '
+import os
+import subprocess
+import sys
+
+read_fd, write_fd = os.pipe()
+try:
+    os.set_blocking(write_fd, False)
+    try:
+        while True:
+            os.write(write_fd, b"x" * 512)
+    except BlockingIOError:
+        pass
+    os.set_blocking(write_fd, True)
+    stub = """
+set -euo pipefail
+scratch=/synthetic
+host_check=unused
+watchdog_command() { exit 124; }
+"""
+    command = stub + sys.argv[1] + "\nlifetime /synthetic-volume sample:startup\n"
+    result = subprocess.run(["bash", "-c", command], stderr=write_fd, timeout=2)
+    assert result.returncode == 124, result.returncode
+finally:
+    os.close(read_fd)
+    os.close(write_fd)
+' "$real_watchdog"
+
+    printf 'Lifetime shell controls passed: closed shutdown, surviving mount and descriptor, preserved writer failure, full watchdog stderr\n'
+)
+
 if [[ "${1:-}" == --database-self-test ]]; then
     database_self_test
     exit
 fi
 if [[ "${1:-}" == --writer-self-test ]]; then
     writer_self_test
+    exit
+fi
+
+if [[ "${1:-}" == --lifetime-self-test ]]; then
+    lifetime_shell_self_test
     exit
 fi
 
@@ -345,9 +617,20 @@ cleanup() {
     return "$status"
 }
 
+bounded_cleanup() {
+    # Run precisely the same label-scoped cleanup with a deadline for its
+    # Docker client and filesystem operations. The fallback CI step can retry.
+    { timeout -k 2s 90s bash -euc "$(declare -f cleanup)"'
+scratch=$1 tag=$2 label=$3
+cleanup' bash "$scratch" "$tag" "$label"; } >/dev/null 2>&1
+}
+
 if [[ "${1:-}" == --cleanup ]]; then
     # A failed checkout or an unavailable daemon before provisioning owns nothing.
-    [[ ! -f "$scratch/.recovery-run" ]] || cleanup
+    if [[ -f "$scratch/.recovery-run" ]] && ! bounded_cleanup; then
+        watchdog_notice 2 'Recovery resource cleanup failed independently of the rehearsal result\n'
+        exit 1
+    fi
     exit
 fi
 
@@ -372,19 +655,10 @@ architecture=$(docker version --format '{{.Server.Arch}}')
 mkdir -- "$scratch"
 printf '%s\n' "$tag" > "$scratch/.recovery-run"
 monitor=
-finish() {
-    local status=$?
-    trap - EXIT
-    if [[ -n "$monitor" ]]; then
-        kill "$monitor" 2>/dev/null || true
-        wait "$monitor" 2>/dev/null || true
-    fi
-    if [[ -e "$scratch/usage-incomplete" ]]; then
-        printf "Runner filesystem sampling failed.\n" >&2
-        status=1
-    fi
-    if [[ -s "$scratch/usage" ]]; then
-        awk '
+diagnostic_watchdog=
+observed_container= observed_removal_id=
+usage_report() {
+    { timeout --foreground -k 0.2s 2s awk '
             NF == 5 {
                 if (!seen[$1]++) { blocks[$1] = $2; inodes[$1] = $4 }
                 peak_blocks[$1] = ($2 > peak_blocks[$1] ? $2 : peak_blocks[$1])
@@ -397,9 +671,53 @@ finish() {
                 for (fs in seen)
                     printf "- %s: peak increase %.0f allocated bytes and %.0f inodes; minimum free %.0f bytes and %.0f inodes.\n", fs, (peak_blocks[fs]-blocks[fs]), (peak_inodes[fs]-inodes[fs]), free[fs], ifree[fs]
             }
-        ' "$scratch/usage" | tee -a "$GITHUB_STEP_SUMMARY" || status=1
+        ' "$scratch/usage"; } 2>/dev/null
+}
+
+deliver_usage_report() {
+    [[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 1
+    # Open the destination inside the timed child, since a FIFO can block
+    # before a shell redirection has even completed.
+    { timeout --foreground -k 0.2s 1s bash -c 'printf "%s\n" "$2" >> "$1"' \
+        bash "$GITHUB_STEP_SUMMARY" "$1"; } >/dev/null 2>&1
+}
+
+finish() {
+    local status=$? report= report_failed=0
+    trap - EXIT
+    # Catchable harness signals interrupt lifetime's wait. Stop its owned
+    # watchdog first so it can forward the signal and reap its controller.
+    if [[ -n "$diagnostic_watchdog" ]] && ! stop_owned_job "$diagnostic_watchdog"; then
+        watchdog_notice 2 'Recovery diagnostic watchdog did not exit after termination\n'
+        [[ "$status" != 0 ]] || status=1
     fi
-    if ! cleanup; then status=1; fi
+    diagnostic_watchdog=
+    if [[ -n "$monitor" ]] && ! stop_owned_job "$monitor"; then
+        watchdog_notice 2 'Runner filesystem monitor did not exit after termination\n'
+        [[ "$status" != 0 ]] || status=1
+    fi
+    if [[ -e "$scratch/usage-incomplete" ]]; then
+        watchdog_notice 2 'Runner filesystem sampling failed.\n'
+        [[ "$status" != 0 ]] || status=1
+    fi
+    # Complete the observed FFG shutdown before the label-scoped fallback.
+    if [[ "$status" == 130 || "$status" == 143 ]] && [[ -n "${observed_container:-}" ]] &&
+        ! stop_observed_app "$observed_container" "$observed_volume" "$observed_directory"; then
+        watchdog_notice 2 'FFG shutdown safety failed during signal teardown\n'
+    fi
+    if [[ -s "$scratch/usage" ]] && ! report=$(usage_report); then
+        report_failed=1
+        [[ "$status" != 0 ]] || status=1
+    fi
+    if ! bounded_cleanup; then
+        watchdog_notice 2 'Recovery resource cleanup failed independently of the rehearsal result\n'
+        [[ "$status" != 0 ]] || status=1
+    fi
+    if [[ "$report_failed" == 1 ]]; then
+        watchdog_notice 2 'Runner filesystem high-water report generation failed\n'
+    elif [[ -n "$report" ]] && ! deliver_usage_report "$report"; then
+        watchdog_notice 2 'Runner filesystem high-water report could not be written to the step summary\n'
+    fi
     exit "$status"
 }
 trap finish EXIT
@@ -454,6 +772,8 @@ for release in candidate historical; do
 done
 
 TMPDIR="$scratch" python3 "$host_check" self-test
+TMPDIR="$scratch" python3 "$host_check" lifetime-self-test
+lifetime_shell_self_test
 sudo -n env TMPDIR="$scratch" python3 "$host_check" census-self-test
 docker run --rm --network none --label "$label" --read-only --tmpfs /tmp:rw,nosuid,nodev,mode=1777 \
     --entrypoint bash "${images[ffg-candidate]}" -euc "$(declare -f verify_database database_self_test)
@@ -472,7 +792,11 @@ job() {
 }
 volume_path() {
     local directory
-    directory=$(docker volume inspect --format '{{.Mountpoint}}' "$1") || return 1
+    if [[ "${2:-}" == bounded ]]; then
+        directory=$(timeout -k 1s 10s docker volume inspect --format '{{.Mountpoint}}' "$1" 2>/dev/null) || return 1
+    else
+        directory=$(docker volume inspect --format '{{.Mountpoint}}' "$1") || return 1
+    fi
     [[ "$directory" == "$docker_root"/volumes/"$1"/_data ]] || fail "unexpected data mountpoint"
     printf '%s\n' "$directory"
 }
@@ -637,8 +961,12 @@ for site in ffg tta; do
     job "$new" "$migrated" '' fs-probe "$site" | tee -a "$GITHUB_STEP_SUMMARY"
     job "$new" "$migrated" '' migrate "$site" | tee -a "$GITHUB_STEP_SUMMARY"
     start_app "$app" "$new" "$migrated" "$site" pre-publication-startup
-    docker exec "$app" node /recovery.mjs publish "$site"
-    one_writer "$app" "$migrated" "$site" post-publication
+    if [[ "$site" == ffg ]]; then
+        publish_observed_ffg "$app" "$migrated"
+    else
+        docker exec "$app" node /recovery.mjs publish "$site"
+        one_writer "$app" "$migrated" "$site" post-publication
+    fi
     if checkpoint "$site" "$new" "$migrated" active; then
         fail "checkpoint proceeded with an admitted publication writer"
     else
@@ -646,7 +974,15 @@ for site in ffg tta; do
            ! -e "$scratch/sets/$site/.staging-backup-set-active" ]] || fail "checkpoint refusal was inconclusive"
         printf -- '- %s: checkpoint refused while its one publication writer was active.\n' "$site" >> "$GITHUB_STEP_SUMMARY"
     fi
-    stop_app "$app" "$migrated"
+    if [[ "$site" == ffg ]]; then
+        if ! lifetime_volume=$(volume_path "$migrated" bounded 2>/dev/null); then
+            watchdog_notice 2 'FFG shutdown safety failed: unable to resolve diagnostic volume\n'
+            exit 1
+        fi
+        stop_observed_app "$app" "$migrated" "$lifetime_volume"
+    else
+        stop_app "$app" "$migrated"
+    fi
     job "$new" "$migrated" readonly fingerprint "$site" | tee "$scratch/$site.fingerprint"
     checkpoint "$site" "$new" "$migrated" post
 
